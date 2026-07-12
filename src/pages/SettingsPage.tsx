@@ -27,7 +27,7 @@ import {
 
 export const SettingsPage = () => {
     const {
-        settingsLoading, settingsLoadError,
+        settingsLoading, settingsLoadError, settingsSaveError,
         nextPriority, setNextPriority,
         staffList, addStaff, removeStaff,
         printers, addPrinter, removePrinter,
@@ -183,9 +183,9 @@ export const SettingsPage = () => {
                     </div>
                 </div>
 
-                {settingsLoadError && (
+                {(settingsLoadError || settingsSaveError) && (
                     <div className="mt-4 rounded-lg border border-rose-300 bg-rose-100 px-4 py-3 text-sm font-bold text-rose-900">
-                        {settingsLoadError}
+                        {settingsLoadError || settingsSaveError}
                     </div>
                 )}
             </section>

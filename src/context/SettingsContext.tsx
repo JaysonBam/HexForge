@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '../lib/supabaseClient';
 import {
@@ -34,6 +34,7 @@ export interface Module {
 interface SettingsContextType {
   settingsLoading: boolean;
   settingsLoadError: string | null;
+  settingsSaveError: string | null;
   staffList: string[];
   printers: string[];
   brands: string[];
@@ -67,6 +68,7 @@ interface SettingsContextType {
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
+const SETTINGS_SAVE_DEBOUNCE_MS = 600;
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const useSettings = () => {
@@ -80,6 +82,9 @@ export const useSettings = () => {
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [settingsLoadError, setSettingsLoadError] = useState<string | null>(null);
+  const [settingsSaveError, setSettingsSaveError] = useState<string | null>(null);
+  const saveTimersRef = useRef<Record<string, number>>({});
+  const skippedInitialSaveRef = useRef<Set<string>>(new Set());
   
   const [nextPriority, setNextPriority] = useState<number>(1);
   const [staffList, setStaffList] = useState<string[]>([]);
@@ -131,39 +136,68 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     loadConfig();
   }, []);
 
+  const queueConfigSave = useCallback((key: string, value: unknown) => {
+    if (!isLoaded || settingsLoadError) return;
+
+    setSettingsSaveError(null);
+
+    if (!skippedInitialSaveRef.current.has(key)) {
+      skippedInitialSaveRef.current.add(key);
+      return;
+    }
+
+    window.clearTimeout(saveTimersRef.current[key]);
+    saveTimersRef.current[key] = window.setTimeout(() => {
+      delete saveTimersRef.current[key];
+      void (async () => {
+        try {
+          const { error } = await supabase.from('config').upsert({ key, value });
+          if (error) {
+            setSettingsSaveError(error.message || `Failed to save ${key}.`);
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : `Failed to save ${key}.`;
+          setSettingsSaveError(message);
+        }
+      })();
+    }, SETTINGS_SAVE_DEBOUNCE_MS);
+  }, [isLoaded, settingsLoadError]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(saveTimersRef.current).forEach((timerId) => window.clearTimeout(timerId));
+      saveTimersRef.current = {};
+    };
+  }, []);
+
   // Persistence
   useEffect(() => {
-    if (isLoaded && !settingsLoadError) supabase.from('config').upsert({ key: 'settings_next_priority', value: nextPriority }).then();
-  }, [nextPriority, isLoaded, settingsLoadError]);
+    queueConfigSave('settings_next_priority', nextPriority);
+  }, [nextPriority, queueConfigSave]);
 
   useEffect(() => {
-    if (isLoaded && !settingsLoadError) supabase.from('config').upsert({ key: 'settings_staff', value: staffList }).then();
-  }, [staffList, isLoaded, settingsLoadError]);
+    queueConfigSave('settings_staff', staffList);
+  }, [staffList, queueConfigSave]);
 
   useEffect(() => {
-    if (isLoaded && !settingsLoadError) supabase.from('config').upsert({ key: 'settings_printers', value: printers }).then();
-  }, [printers, isLoaded, settingsLoadError]);
+    queueConfigSave('settings_printers', printers);
+  }, [printers, queueConfigSave]);
 
   useEffect(() => {
-    if (isLoaded && !settingsLoadError) supabase.from('config').upsert({ key: 'settings_brands', value: brands }).then();
-  }, [brands, isLoaded, settingsLoadError]);
+    queueConfigSave('settings_brands', brands);
+  }, [brands, queueConfigSave]);
 
   useEffect(() => {
-    if (isLoaded && !settingsLoadError) supabase.from('config').upsert({ key: 'settings_modules', value: modules }).then();
-  }, [modules, isLoaded, settingsLoadError]);
+    queueConfigSave('settings_modules', modules);
+  }, [modules, queueConfigSave]);
 
   useEffect(() => {
-    if (isLoaded && !settingsLoadError) supabase.from('config').upsert({ key: 'settings_filaments', value: filaments }).then();
-  }, [filaments, isLoaded, settingsLoadError]);
+    queueConfigSave('settings_filaments', filaments);
+  }, [filaments, queueConfigSave]);
 
   useEffect(() => {
-    if (isLoaded && !settingsLoadError) {
-      supabase.from('config').upsert({
-        key: 'settings_provided_filament_price_per_gram',
-        value: providedFilamentPricePerGram
-      }).then();
-    }
-  }, [providedFilamentPricePerGram, isLoaded, settingsLoadError]);
+    queueConfigSave('settings_provided_filament_price_per_gram', providedFilamentPricePerGram);
+  }, [providedFilamentPricePerGram, queueConfigSave]);
 
   // Actions
   const addStaff = (name: string) => setStaffList(prev => [...prev, name]);
@@ -286,6 +320,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     <SettingsContext.Provider value={{
       settingsLoading: !isLoaded,
       settingsLoadError,
+      settingsSaveError,
       nextPriority, setNextPriority,
       staffList, printers, brands, modules, filaments, providedFilamentPricePerGram,
       getFilamentPrice, setProvidedFilamentPricePerGram,
