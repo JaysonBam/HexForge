@@ -393,6 +393,13 @@ const saveReceipt = async (request: Request) => {
     }, 400);
   }
 
+  if (!receiptNumber) {
+    return jsonResponse({
+      error: 'missing_receipt_number',
+      error_description: 'Enter a receipt number before saving.'
+    }, 400);
+  }
+
   const response = await hexForgeRest(`projects?id=eq.${encodeURIComponent(projectCode)}`, {
     method: 'PATCH',
     headers: {
@@ -455,57 +462,27 @@ const collectParts = async (request: Request) => {
     }, 400);
   }
 
-  const results: Array<{ part_id: string; result: TransitionResult }> = [];
+  const result = await rpc<TransitionResult>('collect_project_parts', {
+    p_project_id: projectCode,
+    p_part_ids: partIds,
+    p_technician_name: collectorName,
+    p_collected_by_student_number: collectedByStudentNumber
+  });
 
-  for (const partId of partIds) {
-    const result = await rpc<TransitionResult>('transition_part_status', {
-      p_project_id: projectCode,
-      p_part_id: partId,
-      p_action: 'COLLECT_PART',
-      p_technician_name: collectorName,
-      p_machine_name: null,
-      p_reason: null
-    });
-
-    results.push({ part_id: partId, result });
-
-    if (!result?.ok) {
-      return jsonResponse({
-        error: 'collection_failed',
-        error_description: Array.isArray(result?.errors) && result.errors.length
-          ? result.errors.join(' ')
-          : 'HexForge rejected the collection action.',
-        data: {
-          results,
-          project: await getProjectContext(projectCode)
-        }
-      }, 409);
-    }
-
-    const updateResponse = await hexForgeRest(`parts?id=eq.${encodeURIComponent(partId)}`, {
-      method: 'PATCH',
-      headers: {
-        Prefer: 'return=minimal'
-      },
-      body: JSON.stringify({ collectedByStudentNumber })
-    });
-
-    if (!updateResponse.ok) {
-      const payload = await readErrorPayload(updateResponse);
-      return jsonResponse({
-        error: 'collector_student_number_save_failed',
-        error_description: payload.message || 'The part was collected, but the collector student number was not saved.',
-        data: {
-          results,
-          project: await getProjectContext(projectCode)
-        }
-      }, updateResponse.status);
-    }
+  if (!result?.ok) {
+    return jsonResponse({
+      error: 'collection_failed',
+      error_description: Array.isArray(result?.errors) && result.errors.length
+        ? result.errors.join(' ')
+        : 'HexForge rejected the collection action.',
+      data: {
+        project: await getProjectContext(projectCode)
+      }
+    }, 409);
   }
 
   return jsonResponse({
     data: {
-      results,
       project: await getProjectContext(projectCode)
     }
   });

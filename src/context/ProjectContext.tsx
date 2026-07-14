@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { Part, PrintRun, Project, QuoteSnapshot } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { normalizePartVerification } from '../domain/partVerification';
@@ -20,6 +20,18 @@ import type {
 } from './project/types';
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
+const EDIT_SAVE_DEBOUNCE_MS = 600;
+
+type QueuedProjectUpdate = {
+  updates: Partial<Project>;
+  timerId: number;
+};
+
+type QueuedPartUpdate = {
+  projectId: string;
+  updates: Partial<Part>;
+  timerId: number;
+};
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const useProjects = () => {
@@ -37,6 +49,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [activeFilter, setActiveFilter] = useState<string>('All');
   const [pendingWrites, setPendingWrites] = useState(0);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const queuedProjectUpdatesRef = useRef<Map<string, QueuedProjectUpdate>>(new Map());
+  const queuedPartUpdatesRef = useRef<Map<string, QueuedPartUpdate>>(new Map());
 
   const refreshProjects = useCallback(async () => {
     try {
@@ -181,9 +195,116 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [refreshProjects]);
 
+  const flushQueuedProjectUpdate = useCallback((id: string) => {
+    const queued = queuedProjectUpdatesRef.current.get(id);
+    if (!queued) return Promise.resolve(true);
+
+    window.clearTimeout(queued.timerId);
+    queuedProjectUpdatesRef.current.delete(id);
+
+    return trackMutation('Update project', () => supabase.from('projects').update(queued.updates).eq('id', id));
+  }, [trackMutation]);
+
+  const flushQueuedPartUpdate = useCallback((partId: string) => {
+    const queued = queuedPartUpdatesRef.current.get(partId);
+    if (!queued) return Promise.resolve(true);
+
+    window.clearTimeout(queued.timerId);
+    queuedPartUpdatesRef.current.delete(partId);
+
+    return trackMutation('Update part', () => supabase.from('parts').update(queued.updates).eq('id', partId));
+  }, [trackMutation]);
+
+  const queueProjectUpdate = useCallback((id: string, updates: Partial<Project>) => {
+    const existing = queuedProjectUpdatesRef.current.get(id);
+    if (existing) window.clearTimeout(existing.timerId);
+
+    const queued: QueuedProjectUpdate = {
+      updates: { ...(existing?.updates ?? {}), ...updates },
+      timerId: window.setTimeout(() => {
+        void flushQueuedProjectUpdate(id);
+      }, EDIT_SAVE_DEBOUNCE_MS)
+    };
+
+    queuedProjectUpdatesRef.current.set(id, queued);
+  }, [flushQueuedProjectUpdate]);
+
+  const queuePartUpdate = useCallback((projectId: string, partId: string, updates: Partial<Part>) => {
+    const existing = queuedPartUpdatesRef.current.get(partId);
+    if (existing) window.clearTimeout(existing.timerId);
+
+    const queued: QueuedPartUpdate = {
+      projectId,
+      updates: { ...(existing?.updates ?? {}), ...updates },
+      timerId: window.setTimeout(() => {
+        void flushQueuedPartUpdate(partId);
+      }, EDIT_SAVE_DEBOUNCE_MS)
+    };
+
+    queuedPartUpdatesRef.current.set(partId, queued);
+  }, [flushQueuedPartUpdate]);
+
+  const flushQueuedUpdatesForProject = useCallback(async (projectId: string) => {
+    const partFlushes = Array.from(queuedPartUpdatesRef.current.entries())
+      .filter(([, queued]) => queued.projectId === projectId)
+      .map(([partId]) => flushQueuedPartUpdate(partId));
+
+    const results = await Promise.all([
+      flushQueuedProjectUpdate(projectId),
+      ...partFlushes
+    ]);
+
+    return results.every(Boolean);
+  }, [flushQueuedPartUpdate, flushQueuedProjectUpdate]);
+
+  const discardQueuedUpdatesForProject = useCallback((projectId: string) => {
+    const queuedProject = queuedProjectUpdatesRef.current.get(projectId);
+    if (queuedProject) {
+      window.clearTimeout(queuedProject.timerId);
+      queuedProjectUpdatesRef.current.delete(projectId);
+    }
+
+    Array.from(queuedPartUpdatesRef.current.entries()).forEach(([partId, queued]) => {
+      if (queued.projectId !== projectId) return;
+      window.clearTimeout(queued.timerId);
+      queuedPartUpdatesRef.current.delete(partId);
+    });
+  }, []);
+
+  const discardQueuedPartUpdate = useCallback((partId: string) => {
+    const queuedPart = queuedPartUpdatesRef.current.get(partId);
+    if (!queuedPart) return;
+    window.clearTimeout(queuedPart.timerId);
+    queuedPartUpdatesRef.current.delete(partId);
+  }, []);
+
   useEffect(() => {
     refreshProjects();
   }, [refreshProjects]);
+
+  useEffect(() => {
+    const queuedProjectUpdates = queuedProjectUpdatesRef.current;
+    const queuedPartUpdates = queuedPartUpdatesRef.current;
+
+    return () => {
+      queuedProjectUpdates.forEach((queued, projectId) => {
+        window.clearTimeout(queued.timerId);
+        void supabase.from('projects').update(queued.updates).eq('id', projectId)
+          .then(({ error }) => {
+            if (error) console.error('Failed to persist a pending project update during teardown:', error);
+          });
+      });
+      queuedPartUpdates.forEach((queued, partId) => {
+        window.clearTimeout(queued.timerId);
+        void supabase.from('parts').update(queued.updates).eq('id', partId)
+          .then(({ error }) => {
+            if (error) console.error('Failed to persist a pending part update during teardown:', error);
+          });
+      });
+      queuedProjectUpdates.clear();
+      queuedPartUpdates.clear();
+    };
+  }, []);
 
   const getProject = (id: string) => projects.find(p => p.id === id);
 
@@ -250,7 +371,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     setProjects(prev => prev.map(p => p.id === id ? { ...p, ...updateData } : p));
-    void trackMutation('Update project', () => supabase.from('projects').update(updateData).eq('id', id));
+    queueProjectUpdate(id, updateData);
   };
 
   const deleteProject = async (id: string) => {
@@ -258,6 +379,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (!project) {
       return false;
     }
+
+    discardQueuedUpdatesForProject(id);
 
     try {
       await removeProjectPartThumbnails(project.parts);
@@ -315,10 +438,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       };
     }));
 
-    void trackMutation('Update part', () => supabase.from('parts').update(updateData).eq('id', partId));
+    queuePartUpdate(projectId, partId, updateData);
   };
 
   const deletePart = (projectId: string, partId: string) => {
+    discardQueuedPartUpdate(partId);
+
     (async () => {
       try {
         const project = getProject(projectId);
@@ -413,6 +538,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     overrideNote,
     printLabel
   }) => {
+    const queuedSavesOk = await flushQueuedUpdatesForProject(projectId);
+    if (!queuedSavesOk) {
+      return { ok: false, errors: ['Pending project edits could not be saved. Please try again.'] };
+    }
+
     const previousProjects = projects;
     const optimisticProjects = applyOptimisticProjectTransition(previousProjects, { projectId, action, printLabel });
     if (optimisticProjects !== previousProjects) {
@@ -473,6 +603,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     machineName,
     reason
   }) => {
+    const queuedProjectSavesOk = await flushQueuedProjectUpdate(projectId);
+    const queuedPartSaveOk = await flushQueuedPartUpdate(partId);
+    if (!queuedProjectSavesOk || !queuedPartSaveOk) {
+      return { ok: false, errors: ['Pending part edits could not be saved. Please try again.'] };
+    }
+
     const previousProjects = projects;
     const optimisticProjects = applyOptimisticPartTransition(previousProjects, {
       projectId,

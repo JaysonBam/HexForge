@@ -7,12 +7,18 @@ import { StaffSessionProvider } from '../context/StaffSessionContext';
 
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
+    <BrowserRouter>
+      <FeedbackProvider>{children}</FeedbackProvider>
+    </BrowserRouter>
+  );
+}
+
+export function WorkspaceProviders({ children }: { children: ReactNode }) {
+  return (
     <ProjectProvider>
       <SettingsProvider>
         <StaffSessionProvider>
-          <BrowserRouter>
-            <FeedbackProvider>{children}</FeedbackProvider>
-          </BrowserRouter>
+          {children}
         </StaffSessionProvider>
       </SettingsProvider>
     </ProjectProvider>
