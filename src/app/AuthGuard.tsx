@@ -11,15 +11,11 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data, error }) => {
-      setAuthenticated(!error && Boolean(data?.user));
-      setLoading(false);
-    });
-
     const {
       data: { subscription }
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setAuthenticated(Boolean(session));
+      setLoading(false);
       if (session) {
         syncGoogleProviderTokensFromSession(session);
       } else {

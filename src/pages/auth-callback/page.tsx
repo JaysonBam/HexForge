@@ -108,8 +108,8 @@ export default function AuthCallbackPage() {
         const identityData = googleIdentity?.identity_data || {}
         const fullName = metadata.full_name || metadata.name || identityData.full_name || identityData.name
         const profileUrl = metadata.avatar_url || metadata.picture || identityData.avatar_url || identityData.picture
-        if (typeof fullName === 'string' && fullName.trim()) updates.full_name = fullName
-        if (typeof profileUrl === 'string' && profileUrl.trim()) updates.profile_url = profileUrl
+        if (typeof fullName === 'string' && fullName.trim() && fullName !== profile.full_name) updates.full_name = fullName
+        if (typeof profileUrl === 'string' && profileUrl.trim() && profileUrl !== profile.profile_url) updates.profile_url = profileUrl
 
         if (profile.status === 'pending') {
           updates.status = 'active'
@@ -123,10 +123,12 @@ export default function AuthCallbackPage() {
 
           if (updateErr) {
             console.error('Profile update error', updateErr)
-            await supabase.auth.signOut()
-            const msg = (updateErr && (updateErr.message || String(updateErr))) || 'update_error'
-            window.location.href = '/login?error=' + encodeURIComponent('update: ' + msg)
-            return
+            if (!profile.id || profile.status === 'pending') {
+              await supabase.auth.signOut()
+              const msg = (updateErr && (updateErr.message || String(updateErr))) || 'update_error'
+              window.location.href = '/login?error=' + encodeURIComponent('update: ' + msg)
+              return
+            }
           }
         }
 

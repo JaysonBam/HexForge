@@ -32,14 +32,38 @@ Deno.serve(async (request) => {
     return jsonResponse({ error: 'method_not_allowed' }, 405);
   }
 
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
   const googleClientId = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID');
   const googleClientSecret = Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET');
 
-  if (!googleClientId || !googleClientSecret) {
+  if (!supabaseUrl || !supabaseAnonKey || !googleClientId || !googleClientSecret) {
     return jsonResponse({
       error: 'server_config_missing',
-      error_description: 'GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET must be set as Supabase Edge Function secrets.'
+      error_description: 'Required Supabase or Google OAuth environment variables are missing.'
     }, 500);
+  }
+
+  const authorization = request.headers.get('Authorization');
+  if (!authorization) {
+    return jsonResponse({ error: 'unauthorized' }, 401);
+  }
+
+  // The profiles RLS policy returns a row only for an authenticated, allow-listed user.
+  const profileResponse = await fetch(`${supabaseUrl}/rest/v1/profiles?select=email&limit=1`, {
+    headers: {
+      apikey: supabaseAnonKey,
+      Authorization: authorization
+    }
+  });
+
+  if (!profileResponse.ok) {
+    return jsonResponse({ error: 'authorization_check_failed' }, 502);
+  }
+
+  const profiles = await profileResponse.json().catch(() => []);
+  if (!Array.isArray(profiles) || profiles.length === 0) {
+    return jsonResponse({ error: 'forbidden' }, 403);
   }
 
   let refreshToken: string | undefined;
