@@ -12,6 +12,7 @@ import { createGmailDraft, GmailAuthError, requestGmailDraftAccess } from '../..
 import { createQuotePdfBytes, loadQuoteLogoImage } from '../../utils/quotePdfUtils';
 import { renderEmailTemplate } from '../../domain/emailTemplates';
 import { buildProjectQuoteAttachment } from '../../utils/projectQuoteAttachment';
+import { copyRichTextToClipboard } from '../../utils/clipboardUtils';
 import {
   getPartFilamentSource,
   isProvidedFilamentSource
@@ -330,7 +331,7 @@ export const CheckpointConfirmation = ({ project }: { project: Project }) => {
       return;
     }
 
-    await navigator.clipboard.writeText(emailContent);
+    await copyRichTextToClipboard(emailContent, communicationEmail.htmlBody);
     notify({ message: 'Email content copied to clipboard.', tone: 'success' });
   };
 

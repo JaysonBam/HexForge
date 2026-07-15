@@ -11,6 +11,7 @@ import { getStudentEmail, isCollectionBlocked } from '../../domain/operations';
 import { createGmailDraft, GmailAuthError, requestGmailDraftAccess } from '../../utils/gmailDraftUtils';
 import { renderEmailTemplate } from '../../domain/emailTemplates';
 import { buildProjectQuoteAttachment } from '../../utils/projectQuoteAttachment';
+import { copyRichTextToClipboard } from '../../utils/clipboardUtils';
 import {
     getPartFilamentSource,
     isProvidedFilamentSource
@@ -137,7 +138,7 @@ export const CheckpointCollection = ({ project }: { project: Project }) => {
     const emailContent = communicationEmail.plainBody;
 
     const copyToClipboard = async () => {
-        await navigator.clipboard.writeText(emailContent);
+        await copyRichTextToClipboard(emailContent, communicationEmail.htmlBody);
         notify({ message: 'Email content copied to clipboard.', tone: 'success' });
     };
 
