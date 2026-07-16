@@ -58,6 +58,7 @@ schema_paths = [
 	"./schemas/projects.sql",
 	"./schemas/parts.sql",
 	"./schemas/workflow.sql",
+	"./schemas/bookings_collection.sql",
 	"./schemas/vendors.sql",
 	"./schemas/users.sql",
 	"./schemas/storage.sql",
