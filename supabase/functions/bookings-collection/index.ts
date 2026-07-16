@@ -45,6 +45,7 @@ type PartRow = {
 
 type CollectionBoardItem = {
   project_code: string;
+  priority_number: number;
   student_name: string;
   student_number: string;
   state: string;
@@ -286,6 +287,7 @@ const getProjectContext = async (projectCode: string) => {
 
   return {
     ...publicProject,
+    priority_number: privateProject.priorityNumber,
     parts,
     collection: {
       student_name: privateProject.studentName,
@@ -325,6 +327,7 @@ const toBoardItem = (project: ProjectRow, parts: PartRow[]): CollectionBoardItem
 
   return {
     project_code: project.id,
+    priority_number: project.priorityNumber,
     student_name: project.studentName,
     student_number: project.studentNumber,
     state: project.state,
@@ -530,6 +533,34 @@ const renderEmailText = (value: string, project: ProjectRow, projectLink: string
   return stripTags(rendered);
 };
 
+const escapeHtml = (value: string) => value
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const renderEmailHtml = (value: string, project: ProjectRow, projectLink: string) => {
+  const studentName = escapeHtml(project.studentName);
+  const projectNumber = escapeHtml(String(project.priorityNumber));
+  const rendered = value
+    .replace(/\{\{\s*student_name\s*\}\}/gi, studentName)
+    .replace(/\{\{\s*project_number\s*\}\}/gi, projectNumber)
+    .replace(/\{\{\s*project_link\s*\}\}/gi, escapeHtml(projectLink))
+    .replace(
+      /<span\b([^>]*)data-email-token=["'](student_name|project_number|project_link)["']([^>]*)>(.*?)<\/span>|<span\b([^>]*)data-email-token=["'](student_name|project_number|project_link)["']([^>]*)\/?>/gi,
+      (_match, before = '', tokenA, after = '', content = '', beforeSelf = '', tokenB, afterSelf = '') => {
+        const token = tokenA || tokenB;
+        if (token === 'student_name') return studentName;
+        if (token === 'project_number') return projectNumber;
+        const attrs = `${before}${after}${beforeSelf}${afterSelf}`;
+        const label = escapeHtml(attrs.match(/data-label=["']([^"']+)["']/i)?.[1] || stripTags(content) || 'View your print');
+        return projectLink ? `<a href="${escapeHtml(projectLink)}">${label}</a>` : label;
+      }
+    );
+  return rendered;
+};
+
 const prepareEmail = async (request: Request) => {
   const body = await request.json().catch(() => ({})) as { projectCode?: unknown };
   const projectCode = normalizeProjectCode(body.projectCode);
@@ -542,7 +573,7 @@ const prepareEmail = async (request: Request) => {
 
   const settingsParams = new URLSearchParams({
     select: 'key,value',
-    key: 'in.(settings_email_templates,settings_email_signature)'
+    key: 'eq.settings_email_templates'
   });
   const settingsResponse = await hexForgeRest(`config?${settingsParams}`);
   if (!settingsResponse.ok) {
@@ -552,7 +583,6 @@ const prepareEmail = async (request: Request) => {
   const settingsRows = await settingsResponse.json().catch(() => []) as Array<{ key: string; value: unknown }>;
   const settings = new Map(settingsRows.map((row) => [row.key, row.value]));
   const templates = settings.get('settings_email_templates') as Record<string, StoredEmailTemplate> | undefined;
-  const signature = settings.get('settings_email_signature') as { html?: unknown } | undefined;
   const paymentOutstanding = Boolean(project.needsPayment && !project.moduleOrLecturerPays && !project.receiptNumber?.trim() && !project.paymentOverrideNote?.trim());
   const templateKey = paymentOutstanding ? 'collection_payment_reminder' : 'collection_ready';
   const storedTemplate = templates?.[templateKey];
@@ -569,8 +599,6 @@ const prepareEmail = async (request: Request) => {
       };
   const subjectTemplate = typeof storedTemplate?.subject === 'string' && storedTemplate.subject.trim() ? storedTemplate.subject : fallback.subject;
   const bodyTemplate = typeof storedTemplate?.htmlBody === 'string' && storedTemplate.htmlBody.trim() ? storedTemplate.htmlBody : fallback.htmlBody;
-  const includeSignature = typeof storedTemplate?.includeSignature === 'boolean' ? storedTemplate.includeSignature : fallback.includeSignature;
-  const signatureHtml = includeSignature && typeof signature?.html === 'string' ? signature.html : '';
   const studentViewUrl = (Deno.env.get('STUDENT_VIEW_URL') || Deno.env.get('VITE_STUDENT_VIEW_URL') || '').trim().replace(/\/+$/, '');
   const projectLink = studentViewUrl ? `${studentViewUrl}/${encodeURIComponent(project.id)}` : '';
   const to = normalizeEmail(project.email) || (normalizeStudentNumber(project.studentNumber) ? `u${project.studentNumber}@tuks.co.za` : null);
@@ -579,8 +607,10 @@ const prepareEmail = async (request: Request) => {
   return jsonResponse({
     data: {
       to,
+      student_number: project.studentNumber,
       subject: renderEmailText(subjectTemplate, project, projectLink).replace(/\s+/g, ' ').trim(),
-      body: [renderEmailText(bodyTemplate, project, projectLink), renderEmailText(signatureHtml, project, projectLink)].filter(Boolean).join('\n\n')
+      body: renderEmailText(bodyTemplate, project, projectLink),
+      html_body: renderEmailHtml(bodyTemplate, project, projectLink)
     }
   });
 };
