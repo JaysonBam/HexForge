@@ -71,7 +71,7 @@ export interface ProjectContextType {
   addPart: (projectId: string) => void;
   updatePart: (projectId: string, partId: string, data: Partial<Part>) => void;
   deletePart: (projectId: string, partId: string) => void;
-  addExtractedParts: (projectId: string, parts: Partial<Part>[]) => void;
+  addExtractedParts: (projectId: string, parts: Partial<Part>[]) => Promise<boolean>;
   transitionProjectState: (args: {
     projectId: string;
     action: ProjectTransitionAction;

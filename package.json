@@ -5,9 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:helper": "npm run build:helper && electron helper",
     "build": "tsc -b && vite build",
+    "build:helper": "tsc -p helper/tsconfig.json && node helper/scripts/copyAssets.ts",
+    "package:helper": "npm run build:helper && node --import tsx helper/scripts/packageHelper.ts",
+    "smoke:helper": "node --import tsx helper/scripts/smokeHelper.ts",
     "lint": "eslint .",
-    "test": "node --test tests/*.test.ts",
+    "test": "node --import tsx --test tests/*.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -39,12 +43,15 @@
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
+    "electron": "37.10.3",
+    "electron-builder": "^26.0.12",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
     "supabase": "^2.84.5",
     "tailwindcss": "^4.2.2",
+    "tsx": "^4.23.1",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4"

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'" />
+    <title>Printing Manager Helper</title>
+    <link rel="stylesheet" href="settings.css" />
+  </head>
+  <body>
+    <main>
+      <header class="masthead">
+        <div>
+          <p class="eyebrow">HexForge workstation bridge</p>
+          <h1>Printing Manager Helper</h1>
+          <p class="lede">Connect HexForge to project files on this workstation. Files stay local unless you explicitly import or copy them.</p>
+        </div>
+        <span id="version" class="version"></span>
+      </header>
+
+      <form id="settings-form">
+        <section>
+          <div class="section-heading">
+            <div><p class="step">01 / Project files</p><h2>Projects root</h2></div>
+            <button id="open-root" type="button" class="quiet">Open folder</button>
+          </div>
+          <p class="hint">Choose the folder containing every Printing Manager project folder.</p>
+          <div class="field-row">
+            <input id="root-folder" type="text" readonly placeholder="No root selected" />
+            <button id="choose-root" type="button">Choose folder</button>
+          </div>
+        </section>
+
+        <section>
+          <div class="section-heading"><div><p class="step">02 / Connection</p><h2>Local API</h2></div></div>
+          <label for="api-port">Port</label>
+          <input id="api-port" type="number" min="1024" max="65535" required />
+          <label for="allowed-origins">Allowed Printing Manager origins</label>
+          <textarea id="allowed-origins" rows="4" spellcheck="false" placeholder="https://printing.example.com"></textarea>
+          <p class="hint">One exact origin per line. HTTPS is required except for localhost development.</p>
+        </section>
+
+        <section>
+          <div class="section-heading"><div><p class="step">03 / Applications</p><h2>Slicers</h2></div></div>
+          <label for="bambu-path">Bambu Studio</label>
+          <div class="field-row"><input id="bambu-path" type="text" readonly placeholder="Not detected" /><button id="choose-bambu" type="button">Choose app</button></div>
+          <label for="cura-path">UltiMaker Cura</label>
+          <div class="field-row"><input id="cura-path" type="text" readonly placeholder="Not detected" /><button id="choose-cura" type="button">Choose app</button></div>
+          <div class="mapping-grid">
+            <label>.3mf<select data-extension="3mf"><option value="bambu">Bambu Studio</option><option value="cura">UltiMaker Cura</option><option value="system">Windows default</option></select></label>
+            <label>.gcode<select data-extension="gcode"><option value="bambu">Bambu Studio</option><option value="cura">UltiMaker Cura</option><option value="system">Windows default</option></select></label>
+            <label>Model files<select data-extension="stl"><option value="bambu">Bambu Studio</option><option value="cura">UltiMaker Cura</option><option value="system">Windows default</option></select></label>
+          </div>
+        </section>
+
+        <section>
+          <div class="section-heading"><div><p class="step">04 / Windows</p><h2>Startup and shortcuts</h2></div><button id="open-logs" type="button" class="quiet">Open logs</button></div>
+          <label class="check"><input id="start-with-windows" type="checkbox" /> Start quietly with Windows</label>
+          <button id="create-shortcuts" type="button" class="secondary">Create Desktop and Start menu shortcuts</button>
+        </section>
+
+        <footer>
+          <p id="save-status" aria-live="polite"></p>
+          <button type="submit" class="primary">Save settings</button>
+        </footer>
+      </form>
+    </main>
+    <script type="module" src="settings.js"></script>
+  </body>
+</html>

@@ -481,9 +481,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     void trackMutation('Delete part', () => supabase.from('parts').delete().eq('id', partId));
   };
 
-  const addExtractedParts = (projectId: string, extractedParts: Partial<Part>[]) => {
+  const addExtractedParts = async (projectId: string, extractedParts: Partial<Part>[]) => {
     const project = getProject(projectId);
-    if (!project) return;
+    if (!project) return false;
 
     const newParts: Part[] = extractedParts.map((ep, index) => normalizePartVerification({
       ...withSyncedFilamentFlags({
@@ -508,7 +508,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       secondaryServiceCost: ep.secondaryServiceCost,
       secondaryLength: ep.secondaryLength,
       imageUrl: ep.imageUrl,
-
       primaryEstimatedWeight: ep.primaryEstimatedWeight || 0,
       primaryWeight: ep.primaryWeight,
       primaryLength: ep.primaryLength,
@@ -526,8 +525,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     if (newParts.length) {
       const insertedParts = newParts.map(np => ({ ...np, projectId }));
-      void trackMutation('Add extracted parts', () => supabase.from('parts').insert(insertedParts));
+      return trackMutation('Add extracted parts', () => supabase.from('parts').insert(insertedParts));
     }
+    return true;
   };
 
   const transitionProjectState: ProjectContextType['transitionProjectState'] = async ({

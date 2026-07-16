@@ -20,6 +20,7 @@ import {
   type LucideIcon
 } from 'lucide-react';
 import { getWorkspaceTabForState, type WorkspaceTab } from '../domain/operations';
+import { LocalHelperIndicator } from '../local-files/LocalHelperIndicator';
 
 type NavigationItem = {
   id: string;
@@ -341,6 +342,7 @@ export const Layout = () => {
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-3">
+            <LocalHelperIndicator />
             {syncStatus.saving && (
               <span className="forge-pill gap-2 px-3 py-1 text-xs text-slate-700">
                 <span className="forge-energy-dot" aria-hidden="true" />

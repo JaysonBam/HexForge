@@ -150,7 +150,7 @@
   }
 
   .project-detail-shell {
-    --project-rail-width: 11rem;
+    --project-rail-width: 19.5rem;
     display: block;
     padding-left: calc(var(--project-rail-width) + 1.25rem);
   }
@@ -164,14 +164,13 @@
     display: flex;
     width: var(--project-rail-width);
     flex-direction: column;
-    justify-content: space-between;
     gap: 1rem;
-    overflow-y: auto;
+    overflow: hidden;
     border-right: 1px solid var(--forge-border);
     background: rgba(255, 255, 255, 0.96);
     box-shadow: 10px 0 30px rgba(15, 23, 42, 0.045);
     backdrop-filter: blur(14px);
-    padding: 9.75rem 0.85rem 1rem 1rem;
+    padding: 9.75rem 0.75rem 0.75rem;
   }
 
   @media (min-width: 1280px) {
@@ -188,6 +187,37 @@
     color: #64748b;
   }
 
+  .project-summary-main {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .project-summary-static {
+    flex: 0 0 auto;
+  }
+
+  .project-summary-local-files {
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  .project-summary-row {
+    display: flex;
+    min-height: 1.5rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border-bottom: 1px solid rgba(203, 213, 225, 0.55);
+    padding: 0.18rem 0;
+  }
+
+  .project-summary-row:last-child {
+    border-bottom: 0;
+  }
+
   .project-summary-action {
     margin-top: 0.25rem;
     color: var(--forge-ink);
@@ -198,19 +228,19 @@
   }
 
   .project-summary-priority {
-    margin-top: 0.15rem;
     color: var(--forge-ink);
-    font-size: 1.85rem;
+    font-size: 1.15rem;
     font-weight: 950;
-    line-height: 0.95;
+    line-height: 1;
   }
 
   .project-summary-value {
-    margin-top: 0.2rem;
+    max-width: 66%;
     color: var(--forge-ink);
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
     font-weight: 800;
     line-height: 1.2;
+    text-align: right;
     overflow-wrap: anywhere;
   }
 
@@ -620,8 +650,13 @@
       border-bottom: 1px solid var(--forge-border);
       background: rgba(255, 255, 255, 0.96);
       box-shadow: none;
+      overflow: visible;
       padding: 1rem;
       margin-bottom: 1rem;
+    }
+
+    .project-summary-local-files {
+      max-height: 34rem;
     }
 
     .part-detail-top {

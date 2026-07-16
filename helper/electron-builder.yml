@@ -1,0 +1,21 @@
+appId: za.ac.up.misc.printing-manager-helper
+productName: Printing Manager Helper
+electronVersion: 37.10.3
+asar: true
+files:
+  - dist/**/*
+  - package.json
+extraResources:
+  - from: assets/icon.png
+    to: icon.png
+directories:
+  output: ../release
+win:
+  icon: assets/icon.ico
+  target:
+    - target: portable
+      arch:
+        - x64
+  artifactName: PrintingManagerHelper.exe
+portable:
+  artifactName: PrintingManagerHelper.exe

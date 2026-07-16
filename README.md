@@ -11,6 +11,20 @@ npm run build
 npm.cmd test
 ```
 
+## Local File Helper
+
+The optional Windows helper connects the authenticated HexForge workspace to project files stored on the same workstation. HexForge remains fully functional when the helper is absent or stopped.
+
+```powershell
+npm run dev:helper
+npm run build:helper
+npm run package:helper
+```
+
+The portable production artifact is written to `release/PrintingManagerHelper.exe`. Copy that single executable to a workstation, run it, choose the Printing Manager projects root, and add the exact deployed HexForge origin in its settings. The workstation does not need Node.js or development tools.
+
+See `helper/README.md` for configuration, security, update, and smoke-test instructions.
+
 Use `npm.cmd test` on Windows if PowerShell blocks `npm.ps1`.
 
 ## Supabase Local Setup

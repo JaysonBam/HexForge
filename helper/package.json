@@ -1,0 +1,10 @@
+{
+  "name": "printing-manager-helper",
+  "productName": "Printing Manager Helper",
+  "description": "Secure local-file companion for HexForge Printing Manager",
+  "author": "HexForge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/helper/src/main/main.js"
+}

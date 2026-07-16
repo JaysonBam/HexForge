@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Project, Part } from '../../types';
+import type { Project } from '../../types';
 import { useProjects } from '../../context/ProjectContext';
 import { useSettings } from '../../context/SettingsContext';
 import { useStaffSession } from '../../context/StaffSessionContext';
@@ -8,30 +8,13 @@ import { Upload, Plus, ArrowRight, Loader2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useFeedback } from '../ui/FeedbackProvider';
 import { getMissingStaffMessage } from '../../utils/staffSessionUtils';
-import JSZip from 'jszip';
-import { parseBambu } from '../../lib/slicer-parsers/parsers/BambuParser';
-import { parseUltimaker } from '../../lib/slicer-parsers/parsers/UltimakerParser';
 import { uploadThumbnailFromBlobUrl } from '../../utils/storageUtils';
 import { isPartVerifiedForReview } from '../../domain/partVerification';
+import { analyzeProjectFiles } from '../../local-files/projectFileImport';
 
 type CheckpointReviewProps = {
   project: Project;
   onAdvanceFromLockedReview?: () => void;
-};
-
-type ParsedMaterial = {
-  type?: string;
-  brand?: string;
-  weight?: number;
-  cost?: number;
-  length?: number;
-};
-
-type ParsedSlicerPart = {
-  name?: string;
-  printingTime: number;
-  imageUrl?: string;
-  materials?: ParsedMaterial[];
 };
 
 const hasDraggedFiles = (event: DragEvent) => {
@@ -53,106 +36,14 @@ export const CheckpointReview = ({ project, onAdvanceFromLockedReview }: Checkpo
   const processFiles = useCallback(async (newFiles: FileList | File[]) => {
     setLoading(true);
 
-    const extractedParts: Partial<Part>[] = [];
-    const errors: string[] = [];
-
     try {
-      let partCounter = project.parts.length + 1;
-      for (let i = 0; i < newFiles.length; i++) {
-        const uploadedFile = newFiles[i];
-        
-        let parsedParts: ParsedSlicerPart[] = [];
-        
-        const isBambu = uploadedFile.name.endsWith('.gcode.3mf');
-        const isUltimaker = uploadedFile.name.endsWith('.ufp');
-        const isStandard3mf = uploadedFile.name.endsWith('.3mf') && !isBambu;
-        
-        // We handle primarily our known extensions here based on the requirement workflow
-        if (isBambu || isStandard3mf || isUltimaker) {
-          try {
-              const zip = new JSZip();
-              const zipContent = await zip.loadAsync(uploadedFile);
-              
-              if (isBambu || isStandard3mf) {
-                 const bareFilename = uploadedFile.name.replace(/(\.gcode\.3mf|\.3mf)$/i, '');
-                 parsedParts = await parseBambu(zipContent, partCounter, bareFilename) as ParsedSlicerPart[];
-              } else if (isUltimaker) {
-                 parsedParts = await parseUltimaker(zipContent, partCounter) as ParsedSlicerPart[];
-              }
-
-              if (!parsedParts || parsedParts.length === 0) {
-                 errors.push(`File ${uploadedFile.name} was parsed but no printable parts were found.`);
-              }
-              
-              // Now map them into our Project's Parts shape
-              for (const p of parsedParts) {
-                 partCounter++;
-                 
-                 let uploadedImageUrl: string | undefined = undefined;
-                 if (p.imageUrl) {
-                     uploadedImageUrl = await uploadThumbnailFromBlobUrl(p.imageUrl) || p.imageUrl;
-                 }
-
-                 // Primary and secondary material mapping
-                 const materials = p.materials || [];
-                 const m1 = materials[0];
-                 const m2 = materials[1];
-                 
-                 const m1Weight = m1?.weight || 0;
-                   const m2Weight = m2?.weight || 0;
-                   const primaryPriceForCost = m1?.type ? getFilamentPrice(m1.type) : 0;
-                   const serviceCostPrimary = Math.round(m1Weight) * primaryPriceForCost;
-                   
-                   const secondaryPriceForCost = m2?.type ? getFilamentPrice(m2.type) : 0;
-                   const serviceCostSecondary = m2 ? (Math.round(m2Weight) * secondaryPriceForCost) : 0;
-
-                   const hours = Math.floor(p.printingTime / 3600);
-                   const mins = Math.floor((p.printingTime % 3600) / 60);
-                   const timeString = `${hours}h ${mins}m`;
-
-                   const m1Cost = m1?.cost || 0;
-                   const m2Cost = m2?.cost || 0;
-                   const m1Length = m1?.length || 0;
-                   const m2Length = m2?.length || 0;
-
-                   extractedParts.push({
-                       partName: p.name || uploadedFile.name,
-                       primaryMaterialCost: parseFloat(m1Cost.toFixed(2)),
-                       primaryServiceCost: parseFloat(serviceCostPrimary.toFixed(2)),
-                       primaryEstimatedWeight: Math.round(m1Weight),
-                       primaryWeight: parseFloat(m1Weight.toFixed(2)),
-                       printingTime: timeString,
-                       primaryLength: parseFloat(m1Length.toFixed(2)),
-                       secondaryLength: parseFloat(m2Length.toFixed(2)),
-
-                       primaryMaterial: m1?.type || '',
-                       primaryBrand: m1?.brand || '',
-
-                       secondaryMaterial: m2?.type || undefined,
-                       secondaryBrand: m2?.brand || undefined,
-
-                       imageUrl: uploadedImageUrl,
-                       materials: p.materials,
-
-                       secondaryEstimatedWeight: Math.round(m2Weight),
-                       secondaryWeight: parseFloat(m2Weight.toFixed(2)),
-                       secondaryServiceCost: parseFloat(serviceCostSecondary.toFixed(2)),
-                       secondaryMaterialCost: parseFloat(m2Cost.toFixed(2)),
-                       printStatus: 'DRAFT'
-                   });
-              }
-          } catch (fileErr) {
-             console.error(fileErr);
-             errors.push(`Failed to analyze ${uploadedFile.name}. It might be corrupted or unsupported.`);
-          }
-        } else {
-             errors.push(`File ${uploadedFile.name} is not a supported format (.3mf, .gcode.3mf, .ufp).`);
-        }
-      }
-
-      if (extractedParts.length > 0) {
-        addExtractedParts(project.id, extractedParts);
-      }
+      const { parts, errors } = await analyzeProjectFiles({
+        files: Array.from(newFiles),
+        startPartNumber: project.parts.length + 1,
+        getFilamentPrice,
+        uploadThumbnail: uploadThumbnailFromBlobUrl
+      });
+      if (parts.length > 0) await addExtractedParts(project.id, parts);
 
       if (errors.length > 0) {
         await showMessage({
