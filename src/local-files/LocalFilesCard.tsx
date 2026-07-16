@@ -11,6 +11,7 @@ import { uploadThumbnailFromBlobUrl } from '../utils/storageUtils';
 import { useLocalHelper } from './LocalHelperContext';
 import { runSequentialImports } from './importSequence';
 import { analyzeProjectFiles } from './projectFileImport';
+import { isFileLinkedToParts } from './sourceFileLink';
 
 type MatchedResolution = Extract<ProjectResolution, { status: 'matched' | 'created' }>;
 
@@ -177,8 +178,12 @@ export const LocalFilesCard = ({ project }: { project: Project }) => {
         getFilamentPrice,
         uploadThumbnail: uploadThumbnailFromBlobUrl
       });
+      const linkedParts = result.parts.map((part) => ({
+        ...part,
+        sourceFilePath: file.relativePath
+      }));
       if (result.parts.length) {
-        const saved = await addExtractedParts(project.id, result.parts);
+        const saved = await addExtractedParts(project.id, linkedParts);
         if (!saved) throw new Error('HexForge could not save the imported parts.');
         if (announce) notify({ title: 'Local file imported', message: `${file.filename} was added to the existing parts list.`, tone: 'success' });
       }
@@ -333,8 +338,9 @@ export const LocalFilesCard = ({ project }: { project: Project }) => {
                       const opening = actionId === `open:${file.fileId}`;
                       const copying = actionId === `copy:${file.fileId}`;
                       const displayPath = fileDisplayPath(file);
+                      const linked = isFileLinkedToParts(file, project.parts);
                       return (
-                        <div key={file.fileId} className="flex min-w-0 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1.5 shadow-sm">
+                        <div key={file.fileId} className={`flex min-w-0 items-center gap-1.5 rounded-md border bg-white px-2 py-1.5 shadow-sm ${linked ? 'border-slate-700 ring-1 ring-slate-700/20' : 'border-slate-200'}`}>
                           <p className="min-w-0 flex-1 truncate font-mono text-[9px] font-bold text-slate-800" title={displayPath}>{displayPath}</p>
                           <div className="flex shrink-0 items-center gap-1">
                             {file.group === 'print_ready' && file.importEligible && (

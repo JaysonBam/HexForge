@@ -512,6 +512,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       primaryWeight: ep.primaryWeight,
       primaryLength: ep.primaryLength,
       printingTime: ep.printingTime,
+      sourceFilePath: ep.sourceFilePath,
       primaryMaterialCost: ep.primaryMaterialCost || 0,
       primaryServiceCost: ep.primaryServiceCost || 0,
       printStatus: ep.printStatus || 'DRAFT',

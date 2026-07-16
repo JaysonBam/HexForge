@@ -8,6 +8,8 @@ import { Card } from '../ui/Card';
 import { useFeedback } from '../ui/FeedbackProvider';
 import { getMissingStaffMessage } from '../../utils/staffSessionUtils';
 import { Play, Check, Undo2, AlertTriangle } from 'lucide-react';
+import { PartSourceFileButton } from '../../local-files/PartSourceFileButton';
+import { sourceFileName } from '../../local-files/sourceFileLink';
 
 export const CheckpointPrinting = ({ project }: { project: Project }) => {
     const { transitionPartStatus, transitionProjectState, updatePart } = useProjects();
@@ -398,6 +400,7 @@ export const CheckpointPrinting = ({ project }: { project: Project }) => {
                                     )}
                                     <div>
                                         <div className="font-medium">{part.partName}</div>
+                                        {part.sourceFilePath && <div className="mt-1 truncate font-mono text-[11px] text-slate-600" title={part.sourceFilePath}>File: {sourceFileName(part.sourceFilePath)}</div>}
                                         {part.specialInstruction && part.specialInstruction.trim() !== '' && (
                                             <div className="mt-1 text-sm italic text-slate-700">Note: {part.specialInstruction}</div>
                                         )}
@@ -410,9 +413,12 @@ export const CheckpointPrinting = ({ project }: { project: Project }) => {
                                         {renderRunHistory(part)}
                                     </div>
                                 </div>
-                                <Button onClick={() => openStart(part.id)} size="sm" className="mt-3 w-full gap-2">
-                                    <Play size={14} /> Start
-                                </Button>
+                                <div className="mt-3 flex gap-2">
+                                    <PartSourceFileButton part={part} project={project} />
+                                    <Button onClick={() => openStart(part.id)} size="sm" className="flex-1 gap-2">
+                                        <Play size={14} /> Start
+                                    </Button>
+                                </div>
                             </Card>
                         ))}
                     </div>
@@ -434,6 +440,7 @@ export const CheckpointPrinting = ({ project }: { project: Project }) => {
                                     )}
                                     <div>
                                         <div className="font-medium">{part.partName}</div>
+                                        {part.sourceFilePath && <div className="mt-1 truncate font-mono text-[11px] text-slate-600" title={part.sourceFilePath}>File: {sourceFileName(part.sourceFilePath)}</div>}
                                         {part.specialInstruction && part.specialInstruction.trim() !== '' && (
                                             <div className="mt-1 text-sm italic text-indigo-700">Note: {part.specialInstruction}</div>
                                         )}
@@ -444,6 +451,7 @@ export const CheckpointPrinting = ({ project }: { project: Project }) => {
                                     </div>
                                 </div>
                                 <div className="mt-3 flex w-full gap-2">
+                                    <PartSourceFileButton part={part} project={project} />
                                     <Button
                                         onClick={() => handleRequeue(part.id)}
                                         size="sm"
@@ -481,6 +489,7 @@ export const CheckpointPrinting = ({ project }: { project: Project }) => {
                                     )}
                                     <div>
                                         <div className="font-medium text-slate-800">{part.partName}</div>
+                                        {part.sourceFilePath && <div className="mt-1 truncate font-mono text-[11px] text-slate-600" title={part.sourceFilePath}>File: {sourceFileName(part.sourceFilePath)}</div>}
                                         {part.specialInstruction && part.specialInstruction.trim() !== '' && (
                                             <div className="mt-1 text-sm italic text-teal-700">Note: {part.specialInstruction}</div>
                                         )}
@@ -492,8 +501,9 @@ export const CheckpointPrinting = ({ project }: { project: Project }) => {
                                         {renderRunHistory(part)}
                                     </div>
                                 </div>
-                                {part.printStatus !== 'COLLECTED' && (
-                                    <div className="mt-3 flex justify-end">
+                                <div className="mt-3 flex justify-end gap-2">
+                                    <PartSourceFileButton part={part} project={project} />
+                                    {part.printStatus !== 'COLLECTED' && (
                                         <Button
                                             onClick={() => handleRequeue(part.id)}
                                             size="sm"
@@ -503,8 +513,8 @@ export const CheckpointPrinting = ({ project }: { project: Project }) => {
                                         >
                                             <Undo2 size={14} /> Requeue
                                         </Button>
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </Card>
                         ))}
                     </div>

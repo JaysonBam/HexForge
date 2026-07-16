@@ -4,6 +4,8 @@ import type { Project } from '../src/types/index.ts';
 import { runSequentialImports } from '../src/local-files/importSequence.ts';
 import { isImportEligibleFilename } from '../src/local-files/projectFileImport.ts';
 import { syncCollectedProjectFolder } from '../src/local-files/statusSync.ts';
+import { findLinkedLocalFile, isFileLinkedToParts, normalizeSourceFilePath, sourceFileName } from '../src/local-files/sourceFileLink.ts';
+import type { LocalProjectFile } from '../shared/localHelperProtocol.ts';
 
 test('only existing parser formats are import eligible', () => {
   assert.equal(isImportEligibleFilename('model.3mf'), true);
@@ -36,6 +38,15 @@ test('repeated imports are processed intentionally', async () => {
   });
   assert.deepEqual(imported, ['plate.3mf', 'plate.3mf']);
   assert.equal(completed, 2);
+});
+
+test('source file links match stable project-relative paths', () => {
+  const file = { relativePath: 'plates\\Widget.gcode.3mf' } as LocalProjectFile;
+  const linkedPart = { sourceFilePath: 'plates/widget.gcode.3mf' } as Project['parts'][number];
+  assert.equal(normalizeSourceFilePath(file.relativePath), 'plates/widget.gcode.3mf');
+  assert.equal(isFileLinkedToParts(file, [linkedPart]), true);
+  assert.equal(findLinkedLocalFile('plates/widget.gcode.3mf', [file]), file);
+  assert.equal(sourceFileName(linkedPart.sourceFilePath as string), 'widget.gcode.3mf');
 });
 
 test('folder status sync failure cannot change the already-collected project result', async () => {

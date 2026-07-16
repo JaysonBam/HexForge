@@ -41,6 +41,7 @@ export interface Part {
   id: string;
   partNumber: number;
   partName: string;
+  sourceFilePath?: string;
 
   printerName?: string;
   primaryMaterial: string;

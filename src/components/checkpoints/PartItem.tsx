@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileCheck2, Trash2 } from 'lucide-react';
 import type { Part } from '../../types';
 import { useSettings } from '../../context/SettingsContext';
 import { useProjects } from '../../context/ProjectContext';
@@ -17,6 +17,7 @@ import {
     getPartFilamentSource,
     isProvidedFilamentSource
 } from '../../domain/filamentSource.ts';
+import { sourceFileName } from '../../local-files/sourceFileLink';
 
 interface PartItemProps {
     part: Part;
@@ -162,6 +163,12 @@ export const PartItem = ({ part, projectId }: PartItemProps) => {
                     )}
                     <span className="font-bold text-slate-800">#{part.partNumber}</span>
                     <span className="font-medium text-slate-950">{part.partName}</span>
+                    {part.sourceFilePath && (
+                        <span className="forge-badge inline-flex max-w-52 items-center gap-1 px-2 py-0.5 text-xs text-slate-700" title={part.sourceFilePath}>
+                            <FileCheck2 size={12} className="shrink-0" />
+                            <span className="truncate">{sourceFileName(part.sourceFilePath)}</span>
+                        </span>
+                    )}
                     {isVerifiedForReview ? (
                         <span className="forge-badge forge-badge-green px-2 py-0.5 text-xs">
                             Verified
