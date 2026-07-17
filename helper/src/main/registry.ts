@@ -1,7 +1,7 @@
 import { createHmac, randomUUID } from 'node:crypto';
 import type { FolderMatch } from './folders.js';
 
-export type RegisteredProject = Pick<FolderMatch, 'absolutePath' | 'folderName' | 'relativePath'>;
+export type RegisteredProject = Pick<FolderMatch, 'absolutePath' | 'folderName' | 'relativePath' | 'workflowFolder'>;
 export type RegisteredFile = {
   absolutePath: string;
   projectKey: string;

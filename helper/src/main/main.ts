@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell, Tray } f
 import { access, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { LOCAL_HELPER_VERSION } from '../../../shared/localHelperProtocol.js';
+import { LOCAL_HELPER_VERSION, WORKFLOW_FOLDER_KEYS, WORKFLOW_FOLDER_LABELS, type WorkflowFolderKey } from '../../../shared/localHelperProtocol.js';
 import { LocalApiServer } from './apiServer.js';
 import { ConfigStore, normalizeAllowedOrigin, type HelperConfig } from './config.js';
 import { CopyOperationManager } from './copyOperations.js';
@@ -29,7 +29,7 @@ const preloadPath = fileURLToPath(new URL('../preload/preload.cjs', import.meta.
 const portableExecutablePath = () => process.env.PORTABLE_EXECUTABLE_FILE || process.execPath;
 const publicSettings = (config: HelperConfig) => ({
   schemaVersion: config.schemaVersion,
-  rootProjectFolder: config.rootProjectFolder,
+  workflowFolders: config.workflowFolders,
   port: config.port,
   allowedOrigins: config.allowedOrigins,
   bambuStudioPath: config.bambuStudioPath,
@@ -110,22 +110,22 @@ const restartApi = async () => {
 
 const showConnectionStatus = async () => {
   const config = configStore.get();
-  let rootStatus = 'Not configured';
-  if (config.rootProjectFolder) {
-    rootStatus = await access(config.rootProjectFolder).then(() => 'Available').catch(() => 'Unavailable');
-  }
+  let workflowStatus = 'Not configured';
+  const configuredFolders = Object.values(config.workflowFolders).filter(Boolean);
+  if (configuredFolders.length === 4) workflowStatus = await Promise.all(configuredFolders.map((folder) => access(folder as string))).then(() => 'Available').catch(() => 'Unavailable');
   await dialog.showMessageBox({
-    type: rootStatus === 'Available' ? 'info' : 'warning',
+    type: workflowStatus === 'Available' ? 'info' : 'warning',
     title: 'Printing Manager Helper status',
-    message: rootStatus === 'Available' ? 'Files are ready to connect.' : 'Local files need attention.',
-    detail: `Version: ${LOCAL_HELPER_VERSION}\nLocal API: http://127.0.0.1:${config.port}/v1\nProjects root: ${rootStatus}\nAllowed origins: ${config.allowedOrigins.length}`
+    message: workflowStatus === 'Available' ? 'Files are ready to connect.' : 'Local files need attention.',
+    detail: `Version: ${LOCAL_HELPER_VERSION}\nLocal API: http://127.0.0.1:${config.port}/v1\nWorkflow folders: ${workflowStatus}\nAllowed origins: ${config.allowedOrigins.length}`
   });
 };
 
-const chooseRoot = async (): Promise<string | null> => {
+const chooseWorkflowFolder = async (workflowFolder: WorkflowFolderKey): Promise<string | null> => {
+  if (!Object.hasOwn(WORKFLOW_FOLDER_LABELS, workflowFolder)) return null;
   const options: Electron.OpenDialogOptions = {
-    title: 'Choose Printing Manager projects root',
-    defaultPath: configStore.get().rootProjectFolder ?? undefined,
+    title: `Choose ${WORKFLOW_FOLDER_LABELS[workflowFolder]} folder`,
+    defaultPath: configStore.get().workflowFolders[workflowFolder] ?? undefined,
     properties: ['openDirectory', 'createDirectory']
   };
   const result = settingsWindow ? await dialog.showOpenDialog(settingsWindow, options) : await dialog.showOpenDialog(options);
@@ -138,16 +138,11 @@ const rebuildTrayMenu = () => {
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Show connection status', click: () => void showConnectionStatus() },
     { type: 'separator' },
-    { label: 'Change projects root folder', click: async () => {
-      const selected = await chooseRoot();
-      if (selected) {
-        await configStore.update({ rootProjectFolder: selected });
-        rebuildTrayMenu();
-      }
-    } },
-    { label: 'Open projects root folder', enabled: Boolean(config.rootProjectFolder), click: () => {
-      if (config.rootProjectFolder) void shell.openPath(config.rootProjectFolder);
-    } },
+    ...Object.entries(WORKFLOW_FOLDER_LABELS).map(([key, label]) => ({
+      label: `Open ${label}`,
+      enabled: Boolean(config.workflowFolders[key as WorkflowFolderKey]),
+      click: () => { const folder = config.workflowFolders[key as WorkflowFolderKey]; if (folder) void shell.openPath(folder); }
+    })),
     { label: 'Open settings', click: showSettings },
     { label: 'Open logs', click: () => void shell.openPath(logger.directory) },
     { type: 'separator' },
@@ -179,7 +174,7 @@ const registerIpc = () => {
   ipcMain.handle('settings:get', () => {
     return publicSettings(configStore.get());
   });
-  ipcMain.handle('settings:choose-root', chooseRoot);
+  ipcMain.handle('settings:choose-workflow-folder', (_event, workflowFolder: WorkflowFolderKey) => chooseWorkflowFolder(workflowFolder));
   ipcMain.handle('settings:choose-application', async (_event, application: 'bambu' | 'cura') => {
     if (!['bambu', 'cura'].includes(application)) return null;
     const options: Electron.OpenDialogOptions = {
@@ -196,8 +191,14 @@ const registerIpc = () => {
       ? input.allowedOrigins.map(normalizeAllowedOrigin).filter((origin): origin is string => Boolean(origin))
       : previous.allowedOrigins;
     if (!allowedOrigins.length) throw new Error('Add at least one valid allowed origin.');
+    const workflowFolders = Object.fromEntries(WORKFLOW_FOLDER_KEYS.map((key) => {
+      const folder = input.workflowFolders?.[key];
+      return [key, typeof folder === 'string' && folder.trim() ? folder : null];
+    })) as Record<WorkflowFolderKey, string | null>;
+    if (Object.values(workflowFolders).some((folder) => !folder)) throw new Error('Choose all four workflow folders.');
+    if (new Set(Object.values(workflowFolders).map((folder) => path.resolve(folder as string).toLocaleLowerCase())).size !== 4) throw new Error('Each workflow folder must be a separate location.');
     const next = await configStore.update({
-      rootProjectFolder: typeof input.rootProjectFolder === 'string' ? input.rootProjectFolder : null,
+      workflowFolders,
       port: Number(input.port),
       allowedOrigins,
       bambuStudioPath: typeof input.bambuStudioPath === 'string' ? input.bambuStudioPath : null,
@@ -207,12 +208,13 @@ const registerIpc = () => {
     });
     applyStartupPreference(next.startWithWindows);
     rebuildTrayMenu();
-    if (next.port !== previous.port || next.allowedOrigins.join('|') !== previous.allowedOrigins.join('|')) await restartApi();
+    const workflowFoldersChanged = WORKFLOW_FOLDER_KEYS.some((key) => next.workflowFolders[key] !== previous.workflowFolders[key]);
+    if (next.port !== previous.port || next.allowedOrigins.join('|') !== previous.allowedOrigins.join('|') || workflowFoldersChanged) await restartApi();
     return publicSettings(next);
   });
   ipcMain.handle('settings:create-shortcuts', createShortcuts);
   ipcMain.handle('settings:open-root', () => {
-    const root = configStore.get().rootProjectFolder;
+    const root = configStore.get().workflowFolders.to_be_printed;
     if (root) return shell.openPath(root);
     return undefined;
   });
@@ -250,6 +252,6 @@ void app.whenReady().then(async () => {
   tray.on('double-click', showSettings);
   rebuildTrayMenu();
 
-  if (!config.rootProjectFolder || !process.argv.includes('--background')) showSettings();
-  await logger.info('helper_ready', { version: LOCAL_HELPER_VERSION, configured: Boolean(config.rootProjectFolder) });
+  if (Object.values(config.workflowFolders).some((folder) => !folder) || !process.argv.includes('--background')) showSettings();
+  await logger.info('helper_ready', { version: LOCAL_HELPER_VERSION, configured: Object.values(config.workflowFolders).every(Boolean) });
 });

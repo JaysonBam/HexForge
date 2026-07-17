@@ -4,7 +4,7 @@ import { LocalHelperClient, LocalHelperError } from '../src/local-files/localHel
 
 const health = {
   apiVersion: 'v1',
-  helperVersion: '1.0.0',
+  helperVersion: '1.1.0',
   state: 'connected',
   configured: true,
   rootAvailable: true,

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { useFeedback } from '../components/ui/FeedbackProvider';
@@ -34,12 +34,14 @@ import {
 export const ProjectTimeline = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { confirm, notify } = useFeedback();
   const { deleteProject, getProject, projectsLoading, projectsLoadError, updateProject, transitionProjectState } = useProjects();
   const { activeStaffName, claimActiveStaffName } = useStaffSession();
   const { settingsLoading, settingsLoadError } = useSettings();
   const { activeWorkspaceTab, selectWorkspaceTab } = useOutletContext<ProjectWorkspaceNavigationContext>();
   const project = getProject(id || '');
+  const autoCreateLocalFolder = (location.state as { autoCreateLocalFolderFor?: string } | null)?.autoCreateLocalFolderFor === project?.id;
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [deletingProject, setDeletingProject] = useState(false);
   const staffName = activeStaffName || claimActiveStaffName() || 'System';
@@ -235,7 +237,7 @@ export const ProjectTimeline = () => {
           </div>
 
           <div className="project-summary-local-files">
-            <LocalFilesCard project={project} />
+            <LocalFilesCard project={project} autoCreateIfMissing={autoCreateLocalFolder} />
           </div>
         </div>
 

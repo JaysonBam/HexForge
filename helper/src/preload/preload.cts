@@ -3,7 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron') as typeof import('ele
 contextBridge.exposeInMainWorld('printingManagerHelper', {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   saveSettings: (settings: unknown) => ipcRenderer.invoke('settings:save', settings),
-  chooseRoot: () => ipcRenderer.invoke('settings:choose-root'),
+  chooseWorkflowFolder: (workflowFolder: string) => ipcRenderer.invoke('settings:choose-workflow-folder', workflowFolder),
   chooseApplication: (application: 'bambu' | 'cura') => ipcRenderer.invoke('settings:choose-application', application),
   createShortcuts: () => ipcRenderer.invoke('settings:create-shortcuts'),
   openRoot: () => ipcRenderer.invoke('settings:open-root'),

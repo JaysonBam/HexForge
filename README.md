@@ -21,7 +21,7 @@ npm run build:helper
 npm run package:helper
 ```
 
-The portable production artifact is written to `release/PrintingManagerHelper.exe`. Copy that single executable to a workstation, run it, choose the Printing Manager projects root, and add the exact deployed HexForge origin in its settings. The workstation does not need Node.js or development tools.
+The portable production artifact is written to `release/PrintingManagerHelper.exe`. Copy that single executable to a workstation, run it, choose the four Printing Manager workflow folders, and add the exact deployed HexForge origin in its settings. The workstation does not need Node.js or development tools.
 
 See `helper/README.md` for configuration, security, update, and smoke-test instructions.
 

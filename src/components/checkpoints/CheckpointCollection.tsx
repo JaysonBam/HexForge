@@ -18,8 +18,6 @@ import {
 } from '../../domain/filamentSource.ts';
 import { Copy, CheckSquare } from 'lucide-react';
 import gmailIcon from '../../assets/icons/gmail.svg';
-import { useLocalHelper } from '../../local-files/LocalHelperContext';
-import { syncCollectedProjectFolder } from '../../local-files/statusSync';
 
 export const CheckpointCollection = ({ project }: { project: Project }) => {
     const { updateProject, transitionPartStatus } = useProjects();
@@ -33,7 +31,6 @@ export const CheckpointCollection = ({ project }: { project: Project }) => {
     } = useSettings();
     const { activeStaffName, claimActiveStaffName } = useStaffSession();
     const { confirm, notify, showMessage } = useFeedback();
-    const { state: localHelperState, client: localHelperClient } = useLocalHelper();
     const [isOpeningGmail, setIsOpeningGmail] = useState(false);
     const getPrimaryCost = (part: Part) => {
         const weight = part.primaryEstimatedWeight || 0;
@@ -59,15 +56,6 @@ export const CheckpointCollection = ({ project }: { project: Project }) => {
         p => p.printStatus === 'PRINTED' || p.printStatus === 'POST_PROCESSING' || p.printStatus === 'COLLECTED'
     );
     const isPaymentBlocked = isCollectionBlocked(project);
-
-    const syncCollectedFolder = () => {
-        if (localHelperState !== 'connected') return;
-        void syncCollectedProjectFolder(localHelperClient, project).then((result) => {
-            if (result.warning) {
-                notify({ title: 'Project collected; folder unchanged', message: result.warning, tone: 'warning' });
-            }
-        });
-    };
 
     const collectPart = async (partId: string) => {
         if (isPaymentBlocked) {
@@ -101,9 +89,6 @@ export const CheckpointCollection = ({ project }: { project: Project }) => {
             return;
         }
 
-        const closesProject = project.parts.every((part) => part.id === partId || part.printStatus === 'COLLECTED');
-        if (closesProject) syncCollectedFolder();
-
     };
 
     const collectAll = async () => {
@@ -126,7 +111,6 @@ export const CheckpointCollection = ({ project }: { project: Project }) => {
             return;
         }
 
-        let allSucceeded = true;
         for (const part of printableCollectionParts) {
             if (part.printStatus !== 'COLLECTED') {
                 const result = await transitionPartStatus({
@@ -136,13 +120,11 @@ export const CheckpointCollection = ({ project }: { project: Project }) => {
                     technicianName: staffName.trim()
                 });
                 if (!result.ok) {
-                    allSucceeded = false;
                     await showMessage({ title: 'Collection stopped', messages: result.errors, tone: 'error' });
                     break;
                 }
             }
         }
-        if (allSucceeded && printableCollectionParts.length === project.parts.length) syncCollectedFolder();
     };
 
     const collectionEmailTemplateKey = isPaymentBlocked ? 'collection_payment_reminder' : 'collection_ready';

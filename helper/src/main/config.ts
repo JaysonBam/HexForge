@@ -1,13 +1,13 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { LOCAL_HELPER_DEFAULT_PORT, type SupportedFileKind } from '../../../shared/localHelperProtocol.js';
+import { LOCAL_HELPER_DEFAULT_PORT, WORKFLOW_FOLDER_KEYS, type SupportedFileKind, type WorkflowFolderKey } from '../../../shared/localHelperProtocol.js';
 
 export type ApplicationMapping = 'bambu' | 'cura' | 'system';
 
 export type HelperConfig = {
-  schemaVersion: 1;
-  rootProjectFolder: string | null;
+  schemaVersion: 2;
+  workflowFolders: Record<WorkflowFolderKey, string | null>;
   port: number;
   allowedOrigins: string[];
   bambuStudioPath: string | null;
@@ -31,8 +31,13 @@ const DEFAULT_APPLICATIONS: Record<SupportedFileKind, ApplicationMapping> = {
 };
 
 const defaultConfig = (): HelperConfig => ({
-  schemaVersion: 1,
-  rootProjectFolder: null,
+  schemaVersion: 2,
+  workflowFolders: {
+    to_be_printed: null,
+    currently_printing: null,
+    completed_prints: null,
+    do_not_print: null
+  },
   port: LOCAL_HELPER_DEFAULT_PORT,
   allowedOrigins: ['http://localhost:5173', 'http://127.0.0.1:5173'],
   bambuStudioPath: null,
@@ -66,11 +71,13 @@ const normalizeConfig = (value: unknown): HelperConfig => {
 
   return {
     ...defaults,
-    ...input,
-    schemaVersion: 1,
-    rootProjectFolder: typeof input.rootProjectFolder === 'string' && input.rootProjectFolder.trim()
-      ? path.resolve(input.rootProjectFolder)
-      : null,
+    schemaVersion: 2,
+    workflowFolders: Object.fromEntries(
+      WORKFLOW_FOLDER_KEYS.map((key) => {
+        const configured = input.workflowFolders?.[key];
+        return [key, typeof configured === 'string' && configured.trim() ? path.resolve(configured) : null];
+      })
+    ) as Record<WorkflowFolderKey, string | null>,
     port: Number.isInteger(input.port) && Number(input.port) >= 1024 && Number(input.port) <= 65535
       ? Number(input.port)
       : defaults.port,

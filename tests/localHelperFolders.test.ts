@@ -8,9 +8,11 @@ import {
   createProjectFolder,
   findProjectFolderMatches,
   generateProjectFolderName,
+  getFolderSyncState,
   isPathWithinRoot,
-  replaceProjectStatusSuffix,
-  sanitizeWindowsComponent
+  sanitizeWindowsComponent,
+  syncProjectFolder,
+  type WorkflowFolderPaths
 } from '../helper/src/main/folders.ts';
 import { classifySupportedFile } from '../helper/src/main/fileScanner.ts';
 import { isOpaqueFileId, OpaqueRegistry } from '../helper/src/main/registry.ts';
@@ -19,12 +21,24 @@ const project = {
   projectId: 'ABCDE',
   priorityNumber: 107,
   studentName: 'Jane Smith',
-  studentNumber: '12345678',
-  module: 'COS110'
+  studentNumber: '12345678'
+};
+
+const makeWorkflowFolders = async (): Promise<WorkflowFolderPaths> => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'hexforge-workflow-'));
+  const folders: WorkflowFolderPaths = {
+    to_be_printed: path.join(root, 'To Be Printed'),
+    currently_printing: path.join(root, 'Currently Printing'),
+    completed_prints: path.join(root, 'Completed Prints'),
+    do_not_print: path.join(root, 'Do Not Print')
+  };
+  await Promise.all(Object.values(folders).map((folder) => mkdir(folder)));
+  return folders;
 };
 
 test('project folder names use the confirmed Windows convention', () => {
-  assert.equal(generateProjectFolderName(project), 'P107 - Jane Smith - u12345678 - COS110 - tbc');
+  assert.equal(generateProjectFolderName(project), 'P107 Jane Smith u12345678 - TBC');
+  assert.equal(generateProjectFolderName({ ...project, expectTbc: false }), 'P107 Jane Smith u12345678');
 });
 
 test('Windows filename sanitisation removes invalid characters and reserved names', () => {
@@ -34,31 +48,43 @@ test('Windows filename sanitisation removes invalid characters and reserved name
 });
 
 test('project folder matching is priority exact and ambiguity-safe', async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'hexforge-folders-'));
+  const folders = await makeWorkflowFolders();
   await Promise.all([
-    mkdir(path.join(root, 'P107 - Jane Smith - u12345678 - COS110 - tbc')),
-    mkdir(path.join(root, 'P107 - Other Student - u87654321 - COS110 - tbc')),
-    mkdir(path.join(root, 'P1070 - Wrong Priority - u12345678 - COS110 - tbc'))
+    mkdir(path.join(folders.currently_printing, 'P107 Jane Smith u12345678')),
+    mkdir(path.join(folders.to_be_printed, 'P107 Other Student u87654321 - TBC')),
+    mkdir(path.join(folders.completed_prints, 'P107legacy naming is still this project')),
+    mkdir(path.join(folders.do_not_print, 'P1070 Wrong Priority u12345678'))
   ]);
-  const matches = await findProjectFolderMatches(root, project);
-  assert.equal(matches.length, 2);
-  assert.equal(chooseClearFolderMatch(matches)?.folderName, 'P107 - Jane Smith - u12345678 - COS110 - tbc');
+  const matches = await findProjectFolderMatches(folders, project);
+  assert.equal(matches.length, 3);
+  assert.equal(matches.some((match) => match.folderName === 'P107legacy naming is still this project'), true);
+  assert.equal(matches.some((match) => match.folderName.startsWith('P1070')), false);
+  assert.equal(chooseClearFolderMatch(matches)?.folderName, 'P107 Jane Smith u12345678');
 
-  const ambiguous = await findProjectFolderMatches(root, { ...project, studentName: 'Unknown', studentNumber: '00000000', module: 'X' });
+  const ambiguous = await findProjectFolderMatches(folders, { ...project, studentName: 'Unknown', studentNumber: '00000000' });
   assert.equal(chooseClearFolderMatch(ambiguous), null);
 });
 
 test('project folder creation is idempotent and prevents duplicates', async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'hexforge-create-'));
-  const first = await createProjectFolder(root, project);
-  const second = await createProjectFolder(root, project);
+  const folders = await makeWorkflowFolders();
+  const first = await createProjectFolder(folders, project);
+  const second = await createProjectFolder(folders, project);
   assert.equal(first.absolutePath, second.absolutePath);
-  assert.deepEqual(await readdir(root), ['P107 - Jane Smith - u12345678 - COS110 - tbc']);
+  assert.deepEqual(await readdir(folders.to_be_printed), ['P107 Jane Smith u12345678 - TBC']);
 });
 
-test('only recognized folder status suffixes are replaced', () => {
-  assert.equal(replaceProjectStatusSuffix('P107 - Jane - u12345678 - COS110 - tbc', 'collected'), 'P107 - Jane - u12345678 - COS110 - collected');
-  assert.equal(replaceProjectStatusSuffix('P107 - Jane - u12345678 - COS110 - done', 'collected'), null);
+test('folder synchronization reports and repairs workflow location and TBC naming', async () => {
+  const folders = await makeWorkflowFolders();
+  const created = await createProjectFolder(folders, project);
+  const expected = { ...project, expectedWorkflowFolder: 'currently_printing' as const, expectTbc: false };
+  const before = getFolderSyncState(created, expected);
+  assert.equal(before.locationMismatch, true);
+  assert.equal(before.nameMismatch, true);
+  const synced = await syncProjectFolder(folders, created, expected);
+  assert.equal(synced.workflowFolder, 'currently_printing');
+  assert.equal(synced.folderName, 'P107 Jane Smith u12345678');
+  assert.equal(getFolderSyncState(synced, expected).isInSync, true);
+  assert.deepEqual(await readdir(folders.to_be_printed), []);
 });
 
 test('path traversal and encoded traversal resolve outside the root', async () => {
@@ -70,7 +96,7 @@ test('path traversal and encoded traversal resolve outside the root', async () =
 
 test('opaque file identifiers are validated and registered', () => {
   const registry = new OpaqueRegistry();
-  const projectKey = registry.registerProject({ absolutePath: 'C:\\Projects\\P1', folderName: 'P1', relativePath: 'P1' });
+  const projectKey = registry.registerProject({ absolutePath: 'C:\\Projects\\P1', folderName: 'P1', relativePath: 'P1', workflowFolder: 'to_be_printed' });
   const fileId = registry.registerFile('secret-secret-secret-secret-secret', {
     absolutePath: 'C:\\Projects\\P1\\plate.3mf',
     projectKey,

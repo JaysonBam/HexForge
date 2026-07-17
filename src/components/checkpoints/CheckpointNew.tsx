@@ -139,7 +139,7 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
     });
 
     setNextPriority(Math.max(nextPriority, formData.priorityNumber) + 1);
-    navigate(`/project/${newId}`);
+    navigate(`/project/${newId}`, { state: { autoCreateLocalFolderFor: newId } });
   };
 
   const inputBaseClassName = 'forge-command-input h-11 w-full px-3.5 text-sm font-semibold placeholder:text-slate-500';

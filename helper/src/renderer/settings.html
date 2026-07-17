@@ -21,14 +21,18 @@
       <form id="settings-form">
         <section>
           <div class="section-heading">
-            <div><p class="step">01 / Project files</p><h2>Projects root</h2></div>
+            <div><p class="step">01 / Project files</p><h2>Workflow folders</h2></div>
             <button id="open-root" type="button" class="quiet">Open folder</button>
           </div>
-          <p class="hint">Choose the folder containing every Printing Manager project folder.</p>
-          <div class="field-row">
-            <input id="root-folder" type="text" readonly placeholder="No root selected" />
-            <button id="choose-root" type="button">Choose folder</button>
-          </div>
+          <p class="hint">Choose each workflow location. Together these four folders contain all local projects.</p>
+          <label for="workflow-to_be_printed">To Be Printed</label>
+          <div class="field-row"><input id="workflow-to_be_printed" type="text" readonly placeholder="No folder selected" /><button id="choose-to_be_printed" type="button">Choose folder</button></div>
+          <label for="workflow-currently_printing">Currently Printing</label>
+          <div class="field-row"><input id="workflow-currently_printing" type="text" readonly placeholder="No folder selected" /><button id="choose-currently_printing" type="button">Choose folder</button></div>
+          <label for="workflow-completed_prints">Completed Prints</label>
+          <div class="field-row"><input id="workflow-completed_prints" type="text" readonly placeholder="No folder selected" /><button id="choose-completed_prints" type="button">Choose folder</button></div>
+          <label for="workflow-do_not_print">Do Not Print</label>
+          <div class="field-row"><input id="workflow-do_not_print" type="text" readonly placeholder="No folder selected" /><button id="choose-do_not_print" type="button">Choose folder</button></div>
         </section>
 
         <section>

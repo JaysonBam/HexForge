@@ -1,5 +1,7 @@
+import { WORKFLOW_FOLDER_KEYS, type WorkflowFolderKey } from '../../../shared/localHelperProtocol.js';
+
 type SettingsState = {
-  rootProjectFolder: string | null;
+  workflowFolders: Record<WorkflowFolderKey, string | null>;
   port: number;
   allowedOrigins: string[];
   bambuStudioPath: string | null;
@@ -14,7 +16,7 @@ declare global {
     printingManagerHelper: {
       getSettings: () => Promise<SettingsState>;
       saveSettings: (settings: Partial<SettingsState>) => Promise<SettingsState>;
-      chooseRoot: () => Promise<string | null>;
+      chooseWorkflowFolder: (workflowFolder: WorkflowFolderKey) => Promise<string | null>;
       chooseApplication: (application: 'bambu' | 'cura') => Promise<string | null>;
       createShortcuts: () => Promise<{ ok: boolean; message: string }>;
       openRoot: () => Promise<void>;
@@ -29,7 +31,7 @@ const element = <T extends HTMLElement>(id: string): T => {
   return node as T;
 };
 
-const rootInput = element<HTMLInputElement>('root-folder');
+const workflowInputs = Object.fromEntries(WORKFLOW_FOLDER_KEYS.map((key) => [key, element<HTMLInputElement>(`workflow-${key}`)])) as Record<WorkflowFolderKey, HTMLInputElement>;
 const portInput = element<HTMLInputElement>('api-port');
 const originsInput = element<HTMLTextAreaElement>('allowed-origins');
 const bambuInput = element<HTMLInputElement>('bambu-path');
@@ -45,7 +47,7 @@ const setStatus = (message: string, tone: 'neutral' | 'success' | 'error' = 'neu
 
 const load = async () => {
   const settings = await window.printingManagerHelper.getSettings();
-  rootInput.value = settings.rootProjectFolder ?? '';
+  WORKFLOW_FOLDER_KEYS.forEach((key) => { workflowInputs[key].value = settings.workflowFolders[key] ?? ''; });
   portInput.value = String(settings.port);
   originsInput.value = settings.allowedOrigins.join('\n');
   bambuInput.value = settings.bambuStudioPath ?? '';
@@ -57,9 +59,11 @@ const load = async () => {
   });
 };
 
-element<HTMLButtonElement>('choose-root').addEventListener('click', async () => {
-  const selected = await window.printingManagerHelper.chooseRoot();
-  if (selected) rootInput.value = selected;
+WORKFLOW_FOLDER_KEYS.forEach((key) => {
+  element<HTMLButtonElement>(`choose-${key}`).addEventListener('click', async () => {
+    const selected = await window.printingManagerHelper.chooseWorkflowFolder(key);
+    if (selected) workflowInputs[key].value = selected;
+  });
 });
 element<HTMLButtonElement>('choose-bambu').addEventListener('click', async () => {
   const selected = await window.printingManagerHelper.chooseApplication('bambu');
@@ -85,7 +89,7 @@ form.addEventListener('submit', async (event) => {
   });
   try {
     await window.printingManagerHelper.saveSettings({
-      rootProjectFolder: rootInput.value.trim() || null,
+      workflowFolders: Object.fromEntries(WORKFLOW_FOLDER_KEYS.map((key) => [key, workflowInputs[key].value.trim() || null])) as Record<WorkflowFolderKey, string | null>,
       port: Number(portInput.value),
       allowedOrigins: originsInput.value.split(/\r?\n|,/).map((origin) => origin.trim()).filter(Boolean),
       bambuStudioPath: bambuInput.value.trim() || null,

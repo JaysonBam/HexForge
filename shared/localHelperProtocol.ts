@@ -1,4 +1,4 @@
-export const LOCAL_HELPER_VERSION = '1.0.0';
+export const LOCAL_HELPER_VERSION = '1.1.0';
 export const LOCAL_HELPER_API_VERSION = 'v1';
 export const LOCAL_HELPER_DEFAULT_PORT = 47821;
 export const LOCAL_HELPER_CLIENT_HEADER = 'X-Printing-Manager-Client';
@@ -16,7 +16,27 @@ export type ProjectDescriptor = {
   priorityNumber: number;
   studentName: string;
   studentNumber: string;
-  module: string;
+  expectedWorkflowFolder?: WorkflowFolderKey;
+  expectTbc?: boolean;
+};
+
+export const WORKFLOW_FOLDER_KEYS = ['to_be_printed', 'currently_printing', 'completed_prints', 'do_not_print'] as const;
+export type WorkflowFolderKey = typeof WORKFLOW_FOLDER_KEYS[number];
+
+export const WORKFLOW_FOLDER_LABELS: Record<WorkflowFolderKey, string> = {
+  to_be_printed: 'To Be Printed',
+  currently_printing: 'Currently Printing',
+  completed_prints: 'Completed Prints',
+  do_not_print: 'Do Not Print'
+};
+
+export type FolderSyncState = {
+  isInSync: boolean;
+  expectedWorkflowFolder: WorkflowFolderKey;
+  expectedFolderName: string;
+  locationMismatch: boolean;
+  nameMismatch: boolean;
+  suggestedActionLabel: string;
 };
 
 export type HelperHealth = {
@@ -34,6 +54,7 @@ export type FolderCandidate = {
   candidateId: string;
   folderName: string;
   relativePath: string;
+  workflowFolder: WorkflowFolderKey;
 };
 
 export type ProjectResolution =
@@ -44,6 +65,8 @@ export type ProjectResolution =
       projectKey: string;
       folderName: string;
       relativePath: string;
+      workflowFolder: WorkflowFolderKey;
+      sync: FolderSyncState;
     };
 
 export type SupportedFileKind =
@@ -114,7 +137,7 @@ export const isHelperHealth = (value: unknown): value is HelperHealth => {
     || (isObject(value.defaultApplications)
       && Object.values(value.defaultApplications).every((application) => ['bambu', 'cura', 'system'].includes(String(application))));
   return value.apiVersion === LOCAL_HELPER_API_VERSION
-    && typeof value.helperVersion === 'string'
+    && value.helperVersion === LOCAL_HELPER_VERSION
     && ['not_configured', 'root_unavailable', 'connected'].includes(String(value.state))
     && typeof value.configured === 'boolean'
     && typeof value.rootAvailable === 'boolean'
@@ -131,12 +154,21 @@ export const isProjectResolution = (value: unknown): value is ProjectResolution 
       isObject(candidate)
       && typeof candidate.candidateId === 'string'
       && typeof candidate.folderName === 'string'
-      && typeof candidate.relativePath === 'string');
+      && typeof candidate.relativePath === 'string'
+      && Object.hasOwn(WORKFLOW_FOLDER_LABELS, String(candidate.workflowFolder)));
   }
   return (value.status === 'matched' || value.status === 'created')
     && typeof value.projectKey === 'string'
     && typeof value.folderName === 'string'
-    && typeof value.relativePath === 'string';
+    && typeof value.relativePath === 'string'
+    && Object.hasOwn(WORKFLOW_FOLDER_LABELS, String(value.workflowFolder))
+    && isObject(value.sync)
+    && typeof value.sync.isInSync === 'boolean'
+    && Object.hasOwn(WORKFLOW_FOLDER_LABELS, String(value.sync.expectedWorkflowFolder))
+    && typeof value.sync.expectedFolderName === 'string'
+    && typeof value.sync.locationMismatch === 'boolean'
+    && typeof value.sync.nameMismatch === 'boolean'
+    && typeof value.sync.suggestedActionLabel === 'string';
 };
 
 export const isProjectFilesResponse = (value: unknown): value is ProjectFilesResponse => {

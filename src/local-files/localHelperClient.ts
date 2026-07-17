@@ -152,6 +152,18 @@ export class LocalHelperClient {
     });
   }
 
+  syncProjectFolder(projectKey: string, project: ProjectDescriptor, signal?: AbortSignal): Promise<ProjectResolution> {
+    return this.requestJson({
+      path: `/projects/${encodeURIComponent(projectKey)}/sync`,
+      method: 'POST',
+      body: { project },
+      signal,
+      idempotent: true,
+      timeoutMs: 30_000,
+      validate: isProjectResolution
+    });
+  }
+
   listProjectFiles(projectKey: string, signal?: AbortSignal): Promise<ProjectFilesResponse> {
     return this.requestJson({
       path: `/projects/${encodeURIComponent(projectKey)}/files`,
@@ -222,20 +234,6 @@ export class LocalHelperClient {
 
   getCopyOperation(operationId: string, signal?: AbortSignal): Promise<CopyOperation> {
     return this.requestJson({ path: `/operations/${encodeURIComponent(operationId)}`, signal, validate: isCopyOperation });
-  }
-
-  updateProjectStatus(projectKey: string, status: 'collected'): Promise<{ ok: true; folderName: string; relativePath: string }> {
-    return this.requestJson({
-      path: `/projects/${encodeURIComponent(projectKey)}/status`,
-      method: 'POST',
-      body: { status },
-      idempotent: true,
-      validate: (value): value is { ok: true; folderName: string; relativePath: string } =>
-        Boolean(value) && typeof value === 'object'
-        && (value as { ok?: unknown }).ok === true
-        && typeof (value as { folderName?: unknown }).folderName === 'string'
-        && typeof (value as { relativePath?: unknown }).relativePath === 'string'
-    });
   }
 
   openSettings(): Promise<{ ok: true }> {

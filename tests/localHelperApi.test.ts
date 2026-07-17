@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp } from 'node:fs/promises';
+import { access, mkdtemp, mkdir } from 'node:fs/promises';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -23,12 +23,19 @@ const availablePort = () => new Promise<number>((resolve, reject) => {
 test('helper API enforces deployed/dev CORS, PNA preflight, and the custom header', async () => {
   const appData = await mkdtemp(path.join(os.tmpdir(), 'hexforge-api-appdata-'));
   const root = await mkdtemp(path.join(os.tmpdir(), 'hexforge-api-root-'));
+  const workflowFolders = {
+    to_be_printed: path.join(root, 'To Be Printed'),
+    currently_printing: path.join(root, 'Currently Printing'),
+    completed_prints: path.join(root, 'Completed Prints'),
+    do_not_print: path.join(root, 'Do Not Print')
+  };
+  await Promise.all(Object.values(workflowFolders).map((folder) => mkdir(folder)));
   const port = await availablePort();
   const configStore = new ConfigStore(appData);
   const config = await configStore.load();
   await configStore.save({
     ...config,
-    rootProjectFolder: root,
+    workflowFolders,
     port,
     allowedOrigins: ['https://printing.example.com', 'http://localhost:5173']
   });
@@ -71,10 +78,11 @@ test('helper API enforces deployed/dev CORS, PNA preflight, and the custom heade
       'Content-Type': 'application/json',
       'X-Idempotency-Key': crypto.randomUUID()
     };
+    const descriptor = { projectId: 'ABCDE', priorityNumber: 107, studentName: 'API Test', studentNumber: '12345678', expectedWorkflowFolder: 'to_be_printed', expectTbc: true };
     const created = await fetch(`http://127.0.0.1:${port}/v1/projects/create`, {
       method: 'POST',
       headers: projectHeaders,
-      body: JSON.stringify({ project: { projectId: 'ABCDE', priorityNumber: 107, studentName: 'API Test', studentNumber: '12345678', module: 'TEST101' } })
+      body: JSON.stringify({ project: descriptor })
     });
     assert.equal(created.status, 200);
     const createdProject = await created.json() as { projectKey: string };
@@ -84,7 +92,14 @@ test('helper API enforces deployed/dev CORS, PNA preflight, and the custom heade
       body: '{}'
     });
     assert.equal(opened.status, 200);
-    assert.ok(openedFolder?.endsWith('P107 - API Test - u12345678 - TEST101 - tbc'));
+    assert.ok(openedFolder?.endsWith('P107 API Test u12345678 - TBC'));
+    const synchronized = await fetch(`http://127.0.0.1:${port}/v1/projects/${createdProject.projectKey}/sync`, {
+      method: 'POST',
+      headers: { ...projectHeaders, 'X-Idempotency-Key': crypto.randomUUID() },
+      body: JSON.stringify({ project: { ...descriptor, expectedWorkflowFolder: 'currently_printing', expectTbc: false } })
+    });
+    assert.equal(synchronized.status, 200);
+    await access(path.join(workflowFolders.currently_printing, 'P107 API Test u12345678'));
     const rejected = await fetch(`http://127.0.0.1:${port}/v1/health`, {
       headers: { Origin: 'https://attacker.example', [LOCAL_HELPER_CLIENT_HEADER]: LOCAL_HELPER_CLIENT_VALUE }
     });

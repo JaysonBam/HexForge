@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ExternalLink, FileInput, Folder, FolderOpen, FolderPlus, Loader2, RefreshCw, Settings, Usb } from 'lucide-react';
-import type { DefaultApplication, LocalProjectFile, ProjectResolution, SlicerHint, SupportedFileKind } from '../../shared/localHelperProtocol';
+import { AlertTriangle, ExternalLink, FileInput, Folder, FolderOpen, FolderPlus, Loader2, RefreshCw, Settings, Usb } from 'lucide-react';
+import { WORKFLOW_FOLDER_LABELS, type DefaultApplication, type LocalProjectFile, type ProjectResolution, type SlicerHint, type SupportedFileKind } from '../../shared/localHelperProtocol';
 import type { Project } from '../types';
 import { useProjects } from '../context/ProjectContext';
 import { useSettings } from '../context/SettingsContext';
@@ -12,6 +12,7 @@ import { useLocalHelper } from './LocalHelperContext';
 import { runSequentialImports } from './importSequence';
 import { analyzeProjectFiles } from './projectFileImport';
 import { isFileLinkedToParts } from './sourceFileLink';
+import { projectFolderDescriptor } from './projectFolderWorkflow';
 
 type MatchedResolution = Extract<ProjectResolution, { status: 'matched' | 'created' }>;
 
@@ -51,7 +52,7 @@ const SlicerIcon = ({ hint }: { hint: SlicerHint }) => {
   return <ExternalLink size={14} />;
 };
 
-export const LocalFilesCard = ({ project }: { project: Project }) => {
+export const LocalFilesCard = ({ project, autoCreateIfMissing = false }: { project: Project; autoCreateIfMissing?: boolean }) => {
   const { state, health, client } = useLocalHelper();
   const { addExtractedParts, syncStatus } = useProjects();
   const { getFilamentPrice } = useSettings();
@@ -61,55 +62,89 @@ export const LocalFilesCard = ({ project }: { project: Project }) => {
   const [loading, setLoading] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
   const activeRequest = useRef<AbortController | null>(null);
-  const descriptor = useMemo(() => ({
-    projectId: project.id,
-    priorityNumber: project.priorityNumber,
-    studentName: project.studentName,
-    studentNumber: project.studentNumber,
-    module: project.course
-  }), [
-    project.course,
-    project.id,
-    project.priorityNumber,
-    project.studentName,
-    project.studentNumber
-  ]);
+  const lastExpectation = useRef<{ projectId: string; key: string } | null>(null);
+  const lastResolutionWasInSync = useRef(false);
+  const descriptor = useMemo(() => projectFolderDescriptor(project), [project]);
+  const expectedKey = `${descriptor.projectId}:${descriptor.expectedWorkflowFolder}:${descriptor.expectTbc}:${descriptor.priorityNumber}:${descriptor.studentName}:${descriptor.studentNumber}`;
 
   const loadFiles = useCallback(async (matched: MatchedResolution, signal?: AbortSignal) => {
     const response = await client.listProjectFiles(matched.projectKey, signal);
     setFiles(response.files);
   }, [client]);
 
-  const resolveFolder = useCallback(async () => {
+  const resolveFolder = useCallback(async (autoSync = false) => {
     if (state !== 'connected') return;
     activeRequest.current?.abort();
     const controller = new AbortController();
     activeRequest.current = controller;
     setLoading(true);
     try {
-      const result = await client.resolveProject(descriptor, controller.signal);
+      let result = await client.resolveProject(descriptor, controller.signal);
       if (controller.signal.aborted) return;
+      if (result.status === 'not_found' && autoCreateIfMissing) {
+        try {
+          result = await client.createProjectFolder(descriptor, controller.signal);
+          if (controller.signal.aborted) return;
+        } catch (error) {
+          if (controller.signal.aborted) return;
+          setResolution(result);
+          setFiles([]);
+          notify({
+            title: 'Local folder was not created automatically',
+            message: error instanceof Error ? error.message : 'Use Create Folder to try again.',
+            tone: 'warning'
+          });
+          return;
+        }
+      }
+      if ((result.status === 'matched' || result.status === 'created') && !result.sync.isInSync && autoSync) {
+        try {
+          result = await client.syncProjectFolder(result.projectKey, descriptor, controller.signal);
+          if (controller.signal.aborted) return;
+        } catch (error) {
+          notify({
+            title: 'Project saved; local folder needs attention',
+            message: error instanceof Error ? error.message : 'Use the folder sync action when the local drive is available.',
+            tone: 'warning'
+          });
+        }
+      }
       setResolution(result);
-      if (result.status === 'matched' || result.status === 'created') await loadFiles(result, controller.signal);
+      if (result.status === 'matched' || result.status === 'created') {
+        lastResolutionWasInSync.current = result.sync.isInSync;
+        await loadFiles(result, controller.signal);
+      }
       else setFiles([]);
-    } catch {
-      if (!controller.signal.aborted) setResolution(null);
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        setResolution(null);
+        notify({
+          title: 'Local folder could not be prepared',
+          message: error instanceof Error ? error.message : 'The helper could not find or create the project folder.',
+          tone: 'warning'
+        });
+      }
     } finally {
       if (!controller.signal.aborted) setLoading(false);
     }
-  }, [client, descriptor, loadFiles, state]);
+  }, [autoCreateIfMissing, client, descriptor, loadFiles, notify, state]);
 
   useEffect(() => {
+    const sameProject = lastExpectation.current?.projectId === project.id;
+    const expectedChanged = sameProject && lastExpectation.current?.key !== expectedKey;
+    const shouldAutoSync = expectedChanged && lastResolutionWasInSync.current;
+    if (!sameProject) lastResolutionWasInSync.current = false;
+    lastExpectation.current = { projectId: project.id, key: expectedKey };
     const timer = window.setTimeout(() => {
       setResolution(null);
       setFiles([]);
-      if (state === 'connected') void resolveFolder();
+      if (state === 'connected') void resolveFolder(shouldAutoSync);
     }, 0);
     return () => {
       window.clearTimeout(timer);
       activeRequest.current?.abort();
     };
-  }, [project.id, resolveFolder, state]);
+  }, [expectedKey, project.id, resolveFolder, state]);
 
   const refreshFiles = useCallback(async () => {
     if (!resolution || (resolution.status !== 'matched' && resolution.status !== 'created')) return;
@@ -129,6 +164,7 @@ export const LocalFilesCard = ({ project }: { project: Project }) => {
       const result = await client.createProjectFolder(descriptor);
       setResolution(result);
       if (result.status === 'matched' || result.status === 'created') {
+        lastResolutionWasInSync.current = result.sync.isInSync;
         await loadFiles(result);
         notify({
           title: result.status === 'created' ? 'Folder created' : 'Folder matched',
@@ -143,12 +179,31 @@ export const LocalFilesCard = ({ project }: { project: Project }) => {
     }
   };
 
+  const syncFolder = async (matched: MatchedResolution) => {
+    setActionId('sync-folder');
+    try {
+      const result = await client.syncProjectFolder(matched.projectKey, descriptor);
+      if (result.status !== 'matched' && result.status !== 'created') throw new Error('The folder could not be resolved after synchronization.');
+      setResolution(result);
+      lastResolutionWasInSync.current = result.sync.isInSync;
+      await loadFiles(result);
+      notify({ title: 'Local folder synchronized', message: `${WORKFLOW_FOLDER_LABELS[result.workflowFolder]} / ${result.folderName}`, tone: 'success' });
+    } catch (error) {
+      notify({ title: 'Local folder was not synchronized', message: error instanceof Error ? error.message : 'The project workflow was saved, but its local folder still needs attention.', tone: 'warning' });
+    } finally {
+      setActionId(null);
+    }
+  };
+
   const selectCandidate = async (candidateId: string) => {
     setActionId(candidateId);
     try {
       const result = await client.resolveProject(descriptor, undefined, candidateId);
       setResolution(result);
-      if (result.status === 'matched' || result.status === 'created') await loadFiles(result);
+      if (result.status === 'matched' || result.status === 'created') {
+        lastResolutionWasInSync.current = result.sync.isInSync;
+        await loadFiles(result);
+      }
     } catch (error) {
       notify({ title: 'Folder could not be selected', message: error instanceof Error ? error.message : 'Refresh and try again.', tone: 'warning' });
     } finally {
@@ -263,8 +318,8 @@ export const LocalFilesCard = ({ project }: { project: Project }) => {
     return (
       <Card className="flex h-full min-h-0 flex-col border-amber-300 bg-amber-50 p-3 print:hidden">
         <p className="text-[10px] font-black uppercase tracking-[0.14em] text-amber-700">Local files</p>
-        <p className="mt-1 text-xs font-black text-amber-950">Projects root unavailable</p>
-        <p className="mt-1 text-[10px] font-semibold leading-relaxed text-amber-800">Reconnect the drive or choose the root again in helper settings.</p>
+        <p className="mt-1 text-xs font-black text-amber-950">Workflow folders unavailable</p>
+        <p className="mt-1 text-[10px] font-semibold leading-relaxed text-amber-800">Reconnect the drive or check all four folders in helper settings.</p>
         <Button variant="outline" size="sm" className="mt-2 h-7 gap-1.5 px-2 text-[10px]" onClick={() => void client.openSettings()}><Settings size={13} /> Helper settings</Button>
       </Card>
     );
@@ -284,7 +339,7 @@ export const LocalFilesCard = ({ project }: { project: Project }) => {
 
         {resolution?.status === 'not_found' && (
           <div className="forge-panel-muted p-2.5">
-            <div className="flex items-start gap-2"><FolderPlus size={16} className="mt-0.5 shrink-0 text-sky-700" /><div><p className="text-xs font-black text-slate-900">No matching folder yet</p><p className="mt-0.5 text-[10px] font-semibold leading-relaxed text-slate-600">Create it after the project has saved.</p></div></div>
+            <div className="flex items-start gap-2"><FolderPlus size={16} className="mt-0.5 shrink-0 text-sky-700" /><div><p className="text-xs font-black text-slate-900">No matching folder yet</p><p className="mt-0.5 text-[10px] font-semibold leading-relaxed text-slate-600">Create a folder for this existing project.</p></div></div>
             <Button size="sm" className="mt-2 h-7 w-full gap-1.5 text-[10px]" disabled={syncStatus.saving || actionId === 'create-folder'} onClick={() => void createFolder()}>
               {actionId === 'create-folder' ? <Loader2 size={13} className="animate-spin" /> : <FolderPlus size={13} />} Create Folder
             </Button>
@@ -298,7 +353,7 @@ export const LocalFilesCard = ({ project }: { project: Project }) => {
             {resolution.candidates.map((candidate) => (
               <button key={candidate.candidateId} type="button" onClick={() => void selectCandidate(candidate.candidateId)} className="forge-panel-muted flex w-full items-center gap-2 p-2 text-left text-[10px] font-bold text-slate-800 hover:border-sky-400">
                 {actionId === candidate.candidateId ? <Loader2 size={13} className="animate-spin" /> : <Folder size={13} className="text-sky-700" />}
-                <span className="min-w-0 truncate">{candidate.folderName}</span>
+                <span className="min-w-0 truncate">{WORKFLOW_FOLDER_LABELS[candidate.workflowFolder]} / {candidate.folderName}</span>
               </button>
             ))}
           </div>
@@ -306,6 +361,14 @@ export const LocalFilesCard = ({ project }: { project: Project }) => {
 
         {resolution && (resolution.status === 'matched' || resolution.status === 'created') && (
           <>
+            {!resolution.sync.isInSync && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 p-2.5 text-amber-950">
+                <div className="flex items-start gap-2"><AlertTriangle size={14} className="mt-0.5 shrink-0" /><div className="min-w-0"><p className="text-[10px] font-black">Local folder out of sync</p><p className="mt-0.5 text-[9px] font-semibold leading-relaxed">Found in {WORKFLOW_FOLDER_LABELS[resolution.workflowFolder]} as {resolution.folderName}.</p></div></div>
+                <Button variant="outline" size="sm" className="mt-2 h-7 w-full gap-1.5 border-amber-300 px-2 text-[10px]" disabled={actionId !== null} onClick={() => void syncFolder(resolution)}>
+                  {actionId === 'sync-folder' ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} {resolution.sync.suggestedActionLabel}
+                </Button>
+              </div>
+            )}
             <button
               type="button"
               onClick={() => void openProjectFolder(resolution)}
@@ -315,7 +378,7 @@ export const LocalFilesCard = ({ project }: { project: Project }) => {
               title={`Open ${resolution.folderName} in File Explorer`}
             >
               {actionId === 'open-folder' ? <Loader2 size={14} className="shrink-0 animate-spin text-sky-700" /> : <FolderOpen size={14} className="shrink-0 text-sky-700" />}
-              <span className="min-w-0 flex-1 truncate text-[10px] font-black text-slate-900">{resolution.folderName}</span>
+              <span className="min-w-0 flex-1 truncate text-[10px] font-black text-slate-900">{WORKFLOW_FOLDER_LABELS[resolution.workflowFolder]} / {resolution.folderName}</span>
               <ExternalLink size={11} className="shrink-0 text-slate-400 transition-colors group-hover:text-sky-700" />
             </button>
 

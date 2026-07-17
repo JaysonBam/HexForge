@@ -3,9 +3,9 @@ import test from 'node:test';
 import type { Project } from '../src/types/index.ts';
 import { runSequentialImports } from '../src/local-files/importSequence.ts';
 import { isImportEligibleFilename } from '../src/local-files/projectFileImport.ts';
-import { syncCollectedProjectFolder } from '../src/local-files/statusSync.ts';
 import { findLinkedLocalFile, isFileLinkedToParts, normalizeSourceFilePath, sourceFileName } from '../src/local-files/sourceFileLink.ts';
 import type { LocalProjectFile } from '../shared/localHelperProtocol.ts';
+import { getExpectedWorkflowFolder, projectExpectsTbc } from '../src/local-files/projectFolderWorkflow.ts';
 
 test('only existing parser formats are import eligible', () => {
   assert.equal(isImportEligibleFilename('model.3mf'), true);
@@ -49,28 +49,16 @@ test('source file links match stable project-relative paths', () => {
   assert.equal(sourceFileName(linkedPart.sourceFilePath as string), 'widget.gcode.3mf');
 });
 
-test('folder status sync failure cannot change the already-collected project result', async () => {
-  const project = {
-    id: 'ABCDE', priorityNumber: 107, studentName: 'Jane', studentNumber: '12345678', course: 'COS110', parts: []
-  } as unknown as Project;
-  let primaryStatus = 'CLOSED';
-  const result = await syncCollectedProjectFolder({
-    resolveProject: async () => ({ status: 'matched', projectKey: crypto.randomUUID(), folderName: 'folder', relativePath: 'folder' }),
-    updateProjectStatus: async () => { throw new Error('drive removed'); }
-  }, project);
-  assert.equal(primaryStatus, 'CLOSED');
-  assert.equal(result.synced, false);
-  assert.match(result.warning ?? '', /drive removed/);
-  primaryStatus = 'CLOSED';
-});
-
-test('ambiguous collection folders are never renamed silently', async () => {
-  let renameCalls = 0;
-  const result = await syncCollectedProjectFolder({
-    resolveProject: async () => ({ status: 'ambiguous', candidates: [] }),
-    updateProjectStatus: async () => { renameCalls += 1; return { ok: true, folderName: '', relativePath: '' }; }
-  }, { id: 'ABCDE', priorityNumber: 1, studentName: 'A', studentNumber: '12345678', course: 'COS110', parts: [] } as unknown as Project);
-  assert.equal(renameCalls, 0);
-  assert.equal(result.synced, false);
-  assert.match(result.warning ?? '', /more than one/);
+test('local workflow folder follows archive and print progress without changing project workflow', () => {
+  const project = { id: 'ABCDE', priorityNumber: 1, studentName: 'A', studentNumber: '12345678', course: 'COS110', state: 'REVIEW', archived: false, parts: [] } as unknown as Project;
+  assert.equal(getExpectedWorkflowFolder(project), 'to_be_printed');
+  assert.equal(projectExpectsTbc(project), true);
+  project.state = 'IN_PRODUCTION';
+  project.parts = [{ printStatus: 'PRINTING' }] as Project['parts'];
+  assert.equal(getExpectedWorkflowFolder(project), 'currently_printing');
+  assert.equal(projectExpectsTbc(project), false);
+  project.parts = [{ printStatus: 'PRINTED' }, { printStatus: 'POST_PROCESSING' }] as Project['parts'];
+  assert.equal(getExpectedWorkflowFolder(project), 'completed_prints');
+  project.archived = true;
+  assert.equal(getExpectedWorkflowFolder(project), 'do_not_print');
 });

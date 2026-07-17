@@ -8,10 +8,12 @@ import {
   LOCAL_HELPER_CLIENT_VALUE,
   LOCAL_HELPER_IDEMPOTENCY_HEADER,
   LOCAL_HELPER_VERSION,
+  WORKFLOW_FOLDER_KEYS,
   type HelperErrorPayload,
   type ProjectDescriptor,
   type ProjectResolution,
-  type SlicerHint
+  type SlicerHint,
+  type WorkflowFolderKey
 } from '../../../shared/localHelperProtocol.js';
 import type { ConfigStore, HelperConfig } from './config.js';
 import type { CopyOperationManager } from './copyOperations.js';
@@ -21,7 +23,9 @@ import {
   createProjectFolder,
   findProjectFolderMatches,
   isPathWithinRoot,
-  renameProjectFolderStatus,
+  getFolderSyncState,
+  syncProjectFolder,
+  type WorkflowFolderPaths,
   type FolderMatch
 } from './folders.js';
 import type { RotatingLogger } from './logger.js';
@@ -30,6 +34,10 @@ import { isUuid, OpaqueRegistry } from './registry.js';
 const MAX_BODY_BYTES = 32 * 1024;
 const ALLOWED_METHODS = 'GET, POST, OPTIONS';
 const ALLOWED_HEADERS = ['content-type', LOCAL_HELPER_CLIENT_HEADER.toLocaleLowerCase(), LOCAL_HELPER_IDEMPOTENCY_HEADER.toLocaleLowerCase()];
+const configuredWorkflowFolders = (config: HelperConfig): WorkflowFolderPaths | null => {
+  if (!WORKFLOW_FOLDER_KEYS.every((key) => typeof config.workflowFolders[key] === 'string' && config.workflowFolders[key])) return null;
+  return config.workflowFolders as WorkflowFolderPaths;
+};
 
 type ApiDependencies = {
   configStore: ConfigStore;
@@ -84,15 +92,17 @@ const isProjectDescriptor = (value: unknown): value is ProjectDescriptor => {
     && project.studentName.trim().length > 0
     && typeof project.studentNumber === 'string'
     && /^u?\d{8}$/i.test(project.studentNumber.trim())
-    && typeof project.module === 'string'
-    && project.module.trim().length > 0;
+    && (project.expectedWorkflowFolder === undefined || WORKFLOW_FOLDER_KEYS.includes(project.expectedWorkflowFolder as WorkflowFolderKey))
+    && (project.expectTbc === undefined || typeof project.expectTbc === 'boolean');
 };
 
-const projectResolution = (match: FolderMatch, registry: OpaqueRegistry, status: 'matched' | 'created'): ProjectResolution => ({
+const projectResolution = (match: FolderMatch, project: ProjectDescriptor, registry: OpaqueRegistry, status: 'matched' | 'created'): ProjectResolution => ({
   status,
   projectKey: registry.registerProject(match),
   folderName: match.folderName,
-  relativePath: match.relativePath
+  relativePath: match.relativePath,
+  workflowFolder: match.workflowFolder,
+  sync: getFolderSyncState(match, project)
 });
 
 export class LocalApiServer {
@@ -168,10 +178,13 @@ export class LocalApiServer {
   }
 
   private async rootState(config: HelperConfig): Promise<{ configured: boolean; available: boolean }> {
-    if (!config.rootProjectFolder) return { configured: false, available: false };
+    const workflowFolders = configuredWorkflowFolders(config);
+    if (!workflowFolders) return { configured: false, available: false };
     try {
-      await access(config.rootProjectFolder);
-      await realpath(config.rootProjectFolder);
+      await Promise.all(WORKFLOW_FOLDER_KEYS.map(async (key) => {
+        await access(workflowFolders[key]);
+        await realpath(workflowFolders[key]);
+      }));
       return { configured: true, available: true };
     } catch {
       return { configured: true, available: false };
@@ -257,13 +270,14 @@ export class LocalApiServer {
       return;
     }
 
-    const root = await this.rootState(config);
-    if (!root.configured || !config.rootProjectFolder) {
-      sendJson(response, 409, errorPayload('NOT_CONFIGURED', 'Choose a projects root folder in helper settings.'));
+    const folderState = await this.rootState(config);
+    const workflowFolders = configuredWorkflowFolders(config);
+    if (!folderState.configured || !workflowFolders) {
+      sendJson(response, 409, errorPayload('NOT_CONFIGURED', 'Choose all four workflow folders in helper settings.'));
       return;
     }
-    if (!root.available) {
-      sendJson(response, 503, errorPayload('ROOT_UNAVAILABLE', 'The configured projects root is currently unavailable.'));
+    if (!folderState.available) {
+      sendJson(response, 503, errorPayload('ROOT_UNAVAILABLE', 'One or more configured workflow folders are unavailable.'));
       return;
     }
 
@@ -275,17 +289,18 @@ export class LocalApiServer {
       }
       if (typeof body.candidateId === 'string') {
         const candidate = this.dependencies.registry.consumeCandidate(body.candidateId);
-        if (!candidate || !isPathWithinRoot(config.rootProjectFolder, candidate.absolutePath)) {
+        const candidateRoot = candidate ? workflowFolders[candidate.workflowFolder] : null;
+        if (!candidate || !candidateRoot || !isPathWithinRoot(candidateRoot, candidate.absolutePath)) {
           sendJson(response, 404, errorPayload('UNKNOWN_CANDIDATE', 'The selected folder candidate is no longer available.'));
           return;
         }
-        sendJson(response, 200, projectResolution({ ...candidate, score: 0, studentNumberMatch: false }, this.dependencies.registry, 'matched'));
+        sendJson(response, 200, projectResolution({ ...candidate, score: 0, studentNumberMatch: false }, body.project, this.dependencies.registry, 'matched'));
         return;
       }
-      const matches = await findProjectFolderMatches(config.rootProjectFolder, body.project);
+      const matches = await findProjectFolderMatches(workflowFolders, body.project);
       const clearMatch = chooseClearFolderMatch(matches);
       if (clearMatch) {
-        sendJson(response, 200, projectResolution(clearMatch, this.dependencies.registry, 'matched'));
+        sendJson(response, 200, projectResolution(clearMatch, body.project, this.dependencies.registry, 'matched'));
         return;
       }
       if (!matches.length) {
@@ -297,7 +312,8 @@ export class LocalApiServer {
         candidates: matches.map((match) => ({
           candidateId: this.dependencies.registry.registerCandidate(match),
           folderName: match.folderName,
-          relativePath: match.relativePath
+          relativePath: match.relativePath,
+          workflowFolder: match.workflowFolder
         }))
       } satisfies ProjectResolution);
       return;
@@ -318,11 +334,11 @@ export class LocalApiServer {
         sendJson(response, 400, errorPayload('INVALID_PROJECT', 'Project metadata is incomplete or invalid.'));
         return;
       }
-      const matches = await findProjectFolderMatches(config.rootProjectFolder, body.project);
+      const matches = await findProjectFolderMatches(workflowFolders, body.project);
       const clearMatch = chooseClearFolderMatch(matches);
       let status = 200;
       let payload: ProjectResolution;
-      if (clearMatch) payload = projectResolution(clearMatch, this.dependencies.registry, 'matched');
+      if (clearMatch) payload = projectResolution(clearMatch, body.project, this.dependencies.registry, 'matched');
       else if (matches.length) {
         status = 409;
         payload = {
@@ -330,10 +346,11 @@ export class LocalApiServer {
           candidates: matches.map((match) => ({
             candidateId: this.dependencies.registry.registerCandidate(match),
             folderName: match.folderName,
-            relativePath: match.relativePath
+            relativePath: match.relativePath,
+            workflowFolder: match.workflowFolder
           }))
         };
-      } else payload = projectResolution(await createProjectFolder(config.rootProjectFolder, body.project), this.dependencies.registry, 'created');
+      } else payload = projectResolution(await createProjectFolder(workflowFolders, body.project), { ...body.project, expectedWorkflowFolder: 'to_be_printed', expectTbc: true }, this.dependencies.registry, 'created');
       this.cacheResponse(idempotency.key, status, payload);
       sendJson(response, status, payload);
       return;
@@ -356,7 +373,7 @@ export class LocalApiServer {
         return;
       }
       try {
-        const canonicalRoot = await realpath(config.rootProjectFolder);
+        const canonicalRoot = await realpath(workflowFolders[project.workflowFolder]);
         const canonicalProject = await realpath(project.absolutePath);
         if (!isPathWithinRoot(canonicalRoot, canonicalProject)) {
           sendJson(response, 403, errorPayload('PATH_OUTSIDE_ROOT', 'The project folder is outside the configured root.'));
@@ -381,7 +398,7 @@ export class LocalApiServer {
         return;
       }
       sendJson(response, 200, await scanProjectFiles({
-        rootPath: config.rootProjectFolder,
+        rootPath: workflowFolders[project.workflowFolder],
         projectKey,
         projectFolder: project,
         config,
@@ -469,8 +486,8 @@ export class LocalApiServer {
       return;
     }
 
-    const statusMatch = pathname.match(/^\/v1\/projects\/([0-9a-f-]+)\/status$/i);
-    if (request.method === 'POST' && statusMatch) {
+    const syncMatch = pathname.match(/^\/v1\/projects\/([0-9a-f-]+)\/sync$/i);
+    if (request.method === 'POST' && syncMatch) {
       const idempotency = this.requireIdempotency(request, pathname);
       if (!idempotency) {
         sendJson(response, 400, errorPayload('IDEMPOTENCY_KEY_REQUIRED', 'A valid idempotency key is required.'));
@@ -480,20 +497,21 @@ export class LocalApiServer {
         sendJson(response, idempotency.cached.status, idempotency.cached.payload);
         return;
       }
-      const project = this.dependencies.registry.getProject(statusMatch[1]);
+      const project = this.dependencies.registry.getProject(syncMatch[1]);
       const body = await readJsonBody(request) as Record<string, unknown>;
-      if (!project || body.status !== 'collected') {
-        sendJson(response, 400, errorPayload('INVALID_STATUS_REQUEST', 'Only a resolved project can be marked collected.'));
+      if (!project || !isProjectDescriptor(body.project)) {
+        sendJson(response, 400, errorPayload('INVALID_SYNC_REQUEST', 'A resolved project and valid expected folder state are required.'));
         return;
       }
       try {
-        const renamed = await renameProjectFolderStatus(config.rootProjectFolder, project.absolutePath, 'collected');
-        this.dependencies.registry.updateProject(statusMatch[1], renamed);
-        const payload = { ok: true, folderName: renamed.folderName, relativePath: renamed.relativePath };
+        const current = { ...project, score: 0, studentNumberMatch: false } satisfies FolderMatch;
+        const synced = await syncProjectFolder(workflowFolders, current, body.project);
+        this.dependencies.registry.updateProject(syncMatch[1], synced);
+        const payload = projectResolution(synced, body.project, this.dependencies.registry, 'matched');
         this.cacheResponse(idempotency.key, 200, payload);
         sendJson(response, 200, payload);
       } catch (error) {
-        sendJson(response, 409, errorPayload('STATUS_RENAME_FAILED', error instanceof Error ? error.message : 'Folder rename failed.'));
+        sendJson(response, 409, errorPayload('FOLDER_SYNC_FAILED', error instanceof Error ? error.message : 'Folder move or rename failed.'));
       }
       return;
     }

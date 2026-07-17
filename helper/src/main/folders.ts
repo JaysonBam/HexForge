@@ -1,10 +1,11 @@
-import { mkdir, readdir, realpath, rename } from 'node:fs/promises';
+import { cp, mkdir, readdir, realpath, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
-import type { ProjectDescriptor } from '../../../shared/localHelperProtocol.js';
+import { WORKFLOW_FOLDER_KEYS, WORKFLOW_FOLDER_LABELS, type FolderSyncState, type ProjectDescriptor, type WorkflowFolderKey } from '../../../shared/localHelperProtocol.js';
 
 const INVALID_WINDOWS_CHARS = /[<>:"/\\|?*]/g;
 const RESERVED_WINDOWS_NAMES = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
-const STATUS_SUFFIX = /\s+-\s+(tbc|collected)$/i;
+
+export type WorkflowFolderPaths = Record<WorkflowFolderKey, string>;
 
 export const sanitizeWindowsComponent = (value: string, fallback = 'Unknown'): string => {
   let output = value
@@ -21,19 +22,16 @@ export const sanitizeWindowsComponent = (value: string, fallback = 'Unknown'): s
   return output || fallback;
 };
 
-export const normalizeStudentNumber = (studentNumber: string): string => {
-  const digits = studentNumber.replace(/\D/g, '').slice(0, 8);
-  return `u${digits}`;
-};
+export const normalizeStudentNumber = (studentNumber: string): string => `u${studentNumber.replace(/\D/g, '').slice(0, 8)}`;
 
-export const generateProjectFolderName = (project: ProjectDescriptor, status: 'tbc' | 'collected' = 'tbc'): string =>
-  [
+export const generateProjectFolderName = (project: ProjectDescriptor, includeTbc = project.expectTbc ?? true): string => {
+  const base = [
     `P${Math.max(1, Math.trunc(project.priorityNumber))}`,
     sanitizeWindowsComponent(project.studentName, 'Unknown Student'),
-    sanitizeWindowsComponent(normalizeStudentNumber(project.studentNumber), 'u00000000'),
-    sanitizeWindowsComponent(project.module, 'Unknown Module'),
-    status
-  ].join(' - ');
+    sanitizeWindowsComponent(normalizeStudentNumber(project.studentNumber), 'u00000000')
+  ].join(' ');
+  return includeTbc ? `${base} - TBC` : base;
+};
 
 export const isPathWithinRoot = (rootPath: string, candidatePath: string): boolean => {
   const relative = path.relative(path.resolve(rootPath), path.resolve(candidatePath));
@@ -46,6 +44,7 @@ export type FolderMatch = {
   absolutePath: string;
   folderName: string;
   relativePath: string;
+  workflowFolder: WorkflowFolderKey;
   score: number;
   studentNumberMatch: boolean;
 };
@@ -53,33 +52,34 @@ export type FolderMatch = {
 export const scoreFolderCandidate = (folderName: string, project: ProjectDescriptor): Pick<FolderMatch, 'score' | 'studentNumberMatch'> => {
   const candidate = normalizeForMatch(folderName);
   const studentNumber = normalizeForMatch(normalizeStudentNumber(project.studentNumber));
-  const studentNumberWithoutPrefix = normalizeForMatch(project.studentNumber);
-  const studentNumberMatch = candidate.includes(studentNumber) || candidate.includes(studentNumberWithoutPrefix);
+  const studentNumberMatch = candidate.includes(studentNumber) || candidate.includes(normalizeForMatch(project.studentNumber));
   let score = studentNumberMatch ? 4 : 0;
   if (candidate.includes(normalizeForMatch(project.studentName))) score += 2;
-  if (candidate.includes(normalizeForMatch(project.module))) score += 1;
   return { score, studentNumberMatch };
 };
 
-export const findProjectFolderMatches = async (rootPath: string, project: ProjectDescriptor): Promise<FolderMatch[]> => {
-  const canonicalRoot = await realpath(rootPath);
-  const priorityPattern = new RegExp(`^P${Math.trunc(project.priorityNumber)}(?:\\s+-\\s+|$)`, 'i');
-  const entries = await readdir(canonicalRoot, { withFileTypes: true });
+export const findProjectFolderMatches = async (workflowFolders: WorkflowFolderPaths, project: ProjectDescriptor): Promise<FolderMatch[]> => {
+  const priorityPattern = new RegExp(`^P${Math.trunc(project.priorityNumber)}(?!\\d)`, 'i');
   const matches: FolderMatch[] = [];
-
-  for (const entry of entries) {
-    if (!entry.isDirectory() || !priorityPattern.test(entry.name)) continue;
-    const absolutePath = await realpath(path.join(canonicalRoot, entry.name));
-    if (!isPathWithinRoot(canonicalRoot, absolutePath)) continue;
-    const scored = scoreFolderCandidate(entry.name, project);
-    matches.push({
-      absolutePath,
-      folderName: entry.name,
-      relativePath: path.relative(canonicalRoot, absolutePath) || '.',
-      ...scored
-    });
+  const seen = new Set<string>();
+  for (const workflowFolder of WORKFLOW_FOLDER_KEYS) {
+    const canonicalRoot = await realpath(workflowFolders[workflowFolder]);
+    const entries = await readdir(canonicalRoot, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory() || !priorityPattern.test(entry.name)) continue;
+      const absolutePath = await realpath(path.join(canonicalRoot, entry.name));
+      const identity = absolutePath.toLocaleLowerCase();
+      if (!isPathWithinRoot(canonicalRoot, absolutePath) || seen.has(identity)) continue;
+      seen.add(identity);
+      matches.push({
+        absolutePath,
+        folderName: entry.name,
+        relativePath: entry.name,
+        workflowFolder,
+        ...scoreFolderCandidate(entry.name, project)
+      });
+    }
   }
-
   return matches.sort((left, right) => right.score - left.score || left.folderName.localeCompare(right.folderName));
 };
 
@@ -90,50 +90,67 @@ export const chooseClearFolderMatch = (matches: FolderMatch[]): FolderMatch | nu
   return best.studentNumberMatch && best.score > runnerUp.score ? best : null;
 };
 
-export const createProjectFolder = async (rootPath: string, project: ProjectDescriptor): Promise<FolderMatch> => {
-  const canonicalRoot = await realpath(rootPath);
-  const folderName = generateProjectFolderName(project);
-  const desiredPath = path.join(canonicalRoot, folderName);
-  if (!isPathWithinRoot(canonicalRoot, desiredPath) || path.dirname(desiredPath) !== canonicalRoot) {
-    throw new Error('Generated project folder is outside the configured root.');
+export const getFolderSyncState = (match: FolderMatch, project: ProjectDescriptor): FolderSyncState => {
+  const expectedWorkflowFolder = project.expectedWorkflowFolder ?? 'to_be_printed';
+  const expectedFolderName = generateProjectFolderName(project);
+  const locationMismatch = match.workflowFolder !== expectedWorkflowFolder;
+  const nameMismatch = match.folderName !== expectedFolderName;
+  const actionParts: string[] = [];
+  if (locationMismatch) actionParts.push(`Move to ${WORKFLOW_FOLDER_LABELS[expectedWorkflowFolder]}`);
+  if (nameMismatch) {
+    if (!project.expectTbc && /\s+-\s+TBC$/i.test(match.folderName)) actionParts.push('Remove TBC');
+    else if (project.expectTbc && !/\s+-\s+TBC$/i.test(match.folderName)) actionParts.push('Add TBC');
+    else actionParts.push('Update folder name');
   }
+  return {
+    isInSync: !locationMismatch && !nameMismatch,
+    expectedWorkflowFolder,
+    expectedFolderName,
+    locationMismatch,
+    nameMismatch,
+    suggestedActionLabel: actionParts.join(' and ') || 'Folder is in sync'
+  };
+};
+
+export const createProjectFolder = async (workflowFolders: WorkflowFolderPaths, project: ProjectDescriptor): Promise<FolderMatch> => {
+  const workflowFolder: WorkflowFolderKey = 'to_be_printed';
+  const canonicalRoot = await realpath(workflowFolders[workflowFolder]);
+  const folderName = generateProjectFolderName({ ...project, expectTbc: true }, true);
+  const desiredPath = path.join(canonicalRoot, folderName);
+  if (!isPathWithinRoot(canonicalRoot, desiredPath) || path.dirname(desiredPath) !== canonicalRoot) throw new Error('Generated project folder is outside To Be Printed.');
   await mkdir(desiredPath, { recursive: false }).catch((error: NodeJS.ErrnoException) => {
     if (error.code !== 'EEXIST') throw error;
   });
   const absolutePath = await realpath(desiredPath);
-  if (!isPathWithinRoot(canonicalRoot, absolutePath)) throw new Error('Created folder escaped the configured root.');
-  return {
-    absolutePath,
-    folderName: path.basename(absolutePath),
-    relativePath: path.relative(canonicalRoot, absolutePath),
-    score: 7,
-    studentNumberMatch: true
-  };
+  return { absolutePath, folderName, relativePath: folderName, workflowFolder, score: 6, studentNumberMatch: true };
 };
 
-export const replaceProjectStatusSuffix = (folderName: string, status: 'collected'): string | null => {
-  if (!STATUS_SUFFIX.test(folderName)) return null;
-  return folderName.replace(STATUS_SUFFIX, ` - ${status}`);
-};
-
-export const renameProjectFolderStatus = async (
-  rootPath: string,
-  folderPath: string,
-  status: 'collected'
-): Promise<{ absolutePath: string; folderName: string; relativePath: string }> => {
-  const canonicalRoot = await realpath(rootPath);
-  const canonicalFolder = await realpath(folderPath);
-  if (!isPathWithinRoot(canonicalRoot, canonicalFolder) || path.dirname(canonicalFolder) !== canonicalRoot) {
-    throw new Error('Project folder is outside the configured root.');
+export const syncProjectFolder = async (workflowFolders: WorkflowFolderPaths, match: FolderMatch, project: ProjectDescriptor): Promise<FolderMatch> => {
+  const expectedWorkflowFolder = project.expectedWorkflowFolder ?? 'to_be_printed';
+  const sourceRoot = await realpath(workflowFolders[match.workflowFolder]);
+  const destinationRoot = await realpath(workflowFolders[expectedWorkflowFolder]);
+  const sourcePath = await realpath(match.absolutePath);
+  if (!isPathWithinRoot(sourceRoot, sourcePath) || path.dirname(sourcePath) !== sourceRoot) throw new Error('Project folder is outside its configured workflow folder.');
+  const folderName = generateProjectFolderName(project);
+  const destinationPath = path.join(destinationRoot, folderName);
+  if (!isPathWithinRoot(destinationRoot, destinationPath) || path.dirname(destinationPath) !== destinationRoot) throw new Error('Destination is outside the configured workflow folder.');
+  const resolvedSource = path.resolve(sourcePath);
+  const resolvedDestination = path.resolve(destinationPath);
+  if (resolvedSource !== resolvedDestination) {
+    if (resolvedSource.toLocaleLowerCase() === resolvedDestination.toLocaleLowerCase()) {
+      const temporaryPath = `${sourcePath}.${process.pid}.rename`;
+      await rename(sourcePath, temporaryPath);
+      await rename(temporaryPath, destinationPath);
+    } else {
+      try {
+        await rename(sourcePath, destinationPath);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EXDEV') throw error;
+        await cp(sourcePath, destinationPath, { recursive: true, errorOnExist: true, force: false });
+        await rm(sourcePath, { recursive: true });
+      }
+    }
   }
-  const nextName = replaceProjectStatusSuffix(path.basename(canonicalFolder), status);
-  if (!nextName) throw new Error('The project folder does not end in a recognized status suffix.');
-  if (nextName === path.basename(canonicalFolder)) {
-    return { absolutePath: canonicalFolder, folderName: nextName, relativePath: path.relative(canonicalRoot, canonicalFolder) };
-  }
-  const nextPath = path.join(canonicalRoot, nextName);
-  if (!isPathWithinRoot(canonicalRoot, nextPath)) throw new Error('Renamed folder would escape the configured root.');
-  await rename(canonicalFolder, nextPath);
-  const absolutePath = await realpath(nextPath);
-  return { absolutePath, folderName: nextName, relativePath: path.relative(canonicalRoot, absolutePath) };
+  const absolutePath = await realpath(destinationPath);
+  return { absolutePath, folderName, relativePath: folderName, workflowFolder: expectedWorkflowFolder, score: 6, studentNumberMatch: true };
 };

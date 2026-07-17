@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { lstat, opendir, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import type { LocalFileGroup, LocalProjectFile, ProjectFilesResponse, SupportedFileKind } from '../../../shared/localHelperProtocol.js';
+import type { LocalFileGroup, LocalProjectFile, ProjectFilesResponse, SupportedFileKind, WorkflowFolderKey } from '../../../shared/localHelperProtocol.js';
 import type { HelperConfig } from './config.js';
 import { isPathWithinRoot } from './folders.js';
 import { OpaqueRegistry } from './registry.js';
@@ -48,7 +48,7 @@ const readHiddenSystemPaths = async (rootPath: string): Promise<Set<string>> => 
 export const scanProjectFiles = async (args: {
   rootPath: string;
   projectKey: string;
-  projectFolder: { absolutePath: string; folderName: string; relativePath: string };
+  projectFolder: { absolutePath: string; folderName: string; relativePath: string; workflowFolder: WorkflowFolderKey };
   config: HelperConfig;
   registry: OpaqueRegistry;
 }): Promise<ProjectFilesResponse> => {

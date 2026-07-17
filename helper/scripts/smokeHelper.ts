@@ -19,17 +19,24 @@ const availablePort = () => new Promise<number>((resolve, reject) => {
 
 const appData = await mkdtemp(path.join(os.tmpdir(), 'printing-manager-helper-appdata-'));
 const root = await mkdtemp(path.join(os.tmpdir(), 'printing-manager-helper-root-'));
+const workflowFolders = {
+  to_be_printed: path.join(root, 'To Be Printed'),
+  currently_printing: path.join(root, 'Currently Printing'),
+  completed_prints: path.join(root, 'Completed Prints'),
+  do_not_print: path.join(root, 'Do Not Print')
+};
+await Promise.all(Object.values(workflowFolders).map((folder) => mkdir(folder)));
 const port = await availablePort();
 const configStore = new ConfigStore(appData);
 const baseConfig = await configStore.load();
 await configStore.save({
   ...baseConfig,
-  rootProjectFolder: root,
+  workflowFolders,
   port,
   allowedOrigins: ['http://localhost:5173']
 });
 
-const executable = path.resolve('release', 'win-unpacked', 'Printing Manager Helper.exe');
+const executable = path.resolve('release', 'PrintingManagerHelper.exe');
 await access(executable);
 const child = spawn(executable, ['--background'], {
   env: { ...process.env, PRINTING_MANAGER_HELPER_APPDATA: appData },
@@ -46,7 +53,7 @@ const headers = {
 };
 
 const waitForHealth = async () => {
-  const deadline = Date.now() + 20_000;
+  const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) throw new Error(`Packaged helper exited with code ${child.exitCode}. ${childOutput}`);
     try {
@@ -82,12 +89,13 @@ try {
     priorityNumber: 107,
     studentName: 'Smoke Test',
     studentNumber: '12345678',
-    module: 'COS110'
+    expectedWorkflowFolder: 'to_be_printed' as const,
+    expectTbc: true
   };
   const created = await post('/v1/projects/create', { project: descriptor });
   const folderName = String(created.folderName);
   const projectKey = String(created.projectKey);
-  const folderPath = path.join(root, folderName);
+  const folderPath = path.join(workflowFolders.to_be_printed, folderName);
   await mkdir(folderPath, { recursive: true });
   await Promise.all([
     writeFile(path.join(folderPath, 'model.stl'), 'solid smoke\nendsolid smoke\n'),
@@ -98,12 +106,25 @@ try {
   const filesResponse = await fetch(`http://127.0.0.1:${port}/v1/projects/${projectKey}/files`, { headers });
   const files = await filesResponse.json() as { totalFiles?: number; counts?: unknown };
   if (!filesResponse.ok || files.totalFiles !== 4) throw new Error(`Expected four supported files, received ${JSON.stringify(files)}.`);
-  const renamed = await post(`/v1/projects/${projectKey}/status`, { status: 'collected' });
-  const rootEntries = await import('node:fs/promises').then(({ readdir }) => readdir(root));
-  if (!rootEntries.some((entry) => entry.endsWith(' - collected'))) throw new Error('Collected folder suffix was not applied.');
+  const renamed = await post(`/v1/projects/${projectKey}/sync`, { project: { ...descriptor, expectedWorkflowFolder: 'completed_prints', expectTbc: false } });
+  const completedEntries = await import('node:fs/promises').then(({ readdir }) => readdir(workflowFolders.completed_prints));
+  if (!completedEntries.includes('P107 Smoke Test u12345678')) throw new Error('Completed folder move was not applied.');
   process.stdout.write(`${JSON.stringify({ health, created, files, renamed, executable }, null, 2)}\n`);
 } finally {
-  child.kill();
-  await new Promise((resolve) => child.once('exit', resolve));
-  await Promise.all([rm(appData, { recursive: true, force: true }), rm(root, { recursive: true, force: true })]);
+  if (child.exitCode === null) {
+    child.kill();
+    await new Promise((resolve) => child.once('exit', resolve));
+  }
+  let cleanupError: unknown;
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    try {
+      await Promise.all([rm(appData, { recursive: true, force: true }), rm(root, { recursive: true, force: true })]);
+      cleanupError = undefined;
+      break;
+    } catch (error) {
+      cleanupError = error;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+  if (cleanupError) process.stderr.write(`Smoke-test temporary files remain for OS cleanup: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}\n`);
 }

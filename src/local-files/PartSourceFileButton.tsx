@@ -5,6 +5,7 @@ import { useFeedback } from '../components/ui/FeedbackProvider';
 import { Button } from '../components/ui/Button';
 import { useLocalHelper } from './LocalHelperContext';
 import { findLinkedLocalFile, sourceFileName } from './sourceFileLink';
+import { projectFolderDescriptor } from './projectFolderWorkflow';
 
 export const PartSourceFileButton = ({
   part,
@@ -25,13 +26,7 @@ export const PartSourceFileButton = ({
   const copyToPrinter = async () => {
     setCopying(true);
     try {
-      const resolution = await client.resolveProject({
-        projectId: project.id,
-        priorityNumber: project.priorityNumber,
-        studentName: project.studentName,
-        studentNumber: project.studentNumber,
-        module: project.course
-      });
+      const resolution = await client.resolveProject(projectFolderDescriptor(project));
       if (resolution.status !== 'matched' && resolution.status !== 'created') {
         throw new Error(resolution.status === 'ambiguous'
           ? 'More than one local project folder matches. Choose the folder in Local files first.'
