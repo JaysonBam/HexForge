@@ -316,7 +316,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return newId;
   };
 
-  const addProject = (data: Partial<Project>) => {
+  const addProject = async (data: Partial<Project>) => {
     const newId = generateProjectId();
 
     const maxPriority = projects.reduce((max, p) => Math.max(max, p.priorityNumber), 0);
@@ -349,9 +349,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const { parts: _parts, quoteSnapshot: _quoteSnapshot, ...projectData } = newProject;
     void _parts;
     void _quoteSnapshot;
-    void trackMutation('Create project', () => supabase.from('projects').insert([projectData]));
-
-    return newId;
+    const saved = await trackMutation('Create project', () => supabase.from('projects').insert([projectData]));
+    return saved ? newId : null;
   };
 
   const updateProject = (id: string, data: Partial<Project>) => {

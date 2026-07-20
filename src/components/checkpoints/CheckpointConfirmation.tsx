@@ -20,6 +20,7 @@ import {
 import { Archive, CheckCircle, Copy } from 'lucide-react';
 import gmailIcon from '../../assets/icons/gmail.svg';
 import { QuoteCostSummary } from './QuoteCostSummary';
+import { GmailReplyComposer } from '../../gmail/GmailReplyComposer';
 import {
   buildQuoteViews,
   formatCurrency,
@@ -316,6 +317,12 @@ export const CheckpointConfirmation = ({ project }: { project: Project }) => {
     project,
     suppressSignature: true
   });
+  const replyEmail = renderEmailTemplate({
+    templates: emailTemplates,
+    signature: emailSignature,
+    templateKey: quoteEmailTemplateKey,
+    project
+  });
   const emailContent = communicationEmail.plainBody;
   const displayedEmailContent = quoteIsIssued
     ? emailContent
@@ -553,17 +560,27 @@ export const CheckpointConfirmation = ({ project }: { project: Project }) => {
             <div className="forge-panel-muted p-4">
                 <div className="mb-4 flex items-center justify-between gap-3">
                     <h3 className="text-lg font-semibold text-slate-900">Communication</h3>
-                    <Button
-                        variant="success"
-                        onClick={sendEmail}
-                        size="sm"
-                        className="gap-2 px-3.5"
-                        disabled={isOpeningGmail || !quoteIsIssued}
-                        title={!quoteIsIssued ? 'Issue the initial quote before opening communication.' : undefined}
-                    >
-                        <img src={gmailIcon} alt="" className="h-4 w-4" />
-                        {isOpeningGmail ? 'Opening in Gmail...' : 'Open in Gmail'}
-                    </Button>
+                    {project.gmailThreadId ? (
+                      <GmailReplyComposer
+                        project={project}
+                        initialBody={replyEmail.plainBody}
+                        initialHtmlBody={replyEmail.htmlBody}
+                        getAttachments={replyEmail.attachQuote ? async () => [await getQuotePdfAttachment()] : undefined}
+                        disabled={!quoteIsIssued}
+                      />
+                    ) : (
+                      <Button
+                          variant="success"
+                          onClick={sendEmail}
+                          size="sm"
+                          className="gap-2 px-3.5"
+                          disabled={isOpeningGmail || !quoteIsIssued}
+                          title={!quoteIsIssued ? 'Issue the initial quote before opening communication.' : undefined}
+                      >
+                          <img src={gmailIcon} alt="" className="h-4 w-4" />
+                          {isOpeningGmail ? 'Opening in Gmail...' : 'Open in Gmail'}
+                      </Button>
+                    )}
                 </div>
                 
                 <div className="relative">

@@ -1,4 +1,4 @@
-export const LOCAL_HELPER_VERSION = '1.1.0';
+export const LOCAL_HELPER_VERSION = '1.2.0';
 export const LOCAL_HELPER_API_VERSION = 'v1';
 export const LOCAL_HELPER_DEFAULT_PORT = 47821;
 export const LOCAL_HELPER_CLIENT_HEADER = 'X-Printing-Manager-Client';
@@ -102,6 +102,13 @@ export type ProjectFilesResponse = {
   files: LocalProjectFile[];
 };
 
+export type AttachmentSaveResult = {
+  status: 'saved' | 'skipped' | 'renamed';
+  filename: string;
+  size: number;
+  folderName: string;
+};
+
 export type CopyOperationStatus =
   | 'awaiting_destination'
   | 'copying'
@@ -137,7 +144,11 @@ export const isHelperHealth = (value: unknown): value is HelperHealth => {
     || (isObject(value.defaultApplications)
       && Object.values(value.defaultApplications).every((application) => ['bambu', 'cura', 'system'].includes(String(application))));
   return value.apiVersion === LOCAL_HELPER_API_VERSION
-    && value.helperVersion === LOCAL_HELPER_VERSION
+    // The API version defines wire compatibility. Requiring the desktop helper's
+    // exact release version would disconnect otherwise compatible installations
+    // whenever the web app is deployed before the helper update.
+    && typeof value.helperVersion === 'string'
+    && value.helperVersion.length > 0
     && ['not_configured', 'root_unavailable', 'connected'].includes(String(value.state))
     && typeof value.configured === 'boolean'
     && typeof value.rootAvailable === 'boolean'
@@ -190,6 +201,13 @@ export const isProjectFilesResponse = (value: unknown): value is ProjectFilesRes
       && (file.group === 'model' || file.group === 'print_ready')
       && typeof file.importEligible === 'boolean');
 };
+
+export const isAttachmentSaveResult = (value: unknown): value is AttachmentSaveResult =>
+  isObject(value)
+  && ['saved', 'skipped', 'renamed'].includes(String(value.status))
+  && typeof value.filename === 'string'
+  && typeof value.size === 'number'
+  && typeof value.folderName === 'string';
 
 export const isCopyOperation = (value: unknown): value is CopyOperation =>
   isObject(value)

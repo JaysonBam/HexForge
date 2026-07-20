@@ -2,6 +2,24 @@
 
 React/Vite workstation app for managing MISC 3D printing intake, quote approval, production, collection, Gmail drafts, and Supabase-backed project data.
 
+## Main Gmail Thread setup
+
+HexForge can link one Main Gmail Thread to a project, cache its messages in Supabase, send replies through the existing Google OAuth connection, and pass downloaded STL/3MF attachment bytes to helper version 1.2.0. Gmail tokens stay in the browser and are never sent to the helper.
+
+Apply the Gmail project migration before using the feature:
+
+```powershell
+supabase link --project-ref <PROJECT_REF>
+supabase db push
+```
+
+The migration is `supabase/migrations/20260718120000_main_gmail_thread.sql`. Existing projects remain valid with no linked thread. Rebuild or repackage the helper so the workstation has the attachment-save endpoint:
+
+```powershell
+npm.cmd run build:helper
+npm.cmd run package:helper
+```
+
 ## Main Commands
 
 ```powershell

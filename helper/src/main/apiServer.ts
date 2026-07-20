@@ -30,6 +30,7 @@ import {
 } from './folders.js';
 import type { RotatingLogger } from './logger.js';
 import { isUuid, OpaqueRegistry } from './registry.js';
+import { saveProjectAttachment } from './attachmentWriter.js';
 
 const MAX_BODY_BYTES = 32 * 1024;
 const ALLOWED_METHODS = 'GET, POST, OPTIONS';
@@ -404,6 +405,55 @@ export class LocalApiServer {
         config,
         registry: this.dependencies.registry
       }));
+      return;
+    }
+
+    const projectAttachmentMatch = pathname.match(/^\/v1\/projects\/([0-9a-f-]+)\/attachments$/i);
+    if (request.method === 'POST' && projectAttachmentMatch) {
+      const idempotency = this.requireIdempotency(request, pathname);
+      if (!idempotency) {
+        sendJson(response, 400, errorPayload('IDEMPOTENCY_KEY_REQUIRED', 'A valid idempotency key is required.'));
+        return;
+      }
+      if (idempotency.cached) {
+        request.resume();
+        sendJson(response, idempotency.cached.status, idempotency.cached.payload);
+        return;
+      }
+      const project = this.dependencies.registry.getProject(projectAttachmentMatch[1]);
+      if (!project) {
+        sendJson(response, 404, errorPayload('UNKNOWN_PROJECT', 'Resolve the project folder again.'));
+        return;
+      }
+      const filename = url.searchParams.get('filename') || '';
+      const expectedSize = Number(url.searchParams.get('size'));
+      try {
+        const canonicalRoot = await realpath(workflowFolders[project.workflowFolder]);
+        const canonicalProject = await realpath(project.absolutePath);
+        if (!isPathWithinRoot(canonicalRoot, canonicalProject)) {
+          sendJson(response, 403, errorPayload('PATH_OUTSIDE_ROOT', 'The project folder is outside its configured workflow folder.'));
+          return;
+        }
+        const payload = await saveProjectAttachment({
+          projectFolderPath: canonicalProject,
+          projectFolderName: project.folderName,
+          filename,
+          expectedSize,
+          stream: request
+        });
+        this.cacheResponse(idempotency.key, 200, payload);
+        sendJson(response, 200, payload);
+      } catch (error) {
+        const code = error instanceof Error ? error.message : 'ATTACHMENT_SAVE_FAILED';
+        const knownMessages: Record<string, string> = {
+          UNSUPPORTED_ATTACHMENT: 'Only STL, 3MF, and ZIP Gmail attachments can be saved.',
+          INVALID_ATTACHMENT_SIZE: 'The Gmail attachment size is invalid or exceeds 100 MB.',
+          ATTACHMENT_SIZE_MISMATCH: 'The Gmail attachment was incomplete and was not saved.',
+          ATTACHMENT_OUTSIDE_PROJECT: 'The attachment filename did not resolve inside the project folder.',
+          ATTACHMENT_NAME_EXHAUSTED: 'A safe available filename could not be found.'
+        };
+        sendJson(response, 409, errorPayload(code, knownMessages[code] || 'The Gmail attachment could not be saved.'));
+      }
       return;
     }
 

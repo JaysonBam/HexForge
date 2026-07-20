@@ -128,15 +128,16 @@ export const PublicAppInfoPage = () => (
           <li>Records project intake details, print parts, material estimates, payment references, and collection status.</li>
           <li>Uses Google sign-in to identify authorized staff members.</li>
           <li>Creates Gmail drafts for student project updates when a staff member chooses that action.</li>
-          <li>Checks unread Gmail metadata for print-related messages so staff can notice pending student requests.</li>
+          <li>Checks recent read and unread Gmail metadata for print-related messages so staff can select a project conversation.</li>
+          <li>Links one Main Gmail Thread to a project, caches its messages, and sends replies only when staff explicitly choose Send Reply.</li>
         </ul>
       </Section>
 
       <Section title="Google data access">
         <p>
-          The app requests Google profile and email identity data, Gmail draft creation access, and read-only Gmail access
-          for print-related reminders. Gmail messages are not sent automatically by HexForge; staff review and send drafts
-          from Gmail.
+          The app requests Google profile and email identity data, Gmail compose access, and read-only Gmail access for
+          print-related intake and project correspondence. Gmail messages are never sent automatically; staff preview and
+          explicitly send each draft or Main Gmail Thread reply.
         </p>
       </Section>
 
@@ -171,8 +172,8 @@ export const PrivacyPolicyPage = () => (
         <ul>
           <li>Google account information: email address, display name, and profile image used for sign-in and access control.</li>
           <li>Google OAuth tokens: access and refresh tokens used to call Gmail APIs after a signed-in user grants access.</li>
-          <li>Gmail metadata: unread message IDs, subjects, dates, and Gmail links for messages matching print-related search terms.</li>
-          <li>Gmail draft content: recipients, subjects, message bodies, and quote attachments that staff choose to create as Gmail drafts.</li>
+          <li>Gmail correspondence: message and thread IDs, senders, recipients, subjects, dates, plain-text bodies, attachment filenames, and download status for a linked Main Gmail Thread.</li>
+          <li>Gmail draft and reply content: recipients, subjects, message bodies, and quote attachments that staff choose to create or send.</li>
           <li>Project records: student names, student numbers, email addresses, course/module details, lecturer names, print parts, print material details, costs, receipt references, status history, and collection records.</li>
           <li>Staff workflow records: names selected at a workstation for review, printing, and collection actions.</li>
         </ul>
@@ -183,7 +184,8 @@ export const PrivacyPolicyPage = () => (
           <li>Authenticate staff and restrict access to authorized users.</li>
           <li>Operate the project intake, quote, printing, and collection workflow.</li>
           <li>Create Gmail drafts for student communication when staff explicitly choose that action.</li>
-          <li>Show staff a print-related unread email reminder using Gmail message metadata.</li>
+          <li>Show staff recent print-related email threads using Gmail message metadata.</li>
+          <li>Display cached Main Gmail Thread correspondence and send staff-reviewed replies through Gmail.</li>
           <li>Maintain operational records needed to run and audit the departmental print service.</li>
         </ul>
       </Section>

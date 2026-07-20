@@ -56,6 +56,7 @@ enabled = true
 schema_paths = [
 	"./schemas/config.sql",
 	"./schemas/projects.sql",
+	"./schemas/gmail.sql",
 	"./schemas/parts.sql",
 	"./schemas/workflow.sql",
 	"./schemas/vendors.sql",

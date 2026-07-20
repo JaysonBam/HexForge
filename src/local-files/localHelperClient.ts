@@ -4,11 +4,13 @@ import {
   LOCAL_HELPER_DEFAULT_PORT,
   LOCAL_HELPER_IDEMPOTENCY_HEADER,
   isCopyOperation,
+  isAttachmentSaveResult,
   isHelperErrorPayload,
   isHelperHealth,
   isProjectFilesResponse,
   isProjectResolution,
   type CopyOperation,
+  type AttachmentSaveResult,
   type HelperHealth,
   type LocalProjectFile,
   type ProjectDescriptor,
@@ -171,6 +173,47 @@ export class LocalHelperClient {
       timeoutMs: 8_000,
       validate: isProjectFilesResponse
     });
+  }
+
+  async saveProjectAttachment(
+    projectKey: string,
+    filename: string,
+    bytes: Uint8Array,
+    signal?: AbortSignal
+  ): Promise<AttachmentSaveResult> {
+    const abort = combineAbort(120_000, signal);
+    try {
+      const url = new URL(`${this.baseUrl}/projects/${encodeURIComponent(projectKey)}/attachments`);
+      url.searchParams.set('filename', filename);
+      url.searchParams.set('size', String(bytes.byteLength));
+      const requestInit: LocalNetworkRequestInit = {
+        method: 'POST',
+        mode: 'cors',
+        cache: 'no-store',
+        targetAddressSpace: 'loopback',
+        signal: abort.signal,
+        headers: {
+          [LOCAL_HELPER_CLIENT_HEADER]: LOCAL_HELPER_CLIENT_VALUE,
+          [LOCAL_HELPER_IDEMPOTENCY_HEADER]: crypto.randomUUID(),
+          'Content-Type': 'application/octet-stream'
+        },
+        body: bytes.slice().buffer as ArrayBuffer
+      };
+      const response = await this.fetcher(url, requestInit);
+      const value: unknown = await response.json().catch(() => null);
+      if (!response.ok) {
+        if (isHelperErrorPayload(value)) throw new LocalHelperError(value.error.code, value.error.message, response.status);
+        throw new LocalHelperError('ATTACHMENT_SAVE_FAILED', `The helper could not save the attachment (${response.status}).`, response.status);
+      }
+      if (!isAttachmentSaveResult(value)) throw new LocalHelperError('INVALID_RESPONSE', 'The helper returned an invalid attachment result.');
+      return value;
+    } catch (error) {
+      if (error instanceof LocalHelperError) throw error;
+      if (abort.signal.aborted) throw new LocalHelperError('TIMEOUT', 'Saving the Gmail attachment timed out.');
+      throw new LocalHelperError('UNAVAILABLE', error instanceof Error ? error.message : 'The local helper is unavailable.');
+    } finally {
+      abort.cleanup();
+    }
   }
 
   openProjectFolder(projectKey: string): Promise<{ ok: true }> {

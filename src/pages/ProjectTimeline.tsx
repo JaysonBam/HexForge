@@ -23,9 +23,11 @@ import {
 } from '../domain/operations';
 import type { ProjectWorkspaceNavigationContext } from '../components/Layout';
 import { LocalFilesCard } from '../local-files/LocalFilesCard';
+import { ProjectCorrespondencePanel } from '../gmail/ProjectCorrespondencePanel';
 import {
   ArrowLeft,
   Archive,
+  Mail,
   ShieldCheck,
   Trash2,
   X
@@ -43,6 +45,7 @@ export const ProjectTimeline = () => {
   const project = getProject(id || '');
   const autoCreateLocalFolder = (location.state as { autoCreateLocalFolderFor?: string } | null)?.autoCreateLocalFolderFor === project?.id;
   const [timelineOpen, setTimelineOpen] = useState(false);
+  const [correspondenceOpen, setCorrespondenceOpen] = useState(false);
   const [deletingProject, setDeletingProject] = useState(false);
   const staffName = activeStaffName || claimActiveStaffName() || 'System';
   const activeTab = project ? activeWorkspaceTab : 'overview';
@@ -253,6 +256,14 @@ export const ProjectTimeline = () => {
           >
             <ShieldCheck size={15} /> View Timeline
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full justify-center gap-2"
+            onClick={() => setCorrespondenceOpen(true)}
+          >
+            <Mail size={15} /> View Correspondence
+          </Button>
         </div>
       </aside>
 
@@ -296,6 +307,12 @@ export const ProjectTimeline = () => {
           </aside>
         </div>
       )}
+      <ProjectCorrespondencePanel
+        project={project}
+        open={correspondenceOpen}
+        onClose={() => setCorrespondenceOpen(false)}
+        onProjectSynced={(updates) => updateProject(project.id, updates)}
+      />
     </div>
   );
 };

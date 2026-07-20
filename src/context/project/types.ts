@@ -65,7 +65,7 @@ export interface ProjectContextType {
   clearSyncError: () => void;
   getProject: (id: string) => Project | undefined;
   refreshProjects: () => Promise<void>;
-  addProject: (data: Partial<Project>) => string;
+  addProject: (data: Partial<Project>) => Promise<string | null>;
   updateProject: (id: string, data: Partial<Project>) => void;
   deleteProject: (id: string) => Promise<boolean>;
   addPart: (projectId: string) => void;

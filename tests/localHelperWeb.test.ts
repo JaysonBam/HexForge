@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { LocalHelperClient, LocalHelperError } from '../src/local-files/localHelperClient.ts';
+import { LOCAL_HELPER_VERSION } from '../shared/localHelperProtocol.ts';
 
 const health = {
   apiVersion: 'v1',
-  helperVersion: '1.1.0',
+  helperVersion: LOCAL_HELPER_VERSION,
   state: 'connected',
   configured: true,
   rootAvailable: true,
@@ -21,6 +22,13 @@ test('web client reports a connected helper only after validating health', async
   const client = new LocalHelperClient(47821, fetcher);
   assert.deepEqual(await client.health(), health);
   assert.equal(targetAddressSpace, 'loopback');
+});
+
+test('web client accepts an older helper release with the same API version', async () => {
+  const compatibleHealth = { ...health, helperVersion: '1.1.0' };
+  const fetcher = (async () => new Response(JSON.stringify(compatibleHealth), { status: 200 })) as typeof fetch;
+  const client = new LocalHelperClient(47821, fetcher);
+  assert.deepEqual(await client.health(), compatibleHealth);
 });
 
 test('web client invokes browser fetch with the global receiver', async () => {

@@ -391,7 +391,7 @@ const EmailReminderCard = ({
             type="button"
             onClick={onOpen}
             className="inline-flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-md border border-sky-500/30 bg-white px-2.5 py-1.5 text-xs font-bold text-sky-700 transition hover:bg-sky-50 sm:flex-none"
-            aria-label="View unread print emails"
+            aria-label="View unread print email threads"
           >
             Open Gmail
             <ExternalLink size={14} />
@@ -461,7 +461,7 @@ const EmailReminderModal = ({
               type="button"
               onClick={onClose}
               className="rounded-md p-2 text-slate-500 transition hover:bg-sky-50 hover:text-slate-950"
-              aria-label="Close unread print emails"
+              aria-label="Close recent print email threads"
             >
               <X size={18} />
             </button>
@@ -479,7 +479,7 @@ const EmailReminderModal = ({
             </div>
           ) : emails.length === 0 ? (
             <div className="forge-empty px-3 py-5 text-center text-sm font-semibold">
-              No unread print-related emails found.
+              No unread print-related email threads found in the last three months.
             </div>
           ) : (
             <div className="space-y-2">

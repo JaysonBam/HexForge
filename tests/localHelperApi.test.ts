@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { access, mkdtemp, mkdir } from 'node:fs/promises';
+import { access, mkdtemp, mkdir, readFile } from 'node:fs/promises';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -86,6 +86,15 @@ test('helper API enforces deployed/dev CORS, PNA preflight, and the custom heade
     });
     assert.equal(created.status, 200);
     const createdProject = await created.json() as { projectKey: string };
+    const gmailBytes = Buffer.from('solid gmail model');
+    const savedAttachment = await fetch(`http://127.0.0.1:${port}/v1/projects/${createdProject.projectKey}/attachments?filename=${encodeURIComponent('mail-part.STL')}&size=${gmailBytes.byteLength}`, {
+      method: 'POST',
+      headers: { ...projectHeaders, 'Content-Type': 'application/octet-stream', 'X-Idempotency-Key': crypto.randomUUID() },
+      body: gmailBytes
+    });
+    assert.equal(savedAttachment.status, 200);
+    assert.equal((await savedAttachment.json() as { status: string }).status, 'saved');
+    assert.equal((await readFile(path.join(workflowFolders.to_be_printed, 'P107 API Test u12345678 - TBC', 'mail-part.STL'))).toString(), 'solid gmail model');
     const opened = await fetch(`http://127.0.0.1:${port}/v1/projects/${createdProject.projectKey}/open-folder`, {
       method: 'POST',
       headers: { ...projectHeaders, 'X-Idempotency-Key': crypto.randomUUID() },

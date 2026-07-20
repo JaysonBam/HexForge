@@ -7,7 +7,9 @@ import { setTimeout } from 'node:timers/promises';
 const workspaceRoot = path.resolve(import.meta.dirname, '..', '..');
 const helperRoot = path.join(workspaceRoot, 'helper');
 const releaseRoot = path.join(workspaceRoot, 'release');
-const stagingRoot = path.join(tmpdir(), 'PrintingManagerHelper-build');
+// Use a per-build directory. Antivirus/indexing can briefly retain handles to a
+// previous Electron output directory, which must not prevent the next build.
+const stagingRoot = path.join(tmpdir(), `PrintingManagerHelper-build-${process.pid}`);
 const artifactName = 'PrintingManagerHelper.exe';
 const builderCli = path.join(workspaceRoot, 'node_modules', 'electron-builder', 'out', 'cli', 'cli.js');
 
@@ -35,10 +37,13 @@ try {
 
   await mkdir(releaseRoot, { recursive: true });
 
-  // A portable Electron app keeps its source executable open while running.
-  // Stop only that named helper immediately before replacing the release artifact.
+  // A portable Electron app keeps both the launcher and its extracted product
+  // processes open. Stop both helper-owned image names before replacing the
+  // release artifact so an older extracted process cannot keep serving the port.
   if (process.platform === 'win32') {
-    spawnSync('taskkill.exe', ['/F', '/T', '/IM', artifactName], { stdio: 'ignore' });
+    for (const imageName of [artifactName, 'Printing Manager Helper.exe']) {
+      spawnSync('taskkill.exe', ['/F', '/T', '/IM', imageName], { stdio: 'ignore' });
+    }
     await setTimeout(500);
   }
 
