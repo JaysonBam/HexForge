@@ -4,7 +4,7 @@ This file is a portable handoff for keeping the important working memory intact 
 
 ## Project Identity
 
-- Working name: `HexForge 3D Printing Manager`
+- Product name: `HexForge`
 - Current package name: `supabase-googleo`
 - Main app: React 19 + TypeScript + Vite
 - Backend/data/auth: Supabase

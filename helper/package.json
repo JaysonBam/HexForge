@@ -1,7 +1,7 @@
 {
-  "name": "printing-manager-helper",
-  "productName": "Printing Manager Helper",
-  "description": "Secure local-file companion for HexForge Printing Manager",
+  "name": "hexforge-file-helper",
+  "productName": "HexForge File Helper",
+  "description": "Secure local-file companion for HexForge",
   "author": "HexForge",
   "version": "1.2.0",
   "private": true,

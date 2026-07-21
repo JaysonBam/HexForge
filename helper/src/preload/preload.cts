@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron') as typeof import('electron');
 
-contextBridge.exposeInMainWorld('printingManagerHelper', {
+contextBridge.exposeInMainWorld('hexForgeFileHelper', {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   saveSettings: (settings: unknown) => ipcRenderer.invoke('settings:save', settings),
   chooseWorkflowFolder: (workflowFolder: string) => ipcRenderer.invoke('settings:choose-workflow-folder', workflowFolder),

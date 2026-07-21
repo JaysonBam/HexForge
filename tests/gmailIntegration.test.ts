@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import test from 'node:test';
+import type { LocalProjectFile } from '../shared/localHelperProtocol.ts';
 import { saveProjectAttachment } from '../helper/src/main/attachmentWriter.ts';
 import {
   buildRecentPrintEmailQuery,
@@ -17,6 +18,7 @@ import {
 import { stripQuotedReplyContent } from '../src/gmail/gmailBody.ts';
 import { getGmailThreadUrl } from '../src/gmail/gmailUrls.ts';
 import { canUseProjectGmailThread, GMAIL_THREAD_ACCOUNT_MISMATCH } from '../src/gmail/gmailThreadOwnership.ts';
+import { isGmailAttachmentDownloadEligible, isGmailAttachmentSavedLocally } from '../src/gmail/gmailAttachmentAvailability.ts';
 import type { GmailThreadSnapshot } from '../src/gmail/types.ts';
 import type { Project } from '../src/types/index.ts';
 
@@ -120,6 +122,25 @@ test('Gmail directions and supported attachment extensions are case-insensitive'
   assert.equal(isSupportedGmailAttachment('source-files.ZIP'), true);
   assert.equal(isSupportedGmailAttachment('drawing.step'), false);
   assert.equal(isSupportedGmailAttachment('notes.pdf'), false);
+});
+
+test('downloaded Gmail attachments are available again when missing from the current workstation', () => {
+  const attachment = {
+    messageId: 'message-1',
+    attachmentId: 'attachment-1',
+    partId: '1',
+    filename: 'part.STL',
+    mimeType: 'application/octet-stream',
+    size: 4,
+    downloadStatus: 'downloaded' as const,
+    savedFilename: 'part (2).STL'
+  };
+  const savedFile = { relativePath: 'part (2).STL' } as LocalProjectFile;
+
+  assert.equal(isGmailAttachmentSavedLocally(attachment, [savedFile]), true);
+  assert.equal(isGmailAttachmentSavedLocally(attachment, []), false);
+  assert.equal(isGmailAttachmentDownloadEligible(attachment), false);
+  assert.equal(isGmailAttachmentDownloadEligible(attachment, true), true);
 });
 
 test('Gmail reply cache removes quoted thread history before it is persisted', () => {

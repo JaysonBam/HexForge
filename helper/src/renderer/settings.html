@@ -4,7 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'" />
-    <title>Printing Manager Helper</title>
+    <title>HexForge File Helper</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="settings.css" />
   </head>
   <body>
@@ -12,7 +13,7 @@
       <header class="masthead">
         <div>
           <p class="eyebrow">HexForge workstation bridge</p>
-          <h1>Printing Manager Helper</h1>
+          <h1>HexForge File Helper</h1>
           <p class="lede">Connect HexForge to project files on this workstation. Files stay local unless you explicitly import or copy them.</p>
         </div>
         <span id="version" class="version"></span>
@@ -39,7 +40,7 @@
           <div class="section-heading"><div><p class="step">02 / Connection</p><h2>Local API</h2></div></div>
           <label for="api-port">Port</label>
           <input id="api-port" type="number" min="1024" max="65535" required />
-          <label for="allowed-origins">Allowed Printing Manager origins</label>
+          <label for="allowed-origins">Allowed HexForge origins</label>
           <textarea id="allowed-origins" rows="4" spellcheck="false" placeholder="https://printing.example.com"></textarea>
           <p class="hint">One exact origin per line. HTTPS is required except for localhost development.</p>
         </section>

@@ -232,7 +232,7 @@ export class LocalApiServer {
       return;
     }
     if (request.headers[LOCAL_HELPER_CLIENT_HEADER.toLocaleLowerCase()] !== LOCAL_HELPER_CLIENT_VALUE) {
-      sendJson(response, 403, errorPayload('CLIENT_HEADER_REQUIRED', 'The required Printing Manager client header is missing.'));
+      sendJson(response, 403, errorPayload('CLIENT_HEADER_REQUIRED', 'The required HexForge File Helper client header is missing.'));
       return;
     }
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');

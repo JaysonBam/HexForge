@@ -17,8 +17,8 @@ const availablePort = () => new Promise<number>((resolve, reject) => {
   });
 });
 
-const appData = await mkdtemp(path.join(os.tmpdir(), 'printing-manager-helper-appdata-'));
-const root = await mkdtemp(path.join(os.tmpdir(), 'printing-manager-helper-root-'));
+const appData = await mkdtemp(path.join(os.tmpdir(), 'hexforge-file-helper-appdata-'));
+const root = await mkdtemp(path.join(os.tmpdir(), 'hexforge-file-helper-root-'));
 const workflowFolders = {
   to_be_printed: path.join(root, 'To Be Printed'),
   currently_printing: path.join(root, 'Currently Printing'),
@@ -36,10 +36,10 @@ await configStore.save({
   allowedOrigins: ['http://localhost:5173']
 });
 
-const executable = path.resolve('release', 'PrintingManagerHelper.exe');
+const executable = path.resolve('release', 'HexForgeFileHelper.exe');
 await access(executable);
 const child = spawn(executable, ['--background'], {
-  env: { ...process.env, PRINTING_MANAGER_HELPER_APPDATA: appData },
+  env: { ...process.env, HEXFORGE_FILE_HELPER_APPDATA: appData },
   windowsHide: true,
   stdio: ['ignore', 'pipe', 'pipe']
 });

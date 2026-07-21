@@ -1,7 +1,7 @@
 export const LOCAL_HELPER_VERSION = '1.2.0';
 export const LOCAL_HELPER_API_VERSION = 'v1';
 export const LOCAL_HELPER_DEFAULT_PORT = 47821;
-export const LOCAL_HELPER_CLIENT_HEADER = 'X-Printing-Manager-Client';
+export const LOCAL_HELPER_CLIENT_HEADER = 'X-HexForge-File-Helper-Client';
 export const LOCAL_HELPER_CLIENT_VALUE = 'HexForge/1';
 export const LOCAL_HELPER_IDEMPOTENCY_HEADER = 'X-Idempotency-Key';
 

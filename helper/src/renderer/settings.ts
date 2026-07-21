@@ -13,7 +13,7 @@ type SettingsState = {
 
 declare global {
   interface Window {
-    printingManagerHelper: {
+    hexForgeFileHelper: {
       getSettings: () => Promise<SettingsState>;
       saveSettings: (settings: Partial<SettingsState>) => Promise<SettingsState>;
       chooseWorkflowFolder: (workflowFolder: WorkflowFolderKey) => Promise<string | null>;
@@ -46,7 +46,7 @@ const setStatus = (message: string, tone: 'neutral' | 'success' | 'error' = 'neu
 };
 
 const load = async () => {
-  const settings = await window.printingManagerHelper.getSettings();
+  const settings = await window.hexForgeFileHelper.getSettings();
   WORKFLOW_FOLDER_KEYS.forEach((key) => { workflowInputs[key].value = settings.workflowFolders[key] ?? ''; });
   portInput.value = String(settings.port);
   originsInput.value = settings.allowedOrigins.join('\n');
@@ -61,22 +61,22 @@ const load = async () => {
 
 WORKFLOW_FOLDER_KEYS.forEach((key) => {
   element<HTMLButtonElement>(`choose-${key}`).addEventListener('click', async () => {
-    const selected = await window.printingManagerHelper.chooseWorkflowFolder(key);
+    const selected = await window.hexForgeFileHelper.chooseWorkflowFolder(key);
     if (selected) workflowInputs[key].value = selected;
   });
 });
 element<HTMLButtonElement>('choose-bambu').addEventListener('click', async () => {
-  const selected = await window.printingManagerHelper.chooseApplication('bambu');
+  const selected = await window.hexForgeFileHelper.chooseApplication('bambu');
   if (selected) bambuInput.value = selected;
 });
 element<HTMLButtonElement>('choose-cura').addEventListener('click', async () => {
-  const selected = await window.printingManagerHelper.chooseApplication('cura');
+  const selected = await window.hexForgeFileHelper.chooseApplication('cura');
   if (selected) curaInput.value = selected;
 });
-element<HTMLButtonElement>('open-root').addEventListener('click', () => void window.printingManagerHelper.openRoot());
-element<HTMLButtonElement>('open-logs').addEventListener('click', () => void window.printingManagerHelper.openLogs());
+element<HTMLButtonElement>('open-root').addEventListener('click', () => void window.hexForgeFileHelper.openRoot());
+element<HTMLButtonElement>('open-logs').addEventListener('click', () => void window.hexForgeFileHelper.openLogs());
 element<HTMLButtonElement>('create-shortcuts').addEventListener('click', async () => {
-  const result = await window.printingManagerHelper.createShortcuts();
+  const result = await window.hexForgeFileHelper.createShortcuts();
   setStatus(result.message, result.ok ? 'success' : 'error');
 });
 
@@ -88,7 +88,7 @@ form.addEventListener('submit', async (event) => {
     defaultApplications[select.dataset.extension ?? ''] = select.value as 'bambu' | 'cura' | 'system';
   });
   try {
-    await window.printingManagerHelper.saveSettings({
+    await window.hexForgeFileHelper.saveSettings({
       workflowFolders: Object.fromEntries(WORKFLOW_FOLDER_KEYS.map((key) => [key, workflowInputs[key].value.trim() || null])) as Record<WorkflowFolderKey, string | null>,
       port: Number(portInput.value),
       allowedOrigins: originsInput.value.split(/\r?\n|,/).map((origin) => origin.trim()).filter(Boolean),

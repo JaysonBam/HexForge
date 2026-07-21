@@ -10,9 +10,9 @@ import { RotatingLogger } from './logger.js';
 import { OpaqueRegistry } from './registry.js';
 import { detectSlicerPaths, openSupportedFile } from './windowsIntegration.js';
 
-app.setName('PrintingManagerHelper');
-const appDataOverride = process.env.PRINTING_MANAGER_HELPER_APPDATA;
-if (appDataOverride) app.setPath('userData', path.join(appDataOverride, 'PrintingManagerHelper'));
+app.setName('HexForgeFileHelper');
+const appDataOverride = process.env.HEXFORGE_FILE_HELPER_APPDATA;
+if (appDataOverride) app.setPath('userData', path.join(appDataOverride, 'HexForgeFileHelper'));
 const hasLock = app.requestSingleInstanceLock();
 if (!hasLock) app.quit();
 
@@ -52,7 +52,7 @@ const showSettings = () => {
     minHeight: 640,
     show: false,
     autoHideMenuBar: true,
-    title: 'Printing Manager Helper',
+    title: 'HexForge File Helper',
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
@@ -101,7 +101,7 @@ const restartApi = async () => {
     const errorOptions: Electron.MessageBoxOptions = {
       type: 'error',
       title: 'Local API could not start',
-      message: 'Printing Manager Helper could not start its local connection.',
+      message: 'HexForge File Helper could not start its local connection.',
       detail: error instanceof Error ? error.message : 'Check the configured port and try again.'
     };
     void (settingsWindow ? dialog.showMessageBox(settingsWindow, errorOptions) : dialog.showMessageBox(errorOptions));
@@ -115,7 +115,7 @@ const showConnectionStatus = async () => {
   if (configuredFolders.length === 4) workflowStatus = await Promise.all(configuredFolders.map((folder) => access(folder as string))).then(() => 'Available').catch(() => 'Unavailable');
   await dialog.showMessageBox({
     type: workflowStatus === 'Available' ? 'info' : 'warning',
-    title: 'Printing Manager Helper status',
+    title: 'HexForge File Helper status',
     message: workflowStatus === 'Available' ? 'Files are ready to connect.' : 'Local files need attention.',
     detail: `Version: ${LOCAL_HELPER_VERSION}\nLocal API: http://127.0.0.1:${config.port}/v1\nWorkflow folders: ${workflowStatus}\nAllowed origins: ${config.allowedOrigins.length}`
   });
@@ -161,9 +161,9 @@ const createShortcuts = async () => {
     const executable = portableExecutablePath();
     const startMenuDirectory = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs');
     await mkdir(startMenuDirectory, { recursive: true });
-    const details = { target: executable, cwd: path.dirname(executable), description: 'Printing Manager local file helper' };
-    const desktopOk = shell.writeShortcutLink(path.join(app.getPath('desktop'), 'Printing Manager Helper.lnk'), 'create', details);
-    const menuOk = shell.writeShortcutLink(path.join(startMenuDirectory, 'Printing Manager Helper.lnk'), 'create', details);
+    const details = { target: executable, cwd: path.dirname(executable), description: 'HexForge File Helper' };
+    const desktopOk = shell.writeShortcutLink(path.join(app.getPath('desktop'), 'HexForge File Helper.lnk'), 'create', details);
+    const menuOk = shell.writeShortcutLink(path.join(startMenuDirectory, 'HexForge File Helper.lnk'), 'create', details);
     return { ok: desktopOk && menuOk, message: desktopOk && menuOk ? 'Desktop and Start menu shortcuts created.' : 'One or more shortcuts could not be created.' };
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : 'Shortcuts could not be created.' };
@@ -248,7 +248,7 @@ void app.whenReady().then(async () => {
 
   const icon = nativeImage.createFromPath(path.join(process.resourcesPath, 'icon.png'));
   tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon.resize({ width: 16, height: 16 }));
-  tray.setToolTip('Printing Manager Helper');
+  tray.setToolTip('HexForge File Helper');
   tray.on('double-click', showSettings);
   rebuildTrayMenu();
 

@@ -9,8 +9,8 @@ const helperRoot = path.join(workspaceRoot, 'helper');
 const releaseRoot = path.join(workspaceRoot, 'release');
 // Use a per-build directory. Antivirus/indexing can briefly retain handles to a
 // previous Electron output directory, which must not prevent the next build.
-const stagingRoot = path.join(tmpdir(), `PrintingManagerHelper-build-${process.pid}`);
-const artifactName = 'PrintingManagerHelper.exe';
+const stagingRoot = path.join(tmpdir(), `HexForgeFileHelper-build-${process.pid}`);
+const artifactName = 'HexForgeFileHelper.exe';
 const builderCli = path.join(workspaceRoot, 'node_modules', 'electron-builder', 'out', 'cli', 'cli.js');
 
 await rm(stagingRoot, { recursive: true, force: true });
@@ -41,7 +41,7 @@ try {
   // processes open. Stop both helper-owned image names before replacing the
   // release artifact so an older extracted process cannot keep serving the port.
   if (process.platform === 'win32') {
-    for (const imageName of [artifactName, 'Printing Manager Helper.exe']) {
+    for (const imageName of [artifactName, 'HexForge File Helper.exe']) {
       spawnSync('taskkill.exe', ['/F', '/T', '/IM', imageName], { stdio: 'ignore' });
     }
     await setTimeout(500);

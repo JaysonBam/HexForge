@@ -1,6 +1,6 @@
-# Printing Manager Helper
+# HexForge File Helper
 
-Printing Manager Helper is HexForge's optional Windows bridge for files stored across four workstation workflow folders. It is a portable Electron application; source files stay local unless a technician explicitly imports a supported slicer archive or copies a print-ready file.
+HexForge File Helper is HexForge's optional Windows bridge for files stored across four workstation workflow folders. It is a portable Electron application; source files stay local unless a technician explicitly imports a supported slicer archive or copies a print-ready file.
 
 ## Build and package
 
@@ -13,13 +13,13 @@ npm run package:helper
 npm run smoke:helper
 ```
 
-The portable, runtime-inclusive artifact is `release/PrintingManagerHelper.exe`. The target workstation does not need Node.js, npm, Git, or the repository.
+The portable, runtime-inclusive artifact is `release/HexForgeFileHelper.exe`. The target workstation does not need Node.js, npm, Git, or the repository.
 
 For development, run `npm run dev:helper`. The helper still binds only to `127.0.0.1`.
 
 ## First run and USB deployment
 
-1. Copy `PrintingManagerHelper.exe` from a USB stick to a stable local location. Do not run it permanently from removable media if Start with Windows will be enabled.
+1. Copy `HexForgeFileHelper.exe` from a USB stick to a stable local location. Do not run it permanently from removable media if Start with Windows will be enabled.
 2. Run the executable. The settings window opens and the helper remains available from its tray icon.
 3. Choose separate **To Be Printed**, **Currently Printing**, **Completed Prints**, and **Do Not Print** folders.
 4. Keep port `47821`, or set the same port in HexForge's **Files** connection popover on that workstation.
@@ -27,7 +27,7 @@ For development, run `npm run dev:helper`. The helper still binds only to `127.0
 6. Confirm or select Bambu Studio and UltiMaker Cura paths, choose default mappings, and save.
 7. Optionally enable **Start with Windows** and create Desktop/Start menu shortcuts.
 
-Configuration and rotating logs are kept in `%APPDATA%\PrintingManagerHelper`. Replacing the stopped executable with a newer version does not remove these files. If the portable executable is moved, launch it once from its new location and recreate shortcuts or re-enable startup.
+Configuration and rotating logs are kept in `%APPDATA%\HexForgeFileHelper`. Replacing the stopped executable with a newer version does not remove these files. If the portable executable is moved, launch it once from its new location and recreate shortcuts or re-enable startup.
 
 ## Tray controls
 
@@ -46,7 +46,7 @@ The tray menu shows connection status, opens each workflow folder, opens setting
 
 ## Security controls
 
-- The API listens only on IPv4 loopback and requires an exact configured browser origin plus the `X-Printing-Manager-Client` header.
+- The API listens only on IPv4 loopback and requires an exact configured browser origin plus the `X-HexForge-File-Helper-Client` header.
 - CORS, preflight, and Private Network Access requests are validated explicitly.
 - The browser supplies project metadata and opaque identifiers, never filesystem paths, destinations, executables, or shell commands.
 - Every path is canonicalized and checked against its configured workflow folder. Escaping symlinks/junctions, traversal, hidden/system entries, and stale file IDs are rejected.

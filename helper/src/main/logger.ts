@@ -9,7 +9,7 @@ export class RotatingLogger {
   private readonly activePath: string;
 
   constructor(appDataDirectory: string) {
-    this.directory = path.join(appDataDirectory, 'PrintingManagerHelper', 'logs');
+    this.directory = path.join(appDataDirectory, 'HexForgeFileHelper', 'logs');
     this.activePath = path.join(this.directory, 'helper.log');
   }
 

@@ -1,5 +1,5 @@
-appId: za.ac.up.misc.printing-manager-helper
-productName: Printing Manager Helper
+appId: za.ac.up.misc.hexforge-file-helper
+productName: HexForge File Helper
 electronVersion: 37.10.3
 asar: true
 files:
@@ -11,11 +11,11 @@ extraResources:
 directories:
   output: ../release
 win:
-  icon: assets/icon.ico
+  icon: assets/icon.png
   target:
     - target: portable
       arch:
         - x64
-  artifactName: PrintingManagerHelper.exe
+  artifactName: HexForgeFileHelper.exe
 portable:
-  artifactName: PrintingManagerHelper.exe
+  artifactName: HexForgeFileHelper.exe

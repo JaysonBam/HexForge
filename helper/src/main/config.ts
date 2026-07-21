@@ -105,7 +105,7 @@ export class ConfigStore {
   private config: HelperConfig = defaultConfig();
 
   constructor(appDataDirectory: string) {
-    this.directory = path.join(appDataDirectory, 'PrintingManagerHelper');
+    this.directory = path.join(appDataDirectory, 'HexForgeFileHelper');
     this.filePath = path.join(this.directory, 'config.json');
   }
 

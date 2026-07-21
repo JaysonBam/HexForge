@@ -29,8 +29,13 @@ export default function App() {
           <Route path="/login" element={<PublicThemeProvider><LoginPage /></PublicThemeProvider>} />
           <Route path="/auth-callback" element={<PublicThemeProvider><AuthCallbackPage /></PublicThemeProvider>} />
           <Route path="/about" element={<PublicThemeProvider><PublicAppInfoPage /></PublicThemeProvider>} />
+          <Route path="/home" element={<PublicThemeProvider><PublicAppInfoPage /></PublicThemeProvider>} />
+          <Route path="/homepage" element={<PublicThemeProvider><PublicAppInfoPage /></PublicThemeProvider>} />
           <Route path="/privacy" element={<PublicThemeProvider><PrivacyPolicyPage /></PublicThemeProvider>} />
+          <Route path="/privacy-policy" element={<PublicThemeProvider><PrivacyPolicyPage /></PublicThemeProvider>} />
           <Route path="/terms" element={<PublicThemeProvider><TermsOfServicePage /></PublicThemeProvider>} />
+          <Route path="/terms-of-service" element={<PublicThemeProvider><TermsOfServicePage /></PublicThemeProvider>} />
+          <Route path="/terms-and-conditions" element={<PublicThemeProvider><TermsOfServicePage /></PublicThemeProvider>} />
           <Route
             path="/"
             element={(

@@ -4,7 +4,9 @@ import type { Project } from '../types';
 import { Button } from '../components/ui/Button';
 import { useFeedback } from '../components/ui/FeedbackProvider';
 import { useLocalHelper } from '../local-files/LocalHelperContext';
+import { getAvailableProjectFiles } from '../local-files/projectLocalFileAvailability';
 import { downloadPreparedGmailAttachments, prepareGmailAttachmentDownload, type PreparedGmailAttachmentDownload } from './gmailAttachmentDownload';
+import { isGmailAttachmentSavedLocally } from './gmailAttachmentAvailability';
 import { isSupportedGmailAttachment } from './gmailParsing';
 import { loadProjectGmailMessages, syncProjectGmailThread } from './gmailProjectService';
 import type { GmailThreadMessage } from './types';
@@ -34,6 +36,8 @@ export const ProjectCorrespondencePanel = ({
   const [loadingCache, setLoadingCache] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [downloadingAttachment, setDownloadingAttachment] = useState<string | null>(null);
+  const [availableLocalFiles, setAvailableLocalFiles] = useState<Awaited<ReturnType<typeof getAvailableProjectFiles>> | null>(null);
+  const [checkingLocalFiles, setCheckingLocalFiles] = useState(false);
   const [warning, setWarning] = useState<string | null>(null);
   const autoSyncedThread = useRef<string | null>(null);
 
@@ -51,6 +55,22 @@ export const ProjectCorrespondencePanel = ({
       setLoadingCache(false);
     }
   }, [project.gmailThreadId, project.id]);
+
+  const loadAvailableLocalFiles = useCallback(async () => {
+    if (!open || helperState !== 'connected') {
+      setAvailableLocalFiles(null);
+      setCheckingLocalFiles(false);
+      return;
+    }
+    setCheckingLocalFiles(true);
+    try {
+      setAvailableLocalFiles(await getAvailableProjectFiles(project, helperClient, true));
+    } catch {
+      setAvailableLocalFiles(null);
+    } finally {
+      setCheckingLocalFiles(false);
+    }
+  }, [helperClient, helperState, open, project]);
 
   const refresh = useCallback(async (manual = false) => {
     if (!project.gmailThreadId || refreshing || !canUseGmail) return;
@@ -77,6 +97,12 @@ export const ProjectCorrespondencePanel = ({
     if (!open) return;
     void loadCached();
   }, [loadCached, open]);
+
+  useEffect(() => {
+    void loadAvailableLocalFiles();
+    window.addEventListener('focus', loadAvailableLocalFiles);
+    return () => window.removeEventListener('focus', loadAvailableLocalFiles);
+  }, [loadAvailableLocalFiles]);
 
   useEffect(() => {
     if (!project.gmailThreadId || !canUseGmail || autoSyncedThread.current === project.gmailThreadId) return;
@@ -121,7 +147,7 @@ export const ProjectCorrespondencePanel = ({
         return;
       }
       const result = await downloadPreparedGmailAttachments(project, helperClient, prepared as PreparedGmailAttachmentDownload);
-      await loadCached();
+      await Promise.all([loadCached(), loadAvailableLocalFiles()]);
       notify({
         title: result.failed ? 'Attachment download completed with warnings' : 'Gmail attachment downloaded',
         message: `${result.saved} saved, ${result.skipped} skipped, ${result.renamed} safely renamed${result.failed ? `, ${result.failed} failed` : ''}.`,
@@ -181,7 +207,7 @@ export const ProjectCorrespondencePanel = ({
                 <article key={message.id} className={`flex ${message.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[88%] rounded-lg border p-4 shadow-sm ${message.direction === 'outgoing' ? 'border-sky-300 bg-sky-50' : 'border-slate-300 bg-white'}`}>
                     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                      <p className="text-xs font-black text-slate-900">{message.senderName || message.senderEmail || (message.direction === 'outgoing' ? 'Printing Manager' : 'Unknown sender')}</p>
+                      <p className="text-xs font-black text-slate-900">{message.senderName || message.senderEmail || (message.direction === 'outgoing' ? 'HexForge' : 'Unknown sender')}</p>
                       <time className="text-[10px] font-bold text-slate-500">{formatDateTime(message.messageDate)}</time>
                     </div>
                     {message.senderName && <p className="mt-0.5 text-[10px] font-semibold text-slate-500">{message.senderEmail}</p>}
@@ -191,13 +217,13 @@ export const ProjectCorrespondencePanel = ({
                         {message.attachments.map((attachment) => {
                           const attachmentKey = `${attachment.messageId}-${attachment.partId}`;
                           const downloadable = isSupportedGmailAttachment(attachment.filename);
-                          const alreadySaved = ['downloaded', 'skipped', 'renamed'].includes(attachment.downloadStatus || 'pending');
+                          const alreadySaved = isGmailAttachmentSavedLocally(attachment, availableLocalFiles);
                           return (
                             <span key={attachmentKey} className="forge-badge inline-flex items-center gap-1 px-2 py-1 text-[10px]">
                               <Paperclip size={11} /> {attachment.filename}
-                              {downloadable && <span className="inline-flex" title={!canUseGmail ? GMAIL_THREAD_ACCOUNT_MISMATCH : alreadySaved ? 'Already saved to the project folder.' : helperState !== 'connected' ? 'Connect the local helper to download this attachment.' : `Download ${attachment.filename}`}>
-                                <Button variant="ghost" size="sm" className="-my-1 ml-1 h-6 gap-1 px-1.5 text-[10px]" onClick={() => void downloadAttachment(attachment)} disabled={Boolean(downloadingAttachment) || helperState !== 'connected' || alreadySaved || !canUseGmail}>
-                                  {downloadingAttachment === attachmentKey ? <Loader2 size={11} className="animate-spin" /> : <Download size={11} />} {alreadySaved ? 'Saved' : 'Download'}
+                              {downloadable && <span className="inline-flex" title={!canUseGmail ? GMAIL_THREAD_ACCOUNT_MISMATCH : alreadySaved ? 'Already saved to the project folder on this workstation.' : helperState !== 'connected' ? 'Connect the local helper to download this attachment.' : `Download ${attachment.filename}`}>
+                                <Button variant="ghost" size="sm" className="-my-1 ml-1 h-6 gap-1 px-1.5 text-[10px]" onClick={() => void downloadAttachment(attachment)} disabled={Boolean(downloadingAttachment) || helperState !== 'connected' || checkingLocalFiles || alreadySaved || !canUseGmail}>
+                                  {downloadingAttachment === attachmentKey || checkingLocalFiles ? <Loader2 size={11} className="animate-spin" /> : <Download size={11} />} {alreadySaved ? 'Saved' : 'Download'}
                                 </Button>
                               </span>}
                             </span>

@@ -19,7 +19,7 @@ import {
   type SlicerHint
 } from '../../shared/localHelperProtocol';
 
-const PORT_STORAGE_KEY = 'printingManager.helperPort';
+const PORT_STORAGE_KEY = 'hexForge.fileHelperPort';
 
 type LocalNetworkRequestInit = RequestInit & {
   targetAddressSpace: 'loopback';
@@ -42,7 +42,7 @@ export class LocalHelperError extends Error {
 }
 
 export const getStoredHelperPort = (): number => {
-  const configuredDefault = Number(import.meta.env.VITE_PRINTING_MANAGER_HELPER_PORT || LOCAL_HELPER_DEFAULT_PORT);
+  const configuredDefault = Number(import.meta.env.VITE_HEXFORGE_FILE_HELPER_PORT || LOCAL_HELPER_DEFAULT_PORT);
   const fallback = Number.isInteger(configuredDefault) && configuredDefault >= 1024 && configuredDefault <= 65535
     ? configuredDefault
     : LOCAL_HELPER_DEFAULT_PORT;

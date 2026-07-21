@@ -2,10 +2,10 @@ import type { ProjectResolution } from '../../shared/localHelperProtocol';
 import { projectFolderDescriptor } from '../local-files/projectFolderWorkflow';
 import type { LocalHelperClient } from '../local-files/localHelperClient';
 import type { Project } from '../types';
-import { isSupportedGmailAttachment } from './gmailParsing';
 import { downloadGmailAttachment } from './gmailThreadApi';
 import { loadProjectGmailMessages, updateAttachmentDownloadStatus } from './gmailProjectService';
 import { assertProjectGmailThreadAccess } from './gmailThreadAccess';
+import { isGmailAttachmentDownloadEligible } from './gmailAttachmentAvailability';
 import type { GmailThreadAttachment } from './types';
 
 type MatchedResolution = Extract<ProjectResolution, { status: 'matched' | 'created' }>;
@@ -30,9 +30,8 @@ export const prepareGmailAttachmentDownload = async (
     attachments: []
   };
   const messages = await loadProjectGmailMessages(project.id);
-  const attachments = (selectedAttachments || messages.flatMap((message) => message.attachments)).filter((attachment) =>
-    isSupportedGmailAttachment(attachment.filename)
-    && !['downloaded', 'skipped', 'renamed'].includes(attachment.downloadStatus || 'pending'));
+  const attachments = (selectedAttachments || messages.flatMap((message) => message.attachments))
+    .filter((attachment) => isGmailAttachmentDownloadEligible(attachment, Boolean(selectedAttachments)));
   return { resolution, attachments };
 };
 
