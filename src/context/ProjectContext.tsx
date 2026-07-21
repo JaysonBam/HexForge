@@ -350,7 +350,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     void _parts;
     void _quoteSnapshot;
     const saved = await trackMutation('Create project', () => supabase.from('projects').insert([projectData]));
-    return saved ? newId : null;
+    if (!saved) {
+      setProjects(prev => prev.filter(project => project.id !== newId));
+      return null;
+    }
+    return newId;
   };
 
   const updateProject = (id: string, data: Partial<Project>) => {
