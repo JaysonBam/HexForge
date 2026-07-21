@@ -18,6 +18,7 @@ import {
 } from '../../domain/filamentSource.ts';
 import { Copy, CheckSquare } from 'lucide-react';
 import gmailIcon from '../../assets/icons/gmail.svg';
+import { GmailReplyComposer } from '../../gmail/GmailReplyComposer';
 
 export const CheckpointCollection = ({ project }: { project: Project }) => {
     const { updateProject, transitionPartStatus } = useProjects();
@@ -134,6 +135,12 @@ export const CheckpointCollection = ({ project }: { project: Project }) => {
         templateKey: collectionEmailTemplateKey,
         project,
         suppressSignature: true
+    });
+    const replyEmail = renderEmailTemplate({
+        templates: emailTemplates,
+        signature: emailSignature,
+        templateKey: collectionEmailTemplateKey,
+        project
     });
     const emailContent = communicationEmail.plainBody;
 
@@ -267,16 +274,25 @@ export const CheckpointCollection = ({ project }: { project: Project }) => {
                 <div className="mb-4 flex items-center justify-between">
                     <h3 className="text-lg font-semibold text-slate-900">Communication</h3>
                     <div className="flex flex-wrap justify-end gap-2">
-                        <Button
-                            variant="success"
-                            onClick={sendEmail}
-                            size="sm"
-                            className="gap-2 px-3.5"
-                            disabled={isOpeningGmail}
-                        >
-                            <img src={gmailIcon} alt="" className="h-4 w-4" />
-                            {isOpeningGmail ? 'Opening in Gmail...' : 'Open in Gmail'}
-                        </Button>
+                        {project.gmailThreadId ? (
+                            <GmailReplyComposer
+                                project={project}
+                                initialBody={replyEmail.plainBody}
+                                initialHtmlBody={replyEmail.htmlBody}
+                                getAttachments={replyEmail.attachQuote ? async () => [await buildProjectQuoteAttachment(project, getFilamentPrice, filaments, providedFilamentPricePerGram)] : undefined}
+                            />
+                        ) : (
+                            <Button
+                                variant="success"
+                                onClick={sendEmail}
+                                size="sm"
+                                className="gap-2 px-3.5"
+                                disabled={isOpeningGmail}
+                            >
+                                <img src={gmailIcon} alt="" className="h-4 w-4" />
+                                {isOpeningGmail ? 'Opening in Gmail...' : 'Open in Gmail'}
+                            </Button>
+                        )}
                     </div>
                 </div>
 

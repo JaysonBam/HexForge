@@ -14,6 +14,7 @@ create table public.parts (
   "projectId" text not null references public.projects(id) on delete cascade,
   "partNumber" integer not null default 1,
   "partName" text not null,
+  "sourceFilePath" text,
   "printerName" text,
   
   -- Material 1

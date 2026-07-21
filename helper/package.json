@@ -1,0 +1,10 @@
+{
+  "name": "hexforge-file-helper",
+  "productName": "HexForge File Helper",
+  "description": "Secure local-file companion for HexForge",
+  "author": "HexForge",
+  "version": "1.2.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/helper/src/main/main.js"
+}

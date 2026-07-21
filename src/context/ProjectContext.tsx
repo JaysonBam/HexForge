@@ -316,7 +316,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return newId;
   };
 
-  const addProject = (data: Partial<Project>) => {
+  const addProject = async (data: Partial<Project>) => {
     const newId = generateProjectId();
 
     const maxPriority = projects.reduce((max, p) => Math.max(max, p.priorityNumber), 0);
@@ -349,8 +349,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const { parts: _parts, quoteSnapshot: _quoteSnapshot, ...projectData } = newProject;
     void _parts;
     void _quoteSnapshot;
-    void trackMutation('Create project', () => supabase.from('projects').insert([projectData]));
-
+    const saved = await trackMutation('Create project', () => supabase.from('projects').insert([projectData]));
+    if (!saved) {
+      setProjects(prev => prev.filter(project => project.id !== newId));
+      return null;
+    }
     return newId;
   };
 
@@ -481,9 +484,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     void trackMutation('Delete part', () => supabase.from('parts').delete().eq('id', partId));
   };
 
-  const addExtractedParts = (projectId: string, extractedParts: Partial<Part>[]) => {
+  const addExtractedParts = async (projectId: string, extractedParts: Partial<Part>[]) => {
     const project = getProject(projectId);
-    if (!project) return;
+    if (!project) return false;
 
     const newParts: Part[] = extractedParts.map((ep, index) => normalizePartVerification({
       ...withSyncedFilamentFlags({
@@ -508,11 +511,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       secondaryServiceCost: ep.secondaryServiceCost,
       secondaryLength: ep.secondaryLength,
       imageUrl: ep.imageUrl,
-
       primaryEstimatedWeight: ep.primaryEstimatedWeight || 0,
       primaryWeight: ep.primaryWeight,
       primaryLength: ep.primaryLength,
       printingTime: ep.printingTime,
+      sourceFilePath: ep.sourceFilePath,
       primaryMaterialCost: ep.primaryMaterialCost || 0,
       primaryServiceCost: ep.primaryServiceCost || 0,
       printStatus: ep.printStatus || 'DRAFT',
@@ -526,8 +529,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     if (newParts.length) {
       const insertedParts = newParts.map(np => ({ ...np, projectId }));
-      void trackMutation('Add extracted parts', () => supabase.from('parts').insert(insertedParts));
+      return trackMutation('Add extracted parts', () => supabase.from('parts').insert(insertedParts));
     }
+    return true;
   };
 
   const transitionProjectState: ProjectContextType['transitionProjectState'] = async ({

@@ -1,0 +1,21 @@
+appId: za.ac.up.misc.hexforge-file-helper
+productName: HexForge File Helper
+electronVersion: 37.10.3
+asar: true
+files:
+  - dist/**/*
+  - package.json
+extraResources:
+  - from: assets/icon.png
+    to: icon.png
+directories:
+  output: ../release
+win:
+  icon: assets/icon.png
+  target:
+    - target: portable
+      arch:
+        - x64
+  artifactName: HexForgeFileHelper.exe
+portable:
+  artifactName: HexForgeFileHelper.exe

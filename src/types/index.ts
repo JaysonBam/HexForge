@@ -41,6 +41,7 @@ export interface Part {
   id: string;
   partNumber: number;
   partName: string;
+  sourceFilePath?: string;
 
   printerName?: string;
   primaryMaterial: string;
@@ -128,6 +129,11 @@ export interface Project {
   paymentOverrideNote?: string;
   state: ProjectState;
   printLabel?: string;
+  gmailThreadId?: string | null;
+  gmailAccountEmail?: string | null;
+  gmailThreadSubject?: string | null;
+  gmailMainContactEmail?: string | null;
+  gmailLastSyncedAt?: string | null;
   quoteSnapshot?: QuoteSnapshot;
   quoteSnapshots?: QuoteSnapshot[];
   parts: Part[];

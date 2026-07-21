@@ -65,13 +65,13 @@ export interface ProjectContextType {
   clearSyncError: () => void;
   getProject: (id: string) => Project | undefined;
   refreshProjects: () => Promise<void>;
-  addProject: (data: Partial<Project>) => string;
+  addProject: (data: Partial<Project>) => Promise<string | null>;
   updateProject: (id: string, data: Partial<Project>) => void;
   deleteProject: (id: string) => Promise<boolean>;
   addPart: (projectId: string) => void;
   updatePart: (projectId: string, partId: string, data: Partial<Part>) => void;
   deletePart: (projectId: string, partId: string) => void;
-  addExtractedParts: (projectId: string, parts: Partial<Part>[]) => void;
+  addExtractedParts: (projectId: string, parts: Partial<Part>[]) => Promise<boolean>;
   transitionProjectState: (args: {
     projectId: string;
     action: ProjectTransitionAction;

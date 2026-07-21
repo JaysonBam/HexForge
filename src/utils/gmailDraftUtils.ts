@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
+import { buildUnreadPrintEmailQuery } from '../gmail/gmailParsing';
 
 export type GmailAttachment = {
   filename: string;
@@ -12,6 +13,12 @@ export type GmailDraftRequest = {
   body: string;
   htmlBody?: string;
   attachments?: GmailAttachment[];
+};
+
+export type GmailReplyRequest = GmailDraftRequest & {
+  threadId: string;
+  inReplyTo: string;
+  references: string;
 };
 
 type GmailDraftResponse = {
@@ -30,6 +37,7 @@ export type GmailUnreadPrintEmailSummary = {
 
 export type GmailUnreadPrintEmail = {
   id: string;
+  threadId: string;
   subject: string;
   receivedAt: string | null;
   dateHeader: string;
@@ -46,6 +54,7 @@ type GmailMessageListResponse = {
 
 type GmailMessageMetadataResponse = {
   id?: string;
+  threadId?: string;
   internalDate?: string;
   payload?: {
     headers?: Array<{
@@ -193,12 +202,22 @@ const encodeSubject = (subject: string) => {
     : `=?UTF-8?B?${base64FromUtf8(sanitized)}?=`;
 };
 
-const buildMimeMessage = ({ to, subject, body, htmlBody, attachments = [] }: GmailDraftRequest) => {
+const buildMimeMessage = ({
+  to,
+  subject,
+  body,
+  htmlBody,
+  attachments = [],
+  inReplyTo,
+  references
+}: GmailDraftRequest & { inReplyTo?: string; references?: string }) => {
   const mixedBoundary = `misc_mixed_${crypto.randomUUID()}`;
   const alternativeBoundary = `misc_alt_${crypto.randomUUID()}`;
   const parts = [
     `To: ${sanitizeHeader(to)}`,
     `Subject: ${encodeSubject(subject)}`,
+    ...(inReplyTo ? [`In-Reply-To: ${sanitizeHeader(inReplyTo)}`] : []),
+    ...(references ? [`References: ${sanitizeHeader(references)}`] : []),
     'MIME-Version: 1.0',
     `Content-Type: multipart/mixed; boundary="${mixedBoundary}"`,
     '',
@@ -375,11 +394,6 @@ const sendDraftRequest = async (accessToken: string, raw: string) =>
     body: JSON.stringify({ message: { raw } })
   });
 
-const buildUnreadPrintEmailQuery = (term: string) => {
-  const searchTerm = /\s/.test(term) ? `"${term}"` : term;
-  return `is:unread newer_than:30d ${searchTerm}`;
-};
-
 const listUnreadPrintEmailIds = async (accessToken: string) => {
   const messageIds = new Set<string>();
 
@@ -459,6 +473,7 @@ const getFlaggedPrintEmail = async (accessToken: string, messageId: string): Pro
 
   return {
     id,
+    threadId: payload.threadId || id,
     subject: getGmailHeaderValue(payload, 'Subject'),
     receivedAt: getGmailMessageReceivedAt(payload),
     dateHeader: getGmailHeaderValue(payload, 'Date'),
@@ -471,15 +486,22 @@ const getFlaggedPrintEmails = async (accessToken: string, messageIds: Set<string
     Array.from(messageIds).map((messageId) => getFlaggedPrintEmail(accessToken, messageId))
   );
 
-  return emails.sort((first, second) => {
+  const sorted = emails.sort((first, second) => {
     const firstTime = first.receivedAt ? new Date(first.receivedAt).getTime() : 0;
     const secondTime = second.receivedAt ? new Date(second.receivedAt).getTime() : 0;
     return secondTime - firstTime || first.subject.localeCompare(second.subject);
   });
+
+  const seenThreads = new Set<string>();
+  return sorted.filter((email) => {
+    if (seenThreads.has(email.threadId)) return false;
+    seenThreads.add(email.threadId);
+    return true;
+  }).slice(0, 10);
 };
 
 const logFlaggedPrintEmails = (emails: GmailUnreadPrintEmail[]) => {
-  console.groupCollapsed(`Unread 3D print email matches (${emails.length})`);
+  console.groupCollapsed(`Unread 3D print email threads (${emails.length})`);
   console.table(emails.map((email) => ({
     subject: email.subject,
     receivedAt: email.receivedAt || email.dateHeader
@@ -496,7 +518,7 @@ const buildUnreadPrintEmailSummary = async (
   logFlaggedPrintEmails(flaggedEmails);
 
   return {
-    count: messageIds.size,
+    count: flaggedEmails.length,
     checkedAt: new Date().toISOString(),
     flaggedSubjects,
     flaggedEmails
@@ -581,6 +603,58 @@ export const createGmailDraft = async (draftRequest: GmailDraftRequest) => {
     messageId: draft.message?.id,
     url: `https://mail.google.com/mail/u/0/#drafts/${encodeURIComponent(draft.message?.id || draft.id)}`
   };
+};
+
+export const gmailApiFetch = async (path: string, init: RequestInit = {}): Promise<Response> => {
+  const refreshPromise = hasGoogleProviderRefreshToken() ? refreshGoogleAccessToken() : null;
+  refreshPromise?.catch((error: unknown) => {
+    console.warn('Background Gmail access refresh failed', error);
+  });
+
+  let accessToken = await getGoogleAccessToken(refreshPromise);
+  const send = () => fetch(`https://gmail.googleapis.com/gmail/v1/users/me${path}`, {
+    ...init,
+    headers: {
+      ...init.headers,
+      Authorization: `Bearer ${accessToken}`
+    }
+  });
+  let response = await send();
+
+  if (response.status === 401) {
+    const refreshedToken = refreshPromise ? await refreshPromise : await refreshGoogleAccessToken();
+    if (refreshedToken) {
+      accessToken = refreshedToken;
+      response = await send();
+    }
+  }
+
+  if (response.status === 401) {
+    clearGoogleProviderTokens();
+    throw new GmailAuthError(`Google rejected the Gmail access token: ${await readGoogleError(response)}`);
+  }
+
+  if (response.status === 403) {
+    const googleError = await readGoogleError(response);
+    if (googleError.toLowerCase().includes('insufficient') || googleError.toLowerCase().includes('scope')) {
+      clearGoogleProviderTokens();
+      throw new GmailAuthError(`Google says the Gmail token does not have the required permission: ${googleError}`);
+    }
+    throw new Error(`Gmail API returned 403: ${googleError}`);
+  }
+
+  return response;
+};
+
+export const sendGmailThreadReply = async (request: GmailReplyRequest) => {
+  const raw = base64UrlFromUtf8(buildMimeMessage(request));
+  const response = await gmailApiFetch('/messages/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ raw, threadId: request.threadId })
+  });
+  if (!response.ok) throw new Error(await readGoogleError(response));
+  return response.json() as Promise<{ id: string; threadId: string; labelIds?: string[] }>;
 };
 
 export const getUnread3dPrintEmailSummary = async (): Promise<GmailUnreadPrintEmailSummary> => {

@@ -26,6 +26,11 @@ create table public.projects (
   "defaultFilamentSource" text not null default 'misc' check ("defaultFilamentSource" in ('misc', 'student_provided', 'module_provided')),
   "receiptNumber" text,
   "printLabel" text,
+  "gmailThreadId" text,
+  "gmailAccountEmail" text,
+  "gmailThreadSubject" text,
+  "gmailMainContactEmail" text,
+  "gmailLastSyncedAt" timestamptz,
   state public.project_state not null default 'INTAKE',
   archived boolean not null default false,
   "createdAt" text not null

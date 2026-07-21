@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { useFeedback } from '../components/ui/FeedbackProvider';
@@ -22,9 +22,12 @@ import {
   type WorkspaceTab
 } from '../domain/operations';
 import type { ProjectWorkspaceNavigationContext } from '../components/Layout';
+import { LocalFilesCard } from '../local-files/LocalFilesCard';
+import { ProjectCorrespondencePanel } from '../gmail/ProjectCorrespondencePanel';
 import {
   ArrowLeft,
   Archive,
+  Mail,
   ShieldCheck,
   Trash2,
   X
@@ -33,13 +36,16 @@ import {
 export const ProjectTimeline = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { confirm, notify } = useFeedback();
   const { deleteProject, getProject, projectsLoading, projectsLoadError, updateProject, transitionProjectState } = useProjects();
   const { activeStaffName, claimActiveStaffName } = useStaffSession();
   const { settingsLoading, settingsLoadError } = useSettings();
   const { activeWorkspaceTab, selectWorkspaceTab } = useOutletContext<ProjectWorkspaceNavigationContext>();
   const project = getProject(id || '');
+  const autoCreateLocalFolder = (location.state as { autoCreateLocalFolderFor?: string } | null)?.autoCreateLocalFolderFor === project?.id;
   const [timelineOpen, setTimelineOpen] = useState(false);
+  const [correspondenceOpen, setCorrespondenceOpen] = useState(false);
   const [deletingProject, setDeletingProject] = useState(false);
   const staffName = activeStaffName || claimActiveStaffName() || 'System';
   const activeTab = project ? activeWorkspaceTab : 'overview';
@@ -187,48 +193,54 @@ export const ProjectTimeline = () => {
   return (
     <div className="project-detail-shell w-full">
       <aside className="project-summary-rail print:hidden" aria-label="Current project summary">
-        <div className="min-w-0">
-          <div className="space-y-2">
-            <StateBadge state={project.state} />
-            <div>
-              <p className="project-summary-label">Next Action</p>
-              <p className="project-summary-action">{getNextAction(project)}</p>
-              <p className="mt-1 text-[11px] font-semibold leading-snug text-slate-600">{getPaymentLabel(project)}</p>
+        <div className="project-summary-main min-w-0">
+          <div className="project-summary-static min-w-0">
+            <div className="space-y-2">
+              <StateBadge state={project.state} />
+              <div>
+                <p className="project-summary-label">Next Action</p>
+                <p className="project-summary-action">{getNextAction(project)}</p>
+                <p className="mt-1 text-[11px] font-semibold leading-snug text-slate-600">{getPaymentLabel(project)}</p>
+              </div>
+            </div>
+
+            <div className="project-summary-divider" />
+
+            <div className="space-y-1.5">
+              <div className="project-summary-row">
+                <p className="project-summary-label">Priority</p>
+                <p className="project-summary-priority">#{project.priorityNumber}</p>
+              </div>
+
+              <div className="project-summary-row">
+                <p className="project-summary-label">Project ID</p>
+                <p className="project-summary-value font-mono">{project.id}</p>
+              </div>
+
+              <div className="project-summary-row">
+                <p className="project-summary-label">Name</p>
+                <p className="project-summary-value">{project.studentName || 'Unnamed Project'}</p>
+              </div>
+
+              <div className="project-summary-row">
+                <p className="project-summary-label">Student Number</p>
+                <p className="project-summary-value font-mono">{project.studentNumber || 'Not set'}</p>
+              </div>
+
+              <div className="project-summary-row">
+                <p className="project-summary-label">Module Code</p>
+                <p className="project-summary-value">{project.course || 'Not set'}</p>
+              </div>
+
+              <div className="project-summary-row items-start">
+                <p className="project-summary-label">Lecturer</p>
+                <p className="project-summary-value">{project.lecturer || 'Not set'}</p>
+              </div>
             </div>
           </div>
 
-          <div className="project-summary-divider" />
-
-          <div className="space-y-3">
-            <div>
-              <p className="project-summary-label">Priority</p>
-              <p className="project-summary-priority">#{project.priorityNumber}</p>
-            </div>
-
-            <div>
-              <p className="project-summary-label">Project ID</p>
-              <p className="project-summary-value font-mono">{project.id}</p>
-            </div>
-
-            <div>
-              <p className="project-summary-label">Name</p>
-              <p className="project-summary-value">{project.studentName || 'Unnamed Project'}</p>
-            </div>
-
-            <div>
-              <p className="project-summary-label">Student Number</p>
-              <p className="project-summary-value font-mono">{project.studentNumber || 'Not set'}</p>
-            </div>
-
-            <div>
-              <p className="project-summary-label">Module Code</p>
-              <p className="project-summary-value">{project.course || 'Not set'}</p>
-            </div>
-
-            <div>
-              <p className="project-summary-label">Lecturer</p>
-              <p className="project-summary-value">{project.lecturer || 'Not set'}</p>
-            </div>
+          <div className="project-summary-local-files">
+            <LocalFilesCard project={project} autoCreateIfMissing={autoCreateLocalFolder} />
           </div>
         </div>
 
@@ -243,6 +255,14 @@ export const ProjectTimeline = () => {
             onClick={() => setTimelineOpen(true)}
           >
             <ShieldCheck size={15} /> View Timeline
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full justify-center gap-2"
+            onClick={() => setCorrespondenceOpen(true)}
+          >
+            <Mail size={15} /> View Correspondence
           </Button>
         </div>
       </aside>
@@ -287,6 +307,12 @@ export const ProjectTimeline = () => {
           </aside>
         </div>
       )}
+      <ProjectCorrespondencePanel
+        project={project}
+        open={correspondenceOpen}
+        onClose={() => setCorrespondenceOpen(false)}
+        onProjectSynced={(updates) => updateProject(project.id, updates)}
+      />
     </div>
   );
 };

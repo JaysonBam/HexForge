@@ -184,7 +184,7 @@ export default function LoginPage() {
                   fontSize: '0.98rem',
                 }}
               >
-                MISC 3D Printing Manager.
+                HexForge.
               </Typography>
             </Box>
 
