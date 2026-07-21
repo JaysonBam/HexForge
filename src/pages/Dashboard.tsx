@@ -121,14 +121,17 @@ export const Dashboard = () => {
       isRefreshing: true
     }));
 
-    const nextReminder = await fetchEmailReminderState();
-    setCachedEmailReminder({
-      ...nextReminder,
-      summary: nextReminder.summary ?? cachedEmailReminderState?.summary ?? null,
-      message: nextReminder.summary ? null : nextReminder.message,
-      isRefreshing: false
-    });
-    emailReminderRefreshInFlightRef.current = false;
+    try {
+      const nextReminder = await fetchEmailReminderState();
+      setCachedEmailReminder({
+        ...nextReminder,
+        summary: nextReminder.summary ?? cachedEmailReminderState?.summary ?? null,
+        message: nextReminder.summary ? null : nextReminder.message,
+        isRefreshing: false
+      });
+    } finally {
+      emailReminderRefreshInFlightRef.current = false;
+    }
   }, [setCachedEmailReminder]);
 
   useEffect(() => {

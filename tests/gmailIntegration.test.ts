@@ -54,7 +54,7 @@ test('recent print Gmail query includes read and unread messages', () => {
 
 test('dashboard Gmail query finds unread messages in print threads from the last three months', () => {
   const query = buildUnreadPrintEmailQuery('3d print');
-  assert.equal(query, 'newer_than:90d is:unread "3d print"');
+  assert.equal(query, 'newer_than:90d is:unread -from:linkedin.com "3d print"');
 });
 
 test('project Gmail links use the working primary-account thread route', () => {

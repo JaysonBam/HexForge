@@ -89,7 +89,7 @@ export const buildRecentPrintEmailQuery = (term: string): string => {
 
 export const buildUnreadPrintEmailQuery = (term: string): string => {
   const searchTerm = /\s/.test(term) ? `"${term}"` : term;
-  return `newer_than:90d is:unread ${searchTerm}`;
+  return `newer_than:90d is:unread -from:linkedin.com ${searchTerm}`;
 };
 
 export const getGmailMessageDirection = (
