@@ -280,9 +280,11 @@ export const ProjectsPage = () => {
                 className="gap-2"
                 disabled={reportRows.length === 0 || reportExporting}
                 onClick={handleReportDownload}
+                loading={reportExporting}
+                loadingText="Preparing Report…"
               >
                 <Download size={16} />
-                {reportExporting ? 'Preparing...' : 'Download Excel'}
+                Download Excel
               </Button>
             </div>
           </div>

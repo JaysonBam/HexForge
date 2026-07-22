@@ -1,26 +1,21 @@
 import type { Project } from '../types';
+import { normalizeModuleCode } from '../domain/moduleCode';
 import type { GmailProjectSuggestions, GmailThreadSnapshot } from './types';
 
 const STUDENT_NUMBER_PATTERN = /(?<!\d)(\d{8})(?!\d)/g;
 const LABELLED_NAME_PATTERN = /\b(?:student\s*name|full\s*name|name)\s*[:-]\s*([A-Za-z][A-Za-z .'-]{1,80})/i;
 const MODULE_CODE_PATTERN = /(?<![A-Za-z0-9])([A-Za-z]{3})[ \t]?(\d{3})(?![A-Za-z0-9])/g;
 
-const normalizeModuleCode = (value: string) => value.replace(/\s+/g, '').toUpperCase();
 export const formatModuleCode = (value: string): string => {
-  const normalized = normalizeModuleCode(value);
-  return /^[A-Z]{3}\d{3}$/.test(normalized) ? `${normalized.slice(0, 3)} ${normalized.slice(3)}` : value.trim();
+  return normalizeModuleCode(value) ?? value.trim();
 };
 
-export const findSavedModuleCode = (
-  values: string[],
-  savedModules: Array<{ code: string }>
-): string => {
-  const savedCodes = new Set(savedModules.map((module) => normalizeModuleCode(module.code)));
+export const findModuleCode = (values: string[]): string => {
   const matches = new Set<string>();
   values.forEach((value) => {
     for (const match of value.matchAll(MODULE_CODE_PATTERN)) {
       const normalizedCode = `${match[1]}${match[2]}`.toUpperCase();
-      if (savedCodes.has(normalizedCode)) matches.add(formatModuleCode(normalizedCode));
+      matches.add(formatModuleCode(normalizedCode));
     }
   });
   return matches.size === 1 ? [...matches][0] : '';
@@ -50,8 +45,7 @@ export const extractLabelledName = (values: string[]): string => {
 
 export const extractProjectSuggestions = (
   thread: GmailThreadSnapshot,
-  existingProjects: Project[],
-  savedModules: Array<{ code: string }> = []
+  existingProjects: Project[]
 ): GmailProjectSuggestions => {
   const externalMessages = thread.messages.filter((message) => message.senderEmail.toLowerCase() !== thread.accountEmail.toLowerCase());
   const accountEmail = thread.accountEmail.toLowerCase();
@@ -76,7 +70,7 @@ export const extractProjectSuggestions = (
     studentNumberCandidates,
     studentName: labelledName || displayName || matchingProject?.studentName || '',
     email,
-    moduleCode: findSavedModuleCode(searchableValues, savedModules)
+    moduleCode: findModuleCode(searchableValues)
   };
 };
 

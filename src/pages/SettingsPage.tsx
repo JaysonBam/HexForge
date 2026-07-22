@@ -271,7 +271,7 @@ export const SettingsPage = () => {
                                     <option key={source} value={source}>{filamentSourceLabel(source)}</option>
                                 ))}
                             </select>
-                            <Button onClick={handleAddModule} size="sm" className="h-10 gap-2">
+                            <Button onClick={handleAddModule} size="sm" className="h-10 gap-2" disabled={!newModule.code.trim() || !newModule.lecturer.trim()} title={!newModule.code.trim() || !newModule.lecturer.trim() ? 'Enter both a module code and lecturer.' : undefined}>
                                 <Plus size={15} /> Add
                             </Button>
                         </div>
@@ -346,7 +346,7 @@ export const SettingsPage = () => {
                                 value={newFilament.price}
                                 onChange={(event) => setNewFilament((prev) => ({ ...prev, price: event.target.value }))}
                             />
-                            <Button onClick={handleAddFilament} size="sm" className="h-10 gap-2">
+                            <Button onClick={handleAddFilament} size="sm" className="h-10 gap-2" disabled={!newFilament.type.trim() || !Number.isFinite(Number.parseFloat(newFilament.price))} title={!newFilament.type.trim() || !Number.isFinite(Number.parseFloat(newFilament.price)) ? 'Enter a material and valid price.' : undefined}>
                                 <Plus size={15} /> Add
                             </Button>
                         </div>

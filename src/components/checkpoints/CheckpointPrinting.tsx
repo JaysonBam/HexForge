@@ -2,27 +2,28 @@ import { useState } from 'react';
 import type { Project } from '../../types';
 import { useProjects } from '../../context/ProjectContext';
 import { useSettings } from '../../context/SettingsContext';
-import { useStaffSession } from '../../context/StaffSessionContext';
+import { useStaffActionName } from '../../hooks/useStaffActionName';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { useFeedback } from '../ui/FeedbackProvider';
-import { getMissingStaffMessage } from '../../utils/staffSessionUtils';
 import { Play, Check, Undo2, AlertTriangle } from 'lucide-react';
 import { PartSourceFileButton } from '../../local-files/PartSourceFileButton';
 import { sourceFileName } from '../../local-files/sourceFileLink';
 
-export const CheckpointPrinting = ({ project }: { project: Project }) => {
+export const CheckpointPrinting = ({ project, onAdvanceToCollection }: { project: Project; onAdvanceToCollection?: () => void }) => {
     const { transitionPartStatus, transitionProjectState, updatePart } = useProjects();
     const { printers, brands } = useSettings();
-    const { activeStaffName, claimActiveStaffName } = useStaffSession();
-    const { prompt, showMessage } = useFeedback();
+    const { activeStaffName, requestStaffName, setActiveStaffName, staffOptions } = useStaffActionName();
+    const { notify, prompt, showMessage } = useFeedback();
 
     const [activeAction, setActiveAction] = useState<{ type: 'START' | 'FINISH' | 'FAIL', partId: string } | null>(null);
     const [selectedPrinter, setSelectedPrinter] = useState('');
     const [primaryBrand, setPrimaryBrand] = useState('');
     const [secondaryBrand, setSecondaryBrand] = useState('');
     const [failureReason, setFailureReason] = useState('');
+    const [actionStaffName, setActionStaffName] = useState('');
     const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+    const [pendingAction, setPendingAction] = useState<string | null>(null);
 
     const openStart = (partId: string) => {
         const part = project.parts.find(p => p.id === partId);
@@ -30,17 +31,20 @@ export const CheckpointPrinting = ({ project }: { project: Project }) => {
         setSelectedPrinter('');
         setPrimaryBrand(part?.primaryBrand || '');
         setSecondaryBrand(part?.secondaryBrand || '');
+        setActionStaffName(activeStaffName);
         setFormErrors({});
     };
 
     const openFinish = (partId: string) => {
         setActiveAction({ type: 'FINISH', partId });
+        setActionStaffName(activeStaffName);
         setFormErrors({});
     };
 
     const openFail = (partId: string) => {
         setActiveAction({ type: 'FAIL', partId });
         setFailureReason('');
+        setActionStaffName(activeStaffName);
         setFormErrors({});
     };
 
@@ -54,18 +58,15 @@ export const CheckpointPrinting = ({ project }: { project: Project }) => {
     };
 
     const confirmAction = async () => {
-        if (!activeAction) return;
+        if (!activeAction || pendingAction) return;
         const { type: actionType, partId } = activeAction;
 
-        const technicianName = claimActiveStaffName();
+        const technicianName = actionStaffName.trim();
         if (!technicianName) {
-            await showMessage({
-                title: 'Staff member required',
-                messages: [getMissingStaffMessage('recording a print action')],
-                tone: 'warning'
-            });
+            setFormErrors((previous) => ({ ...previous, actionStaffName: 'Select a staff member.' }));
             return;
         }
+        setActiveStaffName(technicianName);
 
         if (actionType === 'START') {
             const machineName = selectedPrinter.trim();
@@ -75,7 +76,7 @@ export const CheckpointPrinting = ({ project }: { project: Project }) => {
             setFormErrors(errors);
             if (errors.selectedPrinter) return;
 
-            closeAction();
+            setPendingAction(`${actionType}:${partId}`);
             const result = await transitionPartStatus({
                 projectId: project.id,
                 partId,
@@ -83,6 +84,7 @@ export const CheckpointPrinting = ({ project }: { project: Project }) => {
                 technicianName,
                 machineName
             });
+            setPendingAction(null);
 
             if (!result.ok) {
                 await showMessage({ title: 'Print was not started', messages: result.errors, tone: 'error' });
@@ -97,14 +99,16 @@ export const CheckpointPrinting = ({ project }: { project: Project }) => {
                 primaryBrand,
                 secondaryBrand: secondaryBrand || undefined
             });
-        } else if (actionType === 'FINISH') {
             closeAction();
+        } else if (actionType === 'FINISH') {
+            setPendingAction(`${actionType}:${partId}`);
             const result = await transitionPartStatus({
                 projectId: project.id,
                 partId,
                 action: 'FINISH_PRINT',
                 technicianName
             });
+            setPendingAction(null);
 
             if (!result.ok) {
                 await showMessage({ title: 'Print was not finished', messages: result.errors, tone: 'error' });
@@ -114,6 +118,7 @@ export const CheckpointPrinting = ({ project }: { project: Project }) => {
             if (result.warnings && result.warnings.length > 0) {
                 await showMessage({ title: 'Finished with warnings', messages: result.warnings, tone: 'warning' });
             }
+            closeAction();
         } else {
             const reason = failureReason.trim();
             const errors = {
@@ -122,7 +127,7 @@ export const CheckpointPrinting = ({ project }: { project: Project }) => {
             setFormErrors(errors);
             if (errors.failureReason) return;
 
-            closeAction();
+            setPendingAction(`${actionType}:${partId}`);
             const result = await transitionPartStatus({
                 projectId: project.id,
                 partId,
@@ -130,11 +135,13 @@ export const CheckpointPrinting = ({ project }: { project: Project }) => {
                 technicianName,
                 reason
             });
+            setPendingAction(null);
 
             if (!result.ok) {
                 await showMessage({ title: 'Print was not failed', messages: result.errors, tone: 'error' });
                 return;
             }
+            closeAction();
 
             if (result.warnings && result.warnings.length > 0) {
                 await showMessage({ title: 'Failed with warnings', messages: result.warnings, tone: 'warning' });
@@ -147,6 +154,7 @@ export const CheckpointPrinting = ({ project }: { project: Project }) => {
         project.parts.every(p => ['PRINTED', 'POST_PROCESSING', 'COLLECTED'].includes(p.printStatus));
 
     const handleNextStage = async () => {
+        if (pendingAction) return;
         if (!allCollectionReady) {
             await showMessage({
                 title: 'Printing still in progress',
@@ -156,15 +164,8 @@ export const CheckpointPrinting = ({ project }: { project: Project }) => {
             return;
         }
 
-        const technicianName = claimActiveStaffName();
-        if (!technicianName) {
-            await showMessage({
-                title: 'Staff member required',
-                messages: [getMissingStaffMessage('moving a project to collection')],
-                tone: 'warning'
-            });
-            return;
-        }
+        const technicianName = await requestStaffName('moving this project to collection');
+        if (!technicianName) return;
 
         const values = await prompt({
             title: 'Move to collection',
@@ -176,12 +177,14 @@ export const CheckpointPrinting = ({ project }: { project: Project }) => {
         });
         const label = values?.printLabel.trim();
 
+        setPendingAction('next-stage');
         const result = await transitionProjectState({
             projectId: project.id,
             action: 'MARK_READY_FOR_COLLECTION',
             technicianName,
             printLabel: label?.trim() || undefined
         });
+        setPendingAction(null);
 
         if (!result.ok) {
             await showMessage({ title: 'Cannot move to collection', messages: result.errors, tone: 'error' });
@@ -190,19 +193,15 @@ export const CheckpointPrinting = ({ project }: { project: Project }) => {
 
         if (result.warnings && result.warnings.length > 0) {
             await showMessage({ title: 'Moved with warnings', messages: result.warnings, tone: 'warning' });
+        } else {
+            notify({ title: 'Ready for collection', message: 'Project moved to Collection.', tone: 'success' });
         }
+        onAdvanceToCollection?.();
     };
 
     const handleRequeue = async (partId: string) => {
-        const technicianName = claimActiveStaffName();
-        if (!technicianName) {
-            await showMessage({
-                title: 'Staff member required',
-                messages: [getMissingStaffMessage('requeueing a part')],
-                tone: 'warning'
-            });
-            return;
-        }
+        const technicianName = await requestStaffName('requeueing this part');
+        if (!technicianName) return;
 
         const values = await prompt({
             title: 'Requeue part',
@@ -352,15 +351,25 @@ export const CheckpointPrinting = ({ project }: { project: Project }) => {
                                 )}
 
                                 <div>
-                                    <div className={`rounded border p-2 text-sm ${activeStaffName ? 'border-slate-300 bg-slate-100 text-slate-800' : 'forge-alert-warm'}`}>
-                                        {activeStaffName || 'Set the current staff member in the header before confirming this action.'}
-                                    </div>
+                                    <label className="mb-1 block text-sm font-medium">Staff member</label>
+                                    <select
+                                        className={`forge-command-input w-full p-2 ${formErrors.actionStaffName ? 'border-rose-400 bg-rose-50' : ''}`}
+                                        value={actionStaffName}
+                                        onChange={(event) => {
+                                            setActionStaffName(event.target.value);
+                                            setFormErrors((previous) => ({ ...previous, actionStaffName: '' }));
+                                        }}
+                                    >
+                                        <option value="">Select a staff member</option>
+                                        {staffOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+                                    </select>
+                                    {formErrors.actionStaffName && <p className="mt-1 text-xs font-semibold text-rose-600">{formErrors.actionStaffName}</p>}
                                 </div>
                             </div>
 
                             <div className="flex justify-end gap-2 pt-2">
-                                <Button variant="outline" onClick={closeAction}>Cancel</Button>
-                                <Button onClick={confirmAction}>Confirm</Button>
+                                <Button variant="outline" onClick={closeAction} disabled={pendingAction !== null}>Cancel</Button>
+                                <Button onClick={confirmAction} loading={pendingAction?.endsWith(`:${activeAction.partId}`)} loadingText="Saving…">Confirm</Button>
                             </div>
                         </div>
                     </div>
@@ -377,7 +386,7 @@ export const CheckpointPrinting = ({ project }: { project: Project }) => {
                     )}
                 </div>
                 {allCollectionReady && (
-                    <Button onClick={handleNextStage}>
+                    <Button onClick={handleNextStage} loading={pendingAction === 'next-stage'} loadingText="Moving to Collection…">
                         Move to Collection
                     </Button>
                 )}
@@ -415,7 +424,7 @@ export const CheckpointPrinting = ({ project }: { project: Project }) => {
                                 </div>
                                 <div className="mt-3 flex gap-2">
                                     <PartSourceFileButton part={part} project={project} />
-                                    <Button onClick={() => openStart(part.id)} size="sm" className="flex-1 gap-2">
+                                    <Button onClick={() => openStart(part.id)} size="sm" className="flex-1 gap-2" disabled={pendingAction !== null}>
                                         <Play size={14} /> Start
                                     </Button>
                                 </div>
@@ -458,13 +467,14 @@ export const CheckpointPrinting = ({ project }: { project: Project }) => {
                                         variant="outline"
                                         title="Revert to queued"
                                         className="h-auto w-10 shrink-0 p-0 text-slate-600 hover:bg-slate-100"
+                                        disabled={pendingAction !== null}
                                     >
                                         <Undo2 size={14} />
                                     </Button>
-                                    <Button onClick={() => openFail(part.id)} size="sm" variant="outline" className="gap-2 border-red-300 text-red-800 hover:bg-red-100">
+                                    <Button onClick={() => openFail(part.id)} size="sm" variant="outline" className="gap-2 border-red-300 text-red-800 hover:bg-red-100" disabled={pendingAction !== null}>
                                         <AlertTriangle size={14} /> Fail
                                     </Button>
-                                    <Button onClick={() => openFinish(part.id)} size="sm" variant="outline" className="flex-1 gap-2 hover:border-green-300 hover:bg-green-100 hover:text-green-800">
+                                    <Button onClick={() => openFinish(part.id)} size="sm" variant="outline" className="flex-1 gap-2 hover:border-green-300 hover:bg-green-100 hover:text-green-800" disabled={pendingAction !== null}>
                                         <Check size={14} /> Finish
                                     </Button>
                                 </div>
@@ -509,7 +519,8 @@ export const CheckpointPrinting = ({ project }: { project: Project }) => {
                                             size="sm"
                                             variant="outline"
                                             title="Requeue this part"
-                                            className="h-8 gap-2 px-2 py-1 text-slate-600 hover:bg-slate-100"
+                                        className="h-8 gap-2 px-2 py-1 text-slate-600 hover:bg-slate-100"
+                                        disabled={pendingAction !== null}
                                         >
                                             <Undo2 size={14} /> Requeue
                                         </Button>

@@ -1,12 +1,11 @@
 import type { Project, Part } from '../../types';
 import { useProjects } from '../../context/ProjectContext';
 import { useSettings } from '../../context/SettingsContext';
-import { useStaffSession } from '../../context/StaffSessionContext';
+import { useStaffActionName } from '../../hooks/useStaffActionName';
 import { useState } from 'react';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { useFeedback } from '../ui/FeedbackProvider';
-import { getMissingStaffMessage } from '../../utils/staffSessionUtils';
 import { getStudentEmail, isCollectionBlocked } from '../../domain/operations';
 import { createGmailDraft, GmailAuthError, requestGmailDraftAccess } from '../../utils/gmailDraftUtils';
 import { renderEmailTemplate } from '../../domain/emailTemplates';
@@ -30,9 +29,10 @@ export const CheckpointCollection = ({ project }: { project: Project }) => {
         emailSignature,
         refreshEmailSettings
     } = useSettings();
-    const { activeStaffName, claimActiveStaffName } = useStaffSession();
+    const { activeStaffName, requestStaffName } = useStaffActionName();
     const { confirm, notify, showMessage } = useFeedback();
     const [isOpeningGmail, setIsOpeningGmail] = useState(false);
+    const [collectionAction, setCollectionAction] = useState<string | null>(null);
     const getPrimaryCost = (part: Part) => {
         const weight = part.primaryEstimatedWeight || 0;
         const source = getPartFilamentSource(part.primaryFilamentSource, part.primaryOwnFilament);
@@ -59,6 +59,7 @@ export const CheckpointCollection = ({ project }: { project: Project }) => {
     const isPaymentBlocked = isCollectionBlocked(project);
 
     const collectPart = async (partId: string) => {
+        if (collectionAction) return;
         if (isPaymentBlocked) {
             await showMessage({
                 title: 'Collection blocked',
@@ -68,31 +69,27 @@ export const CheckpointCollection = ({ project }: { project: Project }) => {
             return;
         }
 
-        const name = claimActiveStaffName();
-        if (!name) {
-            await showMessage({
-                title: 'Staff member required',
-                messages: [getMissingStaffMessage('collecting a part')],
-                tone: 'warning'
-            });
-            return;
-        }
+        const name = await requestStaffName('collecting this part');
+        if (!name) return;
 
+        setCollectionAction(partId);
         const result = await transitionPartStatus({
             projectId: project.id,
             partId,
             action: 'COLLECT_PART',
             technicianName: name
         });
+        setCollectionAction(null);
 
         if (!result.ok) {
             await showMessage({ title: 'Part was not collected', messages: result.errors, tone: 'error' });
             return;
         }
-
+        notify({ title: 'Part collected', message: 'The collection record was saved.', tone: 'success' });
     };
 
     const collectAll = async () => {
+        if (collectionAction) return;
         if (isPaymentBlocked) {
             await showMessage({
                 title: 'Collection blocked',
@@ -102,29 +99,30 @@ export const CheckpointCollection = ({ project }: { project: Project }) => {
             return;
         }
 
-        const staffName = claimActiveStaffName();
-        if (!staffName) {
-            await showMessage({
-                title: 'Staff member required',
-                messages: [getMissingStaffMessage('collecting parts')],
-                tone: 'warning'
-            });
-            return;
-        }
+        const staffName = await requestStaffName('collecting these parts');
+        if (!staffName) return;
 
-        for (const part of printableCollectionParts) {
-            if (part.printStatus !== 'COLLECTED') {
-                const result = await transitionPartStatus({
-                    projectId: project.id,
-                    partId: part.id,
-                    action: 'COLLECT_PART',
-                    technicianName: staffName.trim()
-                });
-                if (!result.ok) {
-                    await showMessage({ title: 'Collection stopped', messages: result.errors, tone: 'error' });
-                    break;
+        setCollectionAction('all');
+        let collectedCount = 0;
+        try {
+            for (const part of printableCollectionParts) {
+                if (part.printStatus !== 'COLLECTED') {
+                    const result = await transitionPartStatus({
+                        projectId: project.id,
+                        partId: part.id,
+                        action: 'COLLECT_PART',
+                        technicianName: staffName.trim()
+                    });
+                    if (!result.ok) {
+                        await showMessage({ title: 'Collection stopped', messages: result.errors, tone: 'error' });
+                        return;
+                    }
+                    collectedCount += 1;
                 }
             }
+            notify({ title: 'Collection complete', message: `${collectedCount} ${collectedCount === 1 ? 'part was' : 'parts were'} marked collected.`, tone: 'success' });
+        } finally {
+            setCollectionAction(null);
         }
     };
 
@@ -216,7 +214,9 @@ export const CheckpointCollection = ({ project }: { project: Project }) => {
                         onClick={collectAll}
                         size="sm"
                         className="gap-2 bg-teal-700 text-white hover:bg-teal-800"
-                        disabled={isPaymentBlocked}
+                        disabled={isPaymentBlocked || collectionAction !== null}
+                        loading={collectionAction === 'all'}
+                        loadingText="Collecting All…"
                         title={isPaymentBlocked ? 'Enter the receipt number before collecting.' : undefined}
                     >
                         <CheckSquare className="w-4 h-4" /> Collect All Uncollected
@@ -287,10 +287,11 @@ export const CheckpointCollection = ({ project }: { project: Project }) => {
                                 onClick={sendEmail}
                                 size="sm"
                                 className="gap-2 px-3.5"
-                                disabled={isOpeningGmail}
+                                loading={isOpeningGmail}
+                                loadingText="Opening Gmail…"
                             >
                                 <img src={gmailIcon} alt="" className="h-4 w-4" />
-                                {isOpeningGmail ? 'Opening in Gmail...' : 'Open in Gmail'}
+                                Open in Gmail
                             </Button>
                         )}
                     </div>
@@ -351,7 +352,9 @@ export const CheckpointCollection = ({ project }: { project: Project }) => {
                                                 onClick={() => collectPart(part.id)}
                                                 size="sm"
                                                 className="bg-teal-700 text-white hover:bg-teal-800"
-                                                disabled={isPaymentBlocked}
+                                                disabled={isPaymentBlocked || collectionAction !== null}
+                                                loading={collectionAction === part.id}
+                                                loadingText="Collecting…"
                                                 title={isPaymentBlocked ? 'Enter the receipt number before collecting.' : undefined}
                                             >
                                                 Collect

@@ -3,7 +3,7 @@ import { ChevronDown, ChevronUp, FileCheck2, Trash2 } from 'lucide-react';
 import type { Part } from '../../types';
 import { useSettings } from '../../context/SettingsContext';
 import { useProjects } from '../../context/ProjectContext';
-import { useStaffSession } from '../../context/StaffSessionContext';
+import { useStaffActionName } from '../../hooks/useStaffActionName';
 import { Button } from '../ui/Button';
 import { useFeedback } from '../ui/FeedbackProvider';
 import {
@@ -27,10 +27,11 @@ interface PartItemProps {
 export const PartItem = ({ part, projectId }: PartItemProps) => {
     const { updatePart, deletePart, transitionPartStatus } = useProjects();
     const { getFilamentPrice, filaments, providedFilamentPricePerGram } = useSettings();
-    const { claimActiveStaffName } = useStaffSession();
+    const { requestStaffName } = useStaffActionName();
     const { confirm, showMessage } = useFeedback();
     const [expanded, setExpanded] = useState(part.expanded ?? false);
     const [verificationError, setVerificationError] = useState('');
+    const [pendingAction, setPendingAction] = useState<'verify' | 'unverify' | null>(null);
     const isVerifiedForReview = isPartVerifiedForReview(part);
     const visibleCheckedBy = getVisibleCheckedBy(part);
     const showClearVerification = canClearPartVerification(part);
@@ -95,19 +96,19 @@ export const PartItem = ({ part, projectId }: PartItemProps) => {
     const totalServiceCost = (part.primaryServiceCost || 0) + (part.secondaryServiceCost || 0);
 
     const handleVerifyPart = async () => {
-        const technician = claimActiveStaffName();
-        if (!technician) {
-            setVerificationError('Select the staff member in the header');
-            return;
-        }
+        if (pendingAction) return;
+        const technician = await requestStaffName('verifying this part');
+        if (!technician) return;
 
         setVerificationError('');
+        setPendingAction('verify');
         const result = await transitionPartStatus({
             projectId,
             partId: part.id,
             action: 'VERIFY_PART',
             technicianName: technician
         });
+        setPendingAction(null);
         if (!result.ok) {
             setVerificationError(result.errors[0] || 'Part was not verified.');
             await showMessage({ title: 'Part was not verified', messages: result.errors, tone: 'error' });
@@ -115,18 +116,19 @@ export const PartItem = ({ part, projectId }: PartItemProps) => {
     };
 
     const handleUnverifyPart = async () => {
-        const technician = claimActiveStaffName();
-        if (!technician) {
-            return;
-        }
+        if (pendingAction) return;
+        const technician = await requestStaffName('clearing this verification');
+        if (!technician) return;
 
         setVerificationError('');
+        setPendingAction('unverify');
         const result = await transitionPartStatus({
             projectId,
             partId: part.id,
             action: 'UNVERIFY_PART',
             technicianName: technician
         });
+        setPendingAction(null);
         if (!result.ok) {
             setVerificationError(result.errors[0] || 'Part was not unverified.');
             await showMessage({ title: 'Part was not unverified', messages: result.errors, tone: 'error' });
@@ -421,15 +423,15 @@ export const PartItem = ({ part, projectId }: PartItemProps) => {
                         </div>
                         <div className="flex items-center gap-2">
                             {showClearVerification ? (
-                                <Button variant="outline" size="sm" onClick={handleUnverifyPart} className="rounded-lg py-1.5">
+                                <Button variant="outline" size="sm" onClick={handleUnverifyPart} className="rounded-lg py-1.5" disabled={pendingAction !== null} loading={pendingAction === 'unverify'} loadingText="Clearing…">
                                     Clear Verification
                                 </Button>
                             ) : (
-                                <Button size="sm" onClick={handleVerifyPart} className="rounded-lg py-1.5">
+                                <Button size="sm" onClick={handleVerifyPart} className="rounded-lg py-1.5" disabled={pendingAction !== null} loading={pendingAction === 'verify'} loadingText="Verifying…">
                                     Verify Part
                                 </Button>
                             )}
-                            <Button variant="destructive" size="sm" onClick={handleDeletePart} className="flex items-center gap-2 rounded-lg py-1.5">
+                            <Button variant="destructive" size="sm" onClick={handleDeletePart} className="flex items-center gap-2 rounded-lg py-1.5" disabled={pendingAction !== null}>
                                 <Trash2 size={16} /> Delete Part
                             </Button>
                         </div>

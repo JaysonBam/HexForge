@@ -10,7 +10,7 @@ import {
   buildRecentPrintEmailQuery,
   buildUnreadPrintEmailQuery,
   extractProjectSuggestions,
-  findSavedModuleCode,
+  findModuleCode,
   findStudentNumbers,
   getGmailMessageDirection,
   isSupportedGmailAttachment
@@ -21,6 +21,7 @@ import { canUseProjectGmailThread, GMAIL_THREAD_ACCOUNT_MISMATCH } from '../src/
 import { isGmailAttachmentDownloadEligible, isGmailAttachmentSavedLocally } from '../src/gmail/gmailAttachmentAvailability.ts';
 import type { GmailThreadSnapshot } from '../src/gmail/types.ts';
 import type { Project } from '../src/types/index.ts';
+import { isValidModuleCode, normalizeModuleCode } from '../src/domain/moduleCode.ts';
 
 const baseThread = (body: string, overrides: Partial<GmailThreadSnapshot> = {}): GmailThreadSnapshot => ({
   id: 'thread-1',
@@ -90,17 +91,37 @@ test('student number matching is standalone and checks filenames and email addre
   assert.deepEqual(findStudentNumbers(['u12345678@tuks.co.za', 'job-87654321.3mf', 'x123456789y']).sort(), ['12345678', '87654321']);
 });
 
-test('module extraction accepts spaced or combined codes and only returns a saved module', () => {
-  const modules = [{ code: 'EMK 310' }, { code: 'MTR420' }];
-  assert.equal(findSavedModuleCode(['Please print this for EMK310.'], modules), 'EMK 310');
-  assert.equal(findSavedModuleCode(['Module: mtr 420'], modules), 'MTR 420');
-  assert.equal(findSavedModuleCode(['Unknown ABC123'], modules), '');
-  assert.equal(findSavedModuleCode(['EMK310 and MTR 420'], modules), '');
+test('module extraction accepts spaced or combined codes without requiring a saved module', () => {
+  assert.equal(findModuleCode(['Please print this for EMK310.']), 'EMK 310');
+  assert.equal(findModuleCode(['Module: mtr 420']), 'MTR 420');
+  assert.equal(findModuleCode(['Unknown ABC123']), 'ABC 123');
+  assert.equal(findModuleCode(['Module: MRN 422']), 'MRN 422');
+  assert.equal(findModuleCode(['Module: MRN422']), 'MRN 422');
+  assert.equal(findModuleCode(['EMK310 and MTR 420']), '');
+});
+
+test('front-end module codes normalize to three letters, one space, and three numbers', () => {
+  assert.equal(normalizeModuleCode('MRN422'), 'MRN 422');
+  assert.equal(normalizeModuleCode('MRN 422'), 'MRN 422');
+  assert.equal(normalizeModuleCode('mrn422'), 'MRN 422');
+  assert.equal(isValidModuleCode('MRN 422'), true);
+  assert.equal(isValidModuleCode('MR 422'), false);
+  assert.equal(isValidModuleCode('MRN 42'), false);
+  assert.equal(isValidModuleCode('422 MRN'), false);
+  assert.equal(isValidModuleCode('MRN-422'), false);
 });
 
 test('Gmail suggestions include a saved module found anywhere in the thread', () => {
   const thread = baseThread('Please print this for emk 310.');
-  assert.equal(extractProjectSuggestions(thread, [], [{ code: 'EMK310' }]).moduleCode, 'EMK 310');
+  assert.equal(extractProjectSuggestions(thread, []).moduleCode, 'EMK 310');
+});
+
+test('Gmail suggestions retain an unsaved module code for manual lecturer entry', () => {
+  const spaced = baseThread('Module: MRN 422');
+  assert.equal(extractProjectSuggestions(spaced, [], []).moduleCode, 'MRN 422');
+
+  const combined = baseThread('Module: MRN422');
+  assert.equal(extractProjectSuggestions(combined, [], []).moduleCode, 'MRN 422');
 });
 
 test('name falls back from sender display name to an existing project record', () => {
