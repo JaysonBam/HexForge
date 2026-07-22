@@ -7,6 +7,7 @@ import { Button } from '../ui/Button';
 import { Card, CardContent, CardHeader } from '../ui/Card';
 import { useFeedback } from '../ui/FeedbackProvider';
 import { getStudentEmail, isValidEmail, isValidStudentNumber } from '../../domain/operations';
+import { normalizeModuleCode } from '../../domain/moduleCode';
 import {
   DEFAULT_FILAMENT_SOURCE,
   FILAMENT_SOURCE_VALUES,
@@ -38,7 +39,7 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
     studentNumber: project?.studentNumber || '',
     email: buildInitialEmail(project),
     priorityNumber: project?.priorityNumber ?? nextPriority,
-    course: project?.course || '',
+    course: project?.course ? normalizeModuleCode(project.course) ?? project.course : '',
     lecturer: project?.lecturer || '',
     needsPayment: project?.needsPayment ?? true,
     moduleOrLecturerPays: project?.moduleOrLecturerPays ?? false,
@@ -82,7 +83,7 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
       return;
     }
 
-    const suggestions = extractProjectSuggestions(item.snapshot, projects, modules);
+    const suggestions = extractProjectSuggestions(item.snapshot, projects);
     const matchedModule = modules.find((module) =>
       module.code.replace(/\s+/g, '').toUpperCase() === suggestions.moduleCode.replace(/\s+/g, '').toUpperCase());
     setSelectedGmailThread(item);
@@ -91,8 +92,8 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
       studentName: suggestions.studentName || previous.studentName,
       studentNumber: suggestions.studentNumber,
       email: suggestions.email || previous.email,
+      ...(suggestions.moduleCode ? { course: suggestions.moduleCode } : {}),
       ...(matchedModule ? {
-        course: suggestions.moduleCode,
         lecturer: matchedModule.lecturer,
         needsPayment: !matchedModule.modulePayment,
         moduleOrLecturerPays: !!matchedModule.modulePayment,
@@ -168,11 +169,16 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
     }
 
     if (name === 'course') {
-      const matchedModule = modules.find(m => m.code === value);
+      const normalizedCourse = normalizeModuleCode(value);
+      const nextCourse = normalizedCourse ?? value;
+      const matchedModule = normalizedCourse
+        ? modules.find((module) => normalizeModuleCode(module.code) === normalizedCourse)
+        : undefined;
+      setErrors((previous) => ({ ...previous, course: '' }));
       if (matchedModule) {
         setFormData(prev => ({
           ...prev,
-          course: value,
+          course: nextCourse,
           lecturer: matchedModule.lecturer,
           needsPayment: !matchedModule.modulePayment,
           moduleOrLecturerPays: !!matchedModule.modulePayment,
@@ -180,6 +186,8 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
         }));
         return;
       }
+      setFormData((previous) => ({ ...previous, course: nextCourse }));
+      return;
     }
 
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -189,12 +197,17 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
     if (saving) return;
     const missing: string[] = [];
     const trimmedEmail = formData.email.trim();
+    const normalizedCourse = formData.course.trim() ? normalizeModuleCode(formData.course) : '';
+    const moduleCodeError = formData.course.trim() && !normalizedCourse
+      ? 'Module code must be three letters, one space, and three numbers (for example, MRN 422).'
+      : '';
 
     if (!formData.studentName.trim()) missing.push('Student name is required.');
     if (!formData.studentNumber.trim()) missing.push('Student number is required.');
     else if (!isValidStudentNumber(formData.studentNumber)) missing.push('Student number must be exactly 8 digits.');
     if (!trimmedEmail) missing.push('Email is required.');
     else if (!isValidEmail(trimmedEmail)) missing.push('Email address must be valid.');
+    if (moduleCodeError) missing.push(moduleCodeError);
 
     setErrors({
       studentName: !formData.studentName.trim() ? 'This field is required.' : '',
@@ -208,6 +221,7 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
         : !isValidEmail(trimmedEmail)
           ? 'Enter a valid email address.'
           : '',
+      course: moduleCodeError,
       priorityNumber: formData.priorityNumber < 1 ? 'Priority number must be at least 1.' : ''
     });
 
@@ -226,6 +240,7 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
     const payload = {
       ...formData,
       email: trimmedEmail,
+      course: normalizedCourse || '',
       needsPayment: formData.moduleOrLecturerPays ? false : formData.needsPayment,
       defaultFilamentSource: normalizeFilamentSource(formData.defaultFilamentSource || DEFAULT_FILAMENT_SOURCE),
       ...(selectedGmailThread ? {
@@ -239,6 +254,7 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
 
     if (project) {
       updateProject(project.id, payload);
+      notify({ title: 'Project details updated', message: 'Your changes are being saved.', tone: 'success' });
       return;
     }
 
@@ -345,8 +361,8 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
             </h2>
           </div>
           <div className="flex flex-wrap justify-end gap-2">
-            <Button onClick={handleSave} size="lg" className="min-w-[180px]" disabled={saving}>
-            {saving ? 'Creating Project…' : project && project.state !== 'INTAKE' ? 'Save Details' : 'Create Project'}
+            <Button onClick={handleSave} size="lg" className="min-w-[180px]" loading={saving} loadingText="Creating Project…">
+            {project ? 'Save Details' : 'Create Project'}
           </Button>
           </div>
         </div>
@@ -487,6 +503,7 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
                 list="courseOptions"
                 value={formData.course}
                 onChange={handleChange}
+                aria-invalid={Boolean(errors.course)}
                 className={defaultInputClassName}
                 placeholder="Select or type a module code"
               />
@@ -495,6 +512,7 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
                   <option key={m.id} value={m.code}>{m.lecturer}</option>
                 ))}
               </datalist>
+              {errors.course && <p className="text-xs font-semibold text-rose-600">{errors.course}</p>}
             </div>
 
             <div className="space-y-2">
@@ -553,7 +571,7 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
                 onChange={(e) => setFormData(prev => ({
                   ...prev,
                   moduleOrLecturerPays: e.target.checked,
-                  needsPayment: e.target.checked ? false : prev.needsPayment
+                  needsPayment: !e.target.checked
                 }))}
                 className="mt-1 h-4 w-4 rounded border-slate-400 text-sky-700"
               />

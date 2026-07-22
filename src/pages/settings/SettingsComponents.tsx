@@ -80,10 +80,10 @@ export const TextListEditor = ({
         value={value}
         onChange={(event) => onValueChange(event.target.value)}
         onKeyDown={(event) => {
-          if (event.key === 'Enter') onAdd();
+          if (event.key === 'Enter' && value.trim()) onAdd();
         }}
       />
-      <Button onClick={onAdd} size="icon" className="h-9 w-9">
+      <Button onClick={onAdd} size="icon" className="h-9 w-9" disabled={!value.trim()} title={!value.trim() ? 'Enter a value first.' : undefined}>
         <Plus size={15} />
       </Button>
     </div>
@@ -281,10 +281,12 @@ export const EmailMessagesEditor = ({
             onClick={onSave}
             size="sm"
             disabled={emailSettingsSaving || !emailSettingsDirty}
+            loading={emailSettingsSaving}
+            loadingText="Saving…"
             className="h-10 gap-2 px-4"
           >
             <Save size={15} />
-            {emailSettingsSaving ? 'Saving...' : emailSettingsDirty ? 'Save' : 'Saved'}
+            {emailSettingsDirty ? 'Save' : 'Saved'}
           </Button>
         </div>
       </div>

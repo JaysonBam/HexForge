@@ -17,7 +17,6 @@ import type { Project } from '../types';
 import {
   getNextAction,
   getPartCounts,
-  getPaymentLabel,
   getProjectBlockers,
   type WorkspaceTab
 } from '../domain/operations';
@@ -47,6 +46,7 @@ export const ProjectTimeline = () => {
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [correspondenceOpen, setCorrespondenceOpen] = useState(false);
   const [deletingProject, setDeletingProject] = useState(false);
+  const [archivingProject, setArchivingProject] = useState(false);
   const staffName = activeStaffName || claimActiveStaffName() || 'System';
   const activeTab = project ? activeWorkspaceTab : 'overview';
   const selectTab = (tab: WorkspaceTab) => {
@@ -92,7 +92,7 @@ export const ProjectTimeline = () => {
   };
 
   const handleToggleArchive = async () => {
-    if (!project) return;
+    if (!project || archivingProject) return;
 
     const isReviving = project.archived || project.state === 'CANCELLED';
     const shouldToggle = await confirm({
@@ -117,11 +117,13 @@ export const ProjectTimeline = () => {
 
     if (!shouldToggle) return;
 
+    setArchivingProject(true);
     const result = await transitionProjectState({
       projectId: project.id,
       action: isReviving ? 'REOPEN_REVIEW' : 'CANCEL_PROJECT',
       technicianName: staffName
     });
+    setArchivingProject(false);
 
     if (!result.ok) {
       notify({
@@ -162,10 +164,7 @@ export const ProjectTimeline = () => {
   if (id === 'new') {
     return (
       <div className="w-full">
-        <ProjectWorkspaceHeader title="New Project" subtitle="Create the request and assign the next priority number." />
-        <div className="mt-5">
-          <CheckpointNew />
-        </div>
+        <CheckpointNew />
       </div>
     );
   }
@@ -195,12 +194,11 @@ export const ProjectTimeline = () => {
       <aside className="project-summary-rail print:hidden" aria-label="Current project summary">
         <div className="project-summary-main min-w-0">
           <div className="project-summary-static min-w-0">
-            <div className="space-y-2">
+            <div className="flex items-start gap-3">
               <StateBadge state={project.state} />
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="project-summary-label">Next Action</p>
                 <p className="project-summary-action">{getNextAction(project)}</p>
-                <p className="mt-1 text-[11px] font-semibold leading-snug text-slate-600">{getPaymentLabel(project)}</p>
               </div>
             </div>
 
@@ -223,19 +221,10 @@ export const ProjectTimeline = () => {
               </div>
 
               <div className="project-summary-row">
-                <p className="project-summary-label">Student Number</p>
-                <p className="project-summary-value font-mono">{project.studentNumber || 'Not set'}</p>
-              </div>
-
-              <div className="project-summary-row">
                 <p className="project-summary-label">Module Code</p>
                 <p className="project-summary-value">{project.course || 'Not set'}</p>
               </div>
 
-              <div className="project-summary-row items-start">
-                <p className="project-summary-label">Lecturer</p>
-                <p className="project-summary-value">{project.lecturer || 'Not set'}</p>
-              </div>
             </div>
           </div>
 
@@ -244,25 +233,22 @@ export const ProjectTimeline = () => {
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Link to="/" className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 transition-colors hover:text-sky-700">
-            <ArrowLeft size={14} /> Dashboard
-          </Link>
+        <div className="grid grid-cols-2 gap-2">
           <Button
             variant="outline"
             size="sm"
-            className="w-full justify-center gap-2"
+            className="w-full justify-center gap-1.5 px-2"
             onClick={() => setTimelineOpen(true)}
           >
-            <ShieldCheck size={15} /> View Timeline
+            <ShieldCheck size={15} /> Timeline
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="w-full justify-center gap-2"
+            className="w-full justify-center gap-1.5 px-2"
             onClick={() => setCorrespondenceOpen(true)}
           >
-            <Mail size={15} /> View Correspondence
+            <Mail size={15} /> Messages
           </Button>
         </div>
       </aside>
@@ -273,6 +259,7 @@ export const ProjectTimeline = () => {
             <OverviewTab
               project={project}
               deletingProject={deletingProject}
+              archivingProject={archivingProject}
               onDeleteProject={handleDeleteProject}
               onToggleArchive={handleToggleArchive}
             />
@@ -280,8 +267,12 @@ export const ProjectTimeline = () => {
           {activeTab === 'parts' && (
             <CheckpointReview project={project} onAdvanceFromLockedReview={() => selectTab('quote')} />
           )}
-          {activeTab === 'quote' && <CheckpointConfirmation project={project} />}
-          {activeTab === 'production' && <CheckpointPrinting project={project} />}
+          {activeTab === 'quote' && (
+            <CheckpointConfirmation project={project} onAdvanceToProduction={() => selectTab('production')} />
+          )}
+          {activeTab === 'production' && (
+            <CheckpointPrinting project={project} onAdvanceToCollection={() => selectTab('collection')} />
+          )}
           {activeTab === 'collection' && <CheckpointCollection project={project} />}
         </div>
       </div>
@@ -382,16 +373,6 @@ const ProjectTimelineSkeleton = () => (
   </div>
 );
 
-const ProjectWorkspaceHeader = ({ title, subtitle }: { title: string; subtitle: string }) => (
-  <section className="forge-panel p-5">
-    <Link to="/" className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-sky-700">
-      <ArrowLeft size={16} /> Main Dashboard
-    </Link>
-    <h1 className="text-2xl font-black text-slate-950">{title}</h1>
-    <p className="mt-1 text-sm font-semibold text-slate-600">{subtitle}</p>
-  </section>
-);
-
 const WorkspaceMetric = ({ label, value, detail }: { label: string; value: string; detail: string }) => (
   <div className="forge-metric p-3">
     <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-600">{label}</p>
@@ -403,11 +384,13 @@ const WorkspaceMetric = ({ label, value, detail }: { label: string; value: strin
 const OverviewTab = ({
   project,
   deletingProject,
+  archivingProject,
   onDeleteProject,
   onToggleArchive
 }: {
   project: Project;
   deletingProject: boolean;
+  archivingProject: boolean;
   onDeleteProject: () => Promise<void>;
   onToggleArchive: () => Promise<void>;
 }) => {
@@ -473,6 +456,8 @@ const OverviewTab = ({
               size="sm"
               className="w-auto gap-2 whitespace-nowrap self-start border-orange-300 text-orange-800 hover:bg-orange-100 sm:self-center"
               onClick={() => void onToggleArchive()}
+              loading={archivingProject}
+              loadingText={isArchivedOrCancelled ? 'Reviving…' : 'Archiving…'}
             >
               <Archive size={16} />
               {isArchivedOrCancelled ? 'Revive project' : 'Archive project'}
@@ -596,10 +581,11 @@ const DeleteProjectCard = ({
         size="sm"
         className="gap-2 self-start sm:self-center"
         onClick={() => void onDelete()}
-        disabled={deleting}
+        loading={deleting}
+        loadingText="Deleting Project…"
       >
         <Trash2 size={16} />
-        {deleting ? 'Deleting project...' : 'Delete project'}
+        Delete project
       </Button>
     </div>
   </Card>

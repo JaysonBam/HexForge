@@ -1,12 +1,11 @@
 import type { Project, Part } from '../../types';
 import { useProjects } from '../../context/ProjectContext';
 import { useSettings } from '../../context/SettingsContext';
-import { useStaffSession } from '../../context/StaffSessionContext';
+import { useStaffActionName } from '../../hooks/useStaffActionName';
 import { compareQuoteSnapshot } from '../../domain/quoteState';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '../ui/Button';
 import { useFeedback } from '../ui/FeedbackProvider';
-import { getMissingStaffMessage } from '../../utils/staffSessionUtils';
 import { getStudentEmail } from '../../domain/operations';
 import { createGmailDraft, GmailAuthError, requestGmailDraftAccess } from '../../utils/gmailDraftUtils';
 import { createQuotePdfBytes, loadQuoteLogoImage } from '../../utils/quotePdfUtils';
@@ -28,7 +27,7 @@ import {
   formatLineWeight
 } from './quoteCostSummaryModel';
 
-export const CheckpointConfirmation = ({ project }: { project: Project }) => {  
+export const CheckpointConfirmation = ({ project, onAdvanceToProduction }: { project: Project; onAdvanceToProduction?: () => void }) => {
   const { updateProject, transitionProjectState } = useProjects();
   const {
     getFilamentPrice,
@@ -38,9 +37,10 @@ export const CheckpointConfirmation = ({ project }: { project: Project }) => {
     emailSignature,
     refreshEmailSettings
   } = useSettings();
-  const { claimActiveStaffName } = useStaffSession();
+  const { requestStaffName } = useStaffActionName();
   const { confirm, notify, prompt, showMessage } = useFeedback();
   const [isOpeningGmail, setIsOpeningGmail] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'quote' | 'printing' | 'archive' | null>(null);
   // Derive individual costs based on latest price settings
   const getPrimaryCost = (part: Part) => {
     const weight = part.primaryEstimatedWeight || 0;
@@ -126,23 +126,19 @@ export const CheckpointConfirmation = ({ project }: { project: Project }) => {
   };
 
   const handleIssueQuote = async () => {
+    if (pendingAction) return;
     if (!(await validateQuoteActions())) return;
 
-    const technicianName = claimActiveStaffName();
-    if (!technicianName) {
-      await showMessage({
-        title: 'Staff member required',
-        messages: [getMissingStaffMessage('issuing a quote')],
-        tone: 'warning'
-      });
-      return;
-    }
+    const technicianName = await requestStaffName('issuing this quote');
+    if (!technicianName) return;
 
+    setPendingAction('quote');
     const result = await transitionProjectState({
       projectId: project.id,
       action: 'ISSUE_QUOTE',
       technicianName
     });
+    setPendingAction(null);
 
     if (!result.ok) {
       await showMessage({
@@ -159,10 +155,13 @@ export const CheckpointConfirmation = ({ project }: { project: Project }) => {
         messages: result.warnings,
         tone: 'warning'
       });
+    } else {
+      notify({ title: quoteActionMode === 'initial' ? 'Initial quote created' : 'Quote updated', message: 'The issued pricing snapshot is now up to date.', tone: 'success' });
     }
   };
 
   const handleMoveToPrinting = async () => {
+    if (pendingAction) return;
     if (!(await validateQuoteActions())) return;
 
     if (!quoteComparison.hasSnapshot) {
@@ -174,15 +173,8 @@ export const CheckpointConfirmation = ({ project }: { project: Project }) => {
       return;
     }
 
-    const technicianName = claimActiveStaffName();
-    if (!technicianName) {
-      await showMessage({
-        title: 'Staff member required',
-        messages: [getMissingStaffMessage('moving a project to printing')],
-        tone: 'warning'
-      });
-      return;
-    }
+    const technicianName = await requestStaffName('starting production');
+    if (!technicianName) return;
 
     const paymentHandled =
       !project.needsPayment ||
@@ -202,13 +194,16 @@ export const CheckpointConfirmation = ({ project }: { project: Project }) => {
           ]
         });
     const overrideNote = resultValues?.overrideNote?.trim();
+    if (!paymentHandled && !overrideNote) return;
 
+    setPendingAction('printing');
     const result = await transitionProjectState({
       projectId: project.id,
       action: 'MOVE_TO_PRINTING',
       technicianName,
       overrideNote
     });
+    setPendingAction(null);
 
     if (!result.ok) {
       await showMessage({ title: 'Cannot move to printing', messages: result.errors, tone: 'error' });
@@ -217,10 +212,14 @@ export const CheckpointConfirmation = ({ project }: { project: Project }) => {
 
     if (result.warnings && result.warnings.length > 0) {
       await showMessage({ title: 'Moved with warnings', messages: result.warnings, tone: 'warning' });
+    } else {
+      notify({ title: 'Production started', message: 'Project moved to Production.', tone: 'success' });
     }
+    onAdvanceToProduction?.();
   };
 
   const handleArchive = async () => {
+    if (pendingAction) return;
     const shouldCancel = await confirm({
       title: 'Cancel project',
       message: 'This keeps the record but removes it from the active workflow.',
@@ -229,15 +228,8 @@ export const CheckpointConfirmation = ({ project }: { project: Project }) => {
     });
     if (!shouldCancel) return;
 
-    const technicianName = claimActiveStaffName();
-    if (!technicianName) {
-      await showMessage({
-        title: 'Staff member required',
-        messages: [getMissingStaffMessage('cancelling a project')],
-        tone: 'warning'
-      });
-      return;
-    }
+    const technicianName = await requestStaffName('cancelling this project');
+    if (!technicianName) return;
 
     const resultValues = await prompt({
       title: 'Cancellation details',
@@ -249,12 +241,14 @@ export const CheckpointConfirmation = ({ project }: { project: Project }) => {
     const reason = resultValues?.reason.trim();
     if (!reason) return;
 
+    setPendingAction('archive');
     const result = await transitionProjectState({
       projectId: project.id,
       action: 'CANCEL_PROJECT',
       technicianName,
       reason
     });
+    setPendingAction(null);
 
     if (!result.ok) {
       await showMessage({ title: 'Project was not cancelled', messages: result.errors, tone: 'error' });
@@ -263,6 +257,8 @@ export const CheckpointConfirmation = ({ project }: { project: Project }) => {
 
     if (result.warnings && result.warnings.length > 0) {
       await showMessage({ title: 'Cancelled with warnings', messages: result.warnings, tone: 'warning' });
+    } else {
+      notify({ title: 'Project archived', message: 'The project was removed from the active workflow.', tone: 'success' });
     }
   };
 
@@ -470,7 +466,9 @@ export const CheckpointConfirmation = ({ project }: { project: Project }) => {
                     className="gap-2"
                     variant="outline"
                     onClick={handleIssueQuote}
-                    disabled={project.parts.length === 0 || quoteComparison.status === 'up_to_date'}
+                    disabled={project.parts.length === 0 || unverifiedParts.length > 0 || quoteComparison.status === 'up_to_date' || pendingAction !== null}
+                    loading={pendingAction === 'quote'}
+                    loadingText={quoteActionMode === 'initial' ? 'Creating Quote…' : 'Updating Quote…'}
                     title={quoteComparison.status === 'outdated' ? 'Supersede the current issued quote with updated draft values.' : undefined}
                 >
                     <CheckCircle className="w-5 h-5" /> {quoteActionButtonLabel}
@@ -574,11 +572,13 @@ export const CheckpointConfirmation = ({ project }: { project: Project }) => {
                           onClick={sendEmail}
                           size="sm"
                           className="gap-2 px-3.5"
-                          disabled={isOpeningGmail || !quoteIsIssued}
+                          disabled={!quoteIsIssued}
+                          loading={isOpeningGmail}
+                          loadingText="Opening Gmail…"
                           title={!quoteIsIssued ? 'Issue the initial quote before opening communication.' : undefined}
                       >
                           <img src={gmailIcon} alt="" className="h-4 w-4" />
-                          {isOpeningGmail ? 'Opening in Gmail...' : 'Open in Gmail'}
+                          Open in Gmail
                       </Button>
                     )}
                 </div>
@@ -615,7 +615,9 @@ export const CheckpointConfirmation = ({ project }: { project: Project }) => {
                     variant="success"
                     onClick={handleMoveToPrinting}
                     title={!quoteComparison.hasSnapshot ? 'Issue the initial quote before moving to printing.' : undefined}
-                    disabled={project.parts.length === 0 || !quoteComparison.hasSnapshot}
+                    disabled={project.parts.length === 0 || unverifiedParts.length > 0 || !quoteComparison.hasSnapshot || pendingAction !== null}
+                    loading={pendingAction === 'printing'}
+                    loadingText="Starting Production…"
                 >
                     <CheckCircle className="w-5 h-5" /> Confirm Quote and Start Printing
                 </Button>
@@ -628,7 +630,7 @@ export const CheckpointConfirmation = ({ project }: { project: Project }) => {
         </div>
 
         <div className="border-t border-slate-300 pt-4">
-            <Button variant="outline" className="gap-2 border-rose-300 text-rose-800 hover:bg-rose-100" onClick={handleArchive}>
+            <Button variant="outline" className="gap-2 border-rose-300 text-rose-800 hover:bg-rose-100" onClick={handleArchive} disabled={pendingAction !== null} loading={pendingAction === 'archive'} loadingText="Archiving…">
                 <Archive className="w-4 h-4" /> Cancel / Archive Project
             </Button>
         </div>

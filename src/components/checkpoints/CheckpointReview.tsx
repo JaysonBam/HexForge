@@ -2,12 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Project } from '../../types';
 import { useProjects } from '../../context/ProjectContext';
 import { useSettings } from '../../context/SettingsContext';
-import { useStaffSession } from '../../context/StaffSessionContext';
+import { useStaffActionName } from '../../hooks/useStaffActionName';
 import { PartItem } from './PartItem';
 import { Upload, Plus, ArrowRight, Loader2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useFeedback } from '../ui/FeedbackProvider';
-import { getMissingStaffMessage } from '../../utils/staffSessionUtils';
 import { uploadThumbnailFromBlobUrl } from '../../utils/storageUtils';
 import { isPartVerifiedForReview } from '../../domain/partVerification';
 import { analyzeProjectFiles } from '../../local-files/projectFileImport';
@@ -24,9 +23,10 @@ const hasDraggedFiles = (event: DragEvent) => {
 export const CheckpointReview = ({ project, onAdvanceFromLockedReview }: CheckpointReviewProps) => {
   const { transitionProjectState, addExtractedParts, addPart } = useProjects();
   const { getFilamentPrice } = useSettings();
-  const { claimActiveStaffName } = useStaffSession();
-  const { prompt, showMessage } = useFeedback();
+  const { requestStaffName } = useStaffActionName();
+  const { notify, prompt, showMessage } = useFeedback();
   const [loading, setLoading] = useState(false);
+  const [advancing, setAdvancing] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
   const dragDepth = useRef(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -65,6 +65,7 @@ export const CheckpointReview = ({ project, onAdvanceFromLockedReview }: Checkpo
   }, [addExtractedParts, getFilamentPrice, project.id, project.parts.length, showMessage]);
 
   const handleFinishReview = async () => {
+    if (advancing) return;
     if (project.parts.length === 0) {
       await showMessage({ title: 'No parts yet', messages: ['Add at least one printable part before moving to quote.'], tone: 'warning' });
       return;
@@ -80,15 +81,8 @@ export const CheckpointReview = ({ project, onAdvanceFromLockedReview }: Checkpo
         return;
     }
 
-    const technicianName = claimActiveStaffName();
-    if (!technicianName) {
-      await showMessage({
-        title: 'Staff member required',
-        messages: [getMissingStaffMessage('completing review')],
-        tone: 'warning'
-      });
-      return;
-    }
+    const technicianName = await requestStaffName('completing review');
+    if (!technicianName) return;
 
     if (project.state !== 'INTAKE' && project.state !== 'REVIEW') {
       const reasonResult = await prompt({
@@ -119,11 +113,13 @@ export const CheckpointReview = ({ project, onAdvanceFromLockedReview }: Checkpo
       }
     }
 
+    setAdvancing(true);
     const result = await transitionProjectState({
       projectId: project.id,
       action: 'COMPLETE_REVIEW',
       technicianName
     });
+    setAdvancing(false);
 
     if (!result.ok) {
       await showMessage({ title: 'Cannot move to quote', messages: result.errors, tone: 'error' });
@@ -132,6 +128,8 @@ export const CheckpointReview = ({ project, onAdvanceFromLockedReview }: Checkpo
 
     if (result.warnings && result.warnings.length > 0) {
       await showMessage({ title: 'Moved with warnings', messages: result.warnings, tone: 'warning' });
+    } else {
+      notify({ title: 'Review complete', message: 'Project moved to Quote.', tone: 'success' });
     }
     onAdvanceFromLockedReview?.();
   };
@@ -243,7 +241,13 @@ export const CheckpointReview = ({ project, onAdvanceFromLockedReview }: Checkpo
             Add Manual Parts
           </Button>
         </div>
-        <Button onClick={handleFinishReview} disabled={project.parts.length === 0}>
+        <Button
+          onClick={handleFinishReview}
+          disabled={project.parts.length === 0 || project.parts.some((part) => !isPartVerifiedForReview(part))}
+          loading={advancing}
+          loadingText="Moving to Quote…"
+          title={project.parts.length === 0 ? 'Add at least one part first.' : project.parts.some((part) => !isPartVerifiedForReview(part)) ? 'Verify every part first.' : undefined}
+        >
           Move to Quote
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
