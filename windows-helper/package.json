@@ -1,0 +1,28 @@
+{
+  "name": "@hexforge/windows-helper",
+  "productName": "HexForge File Helper",
+  "description": "Secure local-file companion for HexForge",
+  "author": "HexForge",
+  "version": "1.2.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/src/main/main.js",
+  "exports": {
+    "./contracts": "./src/contracts/localHelperProtocol.ts"
+  },
+  "scripts": {
+    "dev": "npm run build && electron .",
+    "build": "tsc -p tsconfig.json && node scripts/copyAssets.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "package": "npm run build && node --import tsx scripts/packageHelper.ts",
+    "smoke": "node --import tsx scripts/smokeHelper.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "electron": "43.2.0",
+    "electron-builder": "^26.0.12",
+    "tsx": "^4.23.1",
+    "typescript": "~5.9.3"
+  }
+}
