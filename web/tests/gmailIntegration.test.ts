@@ -84,6 +84,26 @@ test('student number matching is standalone and checks filenames and email addre
   assert.deepEqual(findStudentNumbers(['u12345678@tuks.co.za', 'job-87654321.3mf', 'x123456789y']).sort(), ['12345678', '87654321']);
 });
 
+test('student extraction prioritizes the external Tuks address over unrelated thread numbers', () => {
+  const thread = baseThread('Please print two copies for room 87654321.');
+  thread.mainContactEmail = 'u12345678@tuks.co.za';
+  thread.messages[0].senderEmail = 'u12345678@tuks.co.za';
+  thread.messages[0].subject = 'Print request';
+  const suggestions = extractProjectSuggestions(thread, []);
+  assert.equal(suggestions.studentNumber, '12345678');
+  assert.deepEqual(suggestions.studentNumberCandidates, ['12345678']);
+});
+
+test('student extraction uses a readable external email name when Gmail has no display name', () => {
+  const thread = baseThread('Please print the attached model.');
+  thread.mainContactEmail = 'ada.lovelace@example.com';
+  thread.messages[0].senderEmail = 'ada.lovelace@example.com';
+  thread.messages[0].senderName = '';
+  thread.messages[0].subject = 'Print request';
+  const suggestions = extractProjectSuggestions(thread, []);
+  assert.equal(suggestions.studentName, 'Ada Lovelace');
+});
+
 test('module extraction accepts spaced or combined codes without requiring a saved module', () => {
   assert.equal(findModuleCode(['Please print this for EMK310.']), 'EMK 310');
   assert.equal(findModuleCode(['Module: mtr 420']), 'MTR 420');
