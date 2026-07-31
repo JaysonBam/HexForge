@@ -1,26 +1,27 @@
 import { useMemo, useState } from 'react';
-import { useSettings } from '../context/SettingsContext';
-import { Button } from '../components/ui/Button';
-import { useFeedback } from '../components/ui/FeedbackProvider';
-import type { EmailEditorSelection } from '../domain/emailTemplates';
+import { useSettings } from '@/features/settings/context/SettingsContext';
+import { Button } from '@/components/ui/Button';
+import { useFeedback } from '@/app/providers/FeedbackProvider';
+import type { EmailEditorSelection } from '@/domain/emailTemplates';
 import {
     DEFAULT_FILAMENT_SOURCE,
     FILAMENT_SOURCE_VALUES,
     filamentSourceLabel,
     normalizeFilamentSource,
     type FilamentSource
-} from '../domain/filamentSource.ts';
+} from '@/domain/filamentSource.ts';
 import {
     EmailMessagesEditor,
     FilamentPriceGroupRow,
+    GmailConnectionSettings,
     ModuleRow,
     SettingsPageSkeleton,
     SettingsSection,
     TextListEditor,
     type TextListConfig,
     type TextListKey
-} from './settings/SettingsComponents';
-import { groupFilamentsByPrice, type Filament } from '../domain/settingsConfig';
+} from '@/features/settings/components/SettingsComponents';
+import { groupFilamentsByPrice, type Filament } from '@/domain/settingsConfig';
 import {
     Plus
 } from 'lucide-react';
@@ -28,7 +29,6 @@ import {
 export const SettingsPage = () => {
     const {
         settingsLoading, settingsLoadError, settingsSaveError,
-        nextPriority, setNextPriority,
         staffList, addStaff, removeStaff,
         printers, addPrinter, removePrinter,
         brands, addBrand, removeBrand,
@@ -192,28 +192,6 @@ export const SettingsPage = () => {
 
             <div className="min-w-0 space-y-5">
                     <SettingsSection
-                        id="project-defaults"
-                        title="Project Defaults"
-                        description="Small operational values that affect new projects immediately."
-                    >
-                        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_14rem] lg:items-center">
-                            <div>
-                                <h3 className="font-bold text-slate-950">Next priority number</h3>
-                                <p className="mt-1 text-sm text-slate-600">
-                                    The number assigned to the next project created from the workstation.
-                                </p>
-                            </div>
-                            <input
-                                type="number"
-                                min={1}
-                                className="forge-command-input h-11 w-full px-3 text-right font-mono text-lg font-bold"
-                                value={nextPriority}
-                                onChange={(event) => setNextPriority(Number.parseInt(event.target.value, 10) || 1)}
-                            />
-                        </div>
-                    </SettingsSection>
-
-                    <SettingsSection
                         id="quick-lists"
                         title="Suggestion Lists"
                         description="Compact lists for the dropdowns and autocomplete fields used across project workflows."
@@ -365,6 +343,14 @@ export const SettingsPage = () => {
                                 />
                             ))}
                         </div>
+                    </SettingsSection>
+
+                    <SettingsSection
+                        id="gmail-connection"
+                        title="Gmail Connection"
+                        description="Gmail authorization is separate from HexForge sign-in and can be revoked at any time."
+                    >
+                        <GmailConnectionSettings />
                     </SettingsSection>
 
                     <SettingsSection

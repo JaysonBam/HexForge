@@ -1,5 +1,5 @@
-import type { ProjectDescriptor, WorkflowFolderKey } from '../../shared/localHelperProtocol';
-import type { Project } from '../types';
+import type { ProjectDescriptor, WorkflowFolderKey } from '@hexforge/windows-helper/contracts';
+import type { Project } from '@/types';
 
 const finishedStatuses = new Set(['PRINTED', 'POST_PROCESSING', 'COLLECTED']);
 const begunStatuses = new Set(['PRINTING', 'PRINTED', 'FAILED', 'POST_PROCESSING', 'COLLECTED']);

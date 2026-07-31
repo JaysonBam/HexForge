@@ -1,4 +1,4 @@
-import type { GmailAttachment } from '../utils/gmailDraftUtils';
+import type { GmailAttachment } from '@/api/google/gmail/client';
 
 export type GmailThreadAttachment = {
   messageId: string;

@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import JSZip from 'jszip';
-import type { Project } from '../src/types/index.ts';
+import type { Project } from '@/types/index.ts';
 import {
   buildCollectionReportXlsx,
   COLLECTION_REPORT_COLUMNS,
   getCollectionReportRows
-} from '../src/utils/collectionReportXlsx.ts';
+} from '@/lib/reports/collectionReportXlsx.ts';
 
 const collectedProject: Project = {
   id: 'ABCDE',

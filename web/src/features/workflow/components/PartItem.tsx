@@ -1,23 +1,23 @@
 import { useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp, FileCheck2, Trash2 } from 'lucide-react';
-import type { Part } from '../../types';
-import { useSettings } from '../../context/SettingsContext';
-import { useProjects } from '../../context/ProjectContext';
-import { useStaffActionName } from '../../hooks/useStaffActionName';
-import { Button } from '../ui/Button';
-import { useFeedback } from '../ui/FeedbackProvider';
+import type { Part } from '@/types';
+import { useSettings } from '@/features/settings/context/SettingsContext';
+import { useProjects } from '@/features/projects/context/ProjectContext';
+import { useStaffActionName } from '@/features/auth/hooks/useStaffActionName';
+import { Button } from '@/components/ui/Button';
+import { useFeedback } from '@/app/providers/FeedbackProvider';
 import {
     canClearPartVerification,
     getVisibleCheckedBy,
     isPartVerifiedForReview
-} from '../../domain/partVerification';
+} from '@/domain/partVerification';
 import {
     FILAMENT_SOURCE_VALUES,
     filamentSourceLabel,
     getPartFilamentSource,
     isProvidedFilamentSource
-} from '../../domain/filamentSource.ts';
-import { sourceFileName } from '../../local-files/sourceFileLink';
+} from '@/domain/filamentSource.ts';
+import { sourceFileName } from '@/features/local-files/sourceFileLink';
 
 interface PartItemProps {
     part: Part;

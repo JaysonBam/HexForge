@@ -13,9 +13,9 @@ import {
   sanitizeWindowsComponent,
   syncProjectFolder,
   type WorkflowFolderPaths
-} from '../helper/src/main/folders.ts';
-import { classifySupportedFile } from '../helper/src/main/fileScanner.ts';
-import { isOpaqueFileId, OpaqueRegistry } from '../helper/src/main/registry.ts';
+} from '../src/main/folders.ts';
+import { classifySupportedFile } from '../src/main/fileScanner.ts';
+import { isOpaqueFileId, OpaqueRegistry } from '../src/main/registry.ts';
 
 const project = {
   projectId: 'ABCDE',

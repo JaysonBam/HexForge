@@ -1,9 +1,14 @@
 import { Outlet, Link, matchPath, useLocation, useNavigate } from 'react-router-dom';
-import { Button } from './ui/Button';
-import { supabase } from '../lib/supabaseClient';
-import { useProjects } from '../context/ProjectContext';
-import { useSettings } from '../context/SettingsContext';
-import { useStaffSession } from '../context/StaffSessionContext';
+import { Button } from '@/components/ui/Button';
+import {
+  getAuthUser,
+  signOut,
+  subscribeToAuthChanges
+} from '@/api/supabase/auth';
+import { getProfileAvatarByEmail } from '@/api/supabase/profiles';
+import { useProjects } from '@/features/projects/context/ProjectContext';
+import { useSettings } from '@/features/settings/context/SettingsContext';
+import { useStaffSession } from '@/features/auth/context/StaffSessionContext';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Boxes,
@@ -19,8 +24,8 @@ import {
   X,
   type LucideIcon
 } from 'lucide-react';
-import { getWorkspaceTabForState, type WorkspaceTab } from '../domain/operations';
-import { LocalHelperIndicator } from '../local-files/LocalHelperIndicator';
+import { getWorkspaceTabForState, type WorkspaceTab } from '@/domain/operations';
+import { LocalHelperIndicator } from '@/features/local-files/LocalHelperIndicator';
 
 type NavigationItem = {
   id: string;
@@ -140,7 +145,7 @@ export const Layout = () => {
     let isMounted = true;
 
     const loadCurrentUser = async () => {
-      const { data } = await supabase.auth.getUser();
+      const { data } = await getAuthUser();
       const user = data.user;
       if (!user) {
         if (!isMounted) {
@@ -167,11 +172,7 @@ export const Layout = () => {
 
       let avatarUrl = avatarFromAuthUser;
       if (email) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('profile_url')
-          .eq('email', email)
-          .maybeSingle();
+        const { data: profile } = await getProfileAvatarByEmail(email);
 
         if (!isMounted) {
           return;
@@ -195,7 +196,7 @@ export const Layout = () => {
 
     loadCurrentUser();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const subscription = subscribeToAuthChanges((_event, session) => {
       if (!session) {
         setProfileAvatarUrl(null);
         setProfileInitials('U');
@@ -259,7 +260,7 @@ export const Layout = () => {
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
+      await signOut();
       window.location.href = '/login';
     } catch (err) {
       console.error(err);
@@ -270,8 +271,8 @@ export const Layout = () => {
   return (
     <div className="forge-app-shell flex h-screen flex-col overflow-hidden text-slate-950">
       <header className="forge-header print:hidden shrink-0">
-        <div className="flex w-full flex-col gap-4 px-4 py-3 sm:px-5 lg:px-6 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
+        <div className="flex w-full flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-5 lg:px-6 min-[1280px]:flex-nowrap">
+          <div className="flex min-w-0 items-center gap-4">
             <div className="flex items-center gap-3 text-slate-950">
               <Link to="/" className="flex w-[9rem] shrink-0 items-center gap-2 text-slate-950">
                 <img src="/favicon.svg" alt="" className="h-12 rounded-md object-contain" />
@@ -284,7 +285,7 @@ export const Layout = () => {
             <nav
               aria-label="Primary navigation"
               ref={navListRef}
-              className="forge-nav-shell relative flex flex-wrap items-center gap-1 p-1"
+              className="forge-nav-shell relative flex flex-nowrap items-center gap-1 p-1"
             >
               {indicatorStyle && (
                 <span
@@ -299,7 +300,7 @@ export const Layout = () => {
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = item.id === activeNavItem.id;
-                const itemClassName = `relative z-10 flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors duration-200 ${
+                const itemClassName = `relative z-10 flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors duration-200 max-[1280px]:px-3 ${
                   isActive
                     ? 'text-slate-950'
                     : 'text-slate-600 hover:text-slate-950'
@@ -316,9 +317,10 @@ export const Layout = () => {
                       }}
                       className={itemClassName}
                       aria-current={isActive ? 'page' : undefined}
+                      title={item.label}
                     >
                       <Icon size={16} className={isActive ? 'text-sky-600' : 'text-slate-500'} />
-                      <span>{item.label}</span>
+                      <span className="max-[1280px]:hidden">{item.label}</span>
                     </button>
                   );
                 }
@@ -332,16 +334,17 @@ export const Layout = () => {
                     }}
                     className={itemClassName}
                     aria-current={isActive ? 'page' : undefined}
+                    title={item.label}
                   >
                     <Icon size={16} className={isActive ? 'text-sky-600' : 'text-slate-500'} />
-                    <span>{item.label}</span>
+                    <span className="max-[1280px]:hidden">{item.label}</span>
                   </Link>
                 );
               })}
             </nav>
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-3">
+          <div className="flex shrink-0 flex-nowrap items-center justify-end gap-3">
             <LocalHelperIndicator />
             {syncStatus.saving && (
               <span className="forge-pill gap-2 px-3 py-1 text-xs text-slate-700">
@@ -362,9 +365,11 @@ export const Layout = () => {
               </div>
             )}
 
-            <Button onClick={() => navigate('/project/new')} className="gap-2 shadow-sm" size="md">
-              <Plus size={17} /> New Project
-            </Button>
+            {!isProjectWorkspaceRoute && (
+              <Button onClick={() => navigate('/project/new')} className="gap-2 shadow-sm" size="md">
+                <Plus size={17} /> New Project
+              </Button>
+            )}
 
             <div className="forge-command-input flex min-w-[260px] items-center gap-2 px-3 py-2">
               <div className="min-w-0 flex-1">

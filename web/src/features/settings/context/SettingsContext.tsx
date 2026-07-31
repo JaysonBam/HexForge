@@ -1,6 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { supabase } from '../lib/supabaseClient';
+import {
+  getConfig,
+  getConfigEntries,
+  saveConfigEntries,
+  saveConfigEntry
+} from '@/api/supabase/settings';
 import {
   defaultEmailSignature,
   defaultEmailTemplates,
@@ -10,18 +15,18 @@ import {
   type EmailTemplate,
   type EmailTemplateKey,
   type EmailTemplates
-} from '../domain/emailTemplates';
+} from '@/domain/emailTemplates';
 import {
   DEFAULT_FILAMENT_SOURCE,
   normalizeFilamentSource,
   type FilamentSource
-} from '../domain/filamentSource.ts';
+} from '@/domain/filamentSource.ts';
 import {
   normalizeFilamentSettings,
   type Filament
-} from '../domain/settingsConfig';
+} from '@/domain/settingsConfig';
 
-export type { Filament } from '../domain/settingsConfig';
+export type { Filament } from '@/domain/settingsConfig';
 
 export interface Module {
   id: string;
@@ -63,8 +68,6 @@ interface SettingsContextType {
   emailSettingsSaveError: string | null;
   saveEmailSettings: () => Promise<boolean>;
   refreshEmailSettings: () => Promise<{ emailTemplates: EmailTemplates; emailSignature: EmailSignature }>;
-  nextPriority: number;
-  setNextPriority: (n: number) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -86,7 +89,6 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const saveTimersRef = useRef<Record<string, number>>({});
   const skippedInitialSaveRef = useRef<Set<string>>(new Set());
   
-  const [nextPriority, setNextPriority] = useState<number>(1);
   const [staffList, setStaffList] = useState<string[]>([]);
   const [printers, setPrinters] = useState<string[]>([]);
   const [brands, setBrands] = useState<string[]>([]);
@@ -103,14 +105,13 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setSettingsLoadError(null);
 
       try {
-        const { data, error } = await supabase.from('config').select('key, value');
+        const { data, error } = await getConfig();
         if (error) {
           setSettingsLoadError(error.message || 'Failed to load settings.');
           return;
         }
 
         const configMap = (data ?? []).reduce((acc, row) => ({ ...acc, [row.key]: row.value }), {} as Record<string, unknown>);
-        if (typeof configMap.settings_next_priority === 'number') setNextPriority(configMap.settings_next_priority);
         if (Array.isArray(configMap.settings_staff)) setStaffList(configMap.settings_staff as string[]);
         if (Array.isArray(configMap.settings_printers)) setPrinters(configMap.settings_printers as string[]);
         if (Array.isArray(configMap.settings_brands)) setBrands(configMap.settings_brands as string[]);
@@ -151,7 +152,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       delete saveTimersRef.current[key];
       void (async () => {
         try {
-          const { error } = await supabase.from('config').upsert({ key, value });
+          const { error } = await saveConfigEntry(key, value);
           if (error) {
             setSettingsSaveError(error.message || `Failed to save ${key}.`);
           }
@@ -171,10 +172,6 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   // Persistence
-  useEffect(() => {
-    queueConfigSave('settings_next_priority', nextPriority);
-  }, [nextPriority, queueConfigSave]);
-
   useEffect(() => {
     queueConfigSave('settings_staff', staffList);
   }, [staffList, queueConfigSave]);
@@ -262,10 +259,10 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const refreshEmailSettings = async () => {
-    const { data, error } = await supabase
-      .from('config')
-      .select('key, value')
-      .in('key', ['settings_email_templates', 'settings_email_signature']);
+    const { data, error } = await getConfigEntries([
+      'settings_email_templates',
+      'settings_email_signature'
+    ]);
 
     if (error) {
       return { emailTemplates, emailSignature };
@@ -291,7 +288,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setEmailSettingsSaveError(null);
 
     try {
-      const { error } = await supabase.from('config').upsert([
+      const { error } = await saveConfigEntries([
         { key: 'settings_email_templates', value: emailTemplates },
         { key: 'settings_email_signature', value: emailSignature }
       ]);
@@ -321,7 +318,6 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       settingsLoading: !isLoaded,
       settingsLoadError,
       settingsSaveError,
-      nextPriority, setNextPriority,
       staffList, printers, brands, modules, filaments, providedFilamentPricePerGram,
       getFilamentPrice, setProvidedFilamentPricePerGram,
       addStaff, removeStaff,

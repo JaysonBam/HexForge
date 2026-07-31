@@ -10,8 +10,8 @@ import {
   isCollectionBlocked,
   isValidStudentNumber,
   isPaymentBlocked
-} from '../src/domain/operations.ts';
-import { buildLiveQuoteLineSummary, compareQuoteSnapshot } from '../src/domain/quoteState.ts';
+} from '@/domain/operations.ts';
+import { buildLiveQuoteLineSummary, compareQuoteSnapshot } from '@/domain/quoteState.ts';
 
 const baseProject = {
   id: 'ABCDE',

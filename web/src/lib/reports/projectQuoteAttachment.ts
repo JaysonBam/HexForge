@@ -1,12 +1,12 @@
-import type { Part, Project, QuoteSnapshotMaterialLine } from '../types';
-import type { GmailAttachment } from './gmailDraftUtils';
-import { createQuotePdfBytes, loadQuoteLogoImage, type QuotePdfLine } from './quotePdfUtils';
-import type { Filament } from '../domain/settingsConfig';
+import type { Part, Project, QuoteSnapshotMaterialLine } from '@/types';
+import type { GmailAttachment } from '@/api/google/gmail/client';
+import { createQuotePdfBytes, loadQuoteLogoImage, type QuotePdfLine } from '@/lib/reports/quotePdf';
+import type { Filament } from '@/domain/settingsConfig';
 import {
   filamentSourceShortLabel,
   getPartFilamentSource,
   isProvidedFilamentSource
-} from '../domain/filamentSource.ts';
+} from '@/domain/filamentSource.ts';
 
 const getPrimaryCost = (
   part: Part,

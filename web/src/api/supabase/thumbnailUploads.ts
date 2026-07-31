@@ -1,4 +1,5 @@
-import { supabase } from '../lib/supabaseClient';
+import { getAuthSession } from './auth';
+import { supabase } from './client';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function uploadThumbnailFromBlobUrl(blobUrl: string): Promise<string | null> {
@@ -8,7 +9,7 @@ export async function uploadThumbnailFromBlobUrl(blobUrl: string): Promise<strin
         if (blobUrl.startsWith('blob:')) {
             // Only allow upload when there's an active authenticated session
             try {
-                const { data: sessionData } = await supabase.auth.getSession();
+                const { data: sessionData } = await getAuthSession();
                 const session = sessionData.session;
                 if (!session) {
                     console.warn('No active session: skipping thumbnail upload');

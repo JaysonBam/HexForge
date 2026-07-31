@@ -1,5 +1,5 @@
-import type { Part, PrintRun, PrintStatus, Project, ProjectState } from '../../types';
-import type { PartTransitionAction, ProjectTransitionAction } from './types';
+import type { Part, PrintRun, PrintStatus, Project, ProjectState } from '@/types';
+import type { PartTransitionAction, ProjectTransitionAction } from '@/features/projects/context/types';
 
 const clonePrintRun = (run: PrintRun): PrintRun => ({ ...run });
 

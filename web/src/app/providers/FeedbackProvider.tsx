@@ -1,17 +1,12 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import {
-  Alert,
-  Button as MuiButton,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  MenuItem,
-  Snackbar,
-  Stack,
-  TextField,
-  Typography
-} from '@mui/material';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react';
 
 type FeedbackTone = 'info' | 'success' | 'warning' | 'error';
 
@@ -76,23 +71,29 @@ type FeedbackContextType = {
 
 const FeedbackContext = createContext<FeedbackContextType | undefined>(undefined);
 
+const toneClasses: Record<FeedbackTone, string> = {
+  info: 'border-sky-300 bg-sky-50 text-sky-950',
+  success: 'border-emerald-300 bg-emerald-50 text-emerald-950',
+  warning: 'border-amber-300 bg-amber-50 text-amber-950',
+  error: 'border-red-300 bg-red-50 text-red-950'
+};
+
 // eslint-disable-next-line react-refresh/only-export-components
 export const useFeedback = () => {
   const context = useContext(FeedbackContext);
-  if (!context) {
-    throw new Error('useFeedback must be used within FeedbackProvider');
-  }
+  if (!context) throw new Error('useFeedback must be used within FeedbackProvider');
   return context;
 };
 
 export const FeedbackProvider = ({ children }: { children: React.ReactNode }) => {
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const [dialog, setDialog] = useState<ActiveDialog | null>(null);
   const [promptValues, setPromptValues] = useState<PromptResult>({});
   const [promptErrors, setPromptErrors] = useState<Record<string, string>>({});
-  const [snackbar, setSnackbar] = useState<NotifyOptions | null>(null);
+  const [notification, setNotification] = useState<NotifyOptions | null>(null);
 
   const notify = useCallback((options: NotifyOptions) => {
-    setSnackbar({ tone: 'info', ...options });
+    setNotification({ tone: 'info', ...options });
   }, []);
 
   const showMessage = useCallback((options: Omit<MessageDialog, 'kind' | 'resolve'>) => (
@@ -109,17 +110,31 @@ export const FeedbackProvider = ({ children }: { children: React.ReactNode }) =>
 
   const prompt = useCallback((options: Omit<PromptDialog, 'kind' | 'resolve'>) => (
     new Promise<PromptResult | null>((resolve) => {
-      const initialValues = options.fields.reduce((acc, field) => {
-        acc[field.name] = field.defaultValue || '';
-        return acc;
-      }, {} as PromptResult);
-      setPromptValues(initialValues);
+      setPromptValues(options.fields.reduce((values, field) => ({
+        ...values,
+        [field.name]: field.defaultValue || ''
+      }), {} as PromptResult));
       setPromptErrors({});
       setDialog({ kind: 'prompt', tone: 'info', ...options, resolve });
     })
   ), []);
 
-  const value = useMemo(() => ({ notify, showMessage, confirm, prompt }), [notify, showMessage, confirm, prompt]);
+  useEffect(() => {
+    const element = dialogRef.current;
+    if (dialog && element && !element.open) element.showModal();
+    if (!dialog && element?.open) element.close();
+  }, [dialog]);
+
+  useEffect(() => {
+    if (!notification) return;
+    const timer = window.setTimeout(() => setNotification(null), 4200);
+    return () => window.clearTimeout(timer);
+  }, [notification]);
+
+  const value = useMemo(
+    () => ({ notify, showMessage, confirm, prompt }),
+    [notify, showMessage, confirm, prompt]
+  );
 
   const closeDialog = () => {
     if (!dialog) return;
@@ -131,13 +146,11 @@ export const FeedbackProvider = ({ children }: { children: React.ReactNode }) =>
 
   const acceptDialog = () => {
     if (!dialog) return;
-
     if (dialog.kind === 'message') {
       dialog.resolve();
       setDialog(null);
       return;
     }
-
     if (dialog.kind === 'confirm') {
       dialog.resolve(true);
       setDialog(null);
@@ -150,8 +163,7 @@ export const FeedbackProvider = ({ children }: { children: React.ReactNode }) =>
         errors[field.name] = 'This field is required.';
       }
     });
-
-    if (Object.keys(errors).length > 0) {
+    if (Object.keys(errors).length) {
       setPromptErrors(errors);
       return;
     }
@@ -164,113 +176,124 @@ export const FeedbackProvider = ({ children }: { children: React.ReactNode }) =>
     <FeedbackContext.Provider value={value}>
       {children}
 
-      <Dialog
-        open={!!dialog}
-        onClose={closeDialog}
-        fullWidth
-        maxWidth={dialog?.kind === 'prompt' ? 'sm' : 'xs'}
-        PaperProps={{
-          sx: {
-            position: 'relative',
-            overflow: 'hidden',
-            borderRadius: '8px',
-            border: '1px solid rgba(203, 213, 225, 0.95)',
-            backgroundColor: '#ffffff',
-            boxShadow: '0 28px 80px rgba(15, 23, 42, 0.26)'
-          }
+      <dialog
+        ref={dialogRef}
+        aria-labelledby="feedback-dialog-title"
+        className="m-auto w-[calc(100%-2rem)] max-w-md overflow-hidden rounded-lg border border-slate-300 bg-white p-0 text-slate-950 shadow-2xl backdrop:bg-slate-950/55"
+        onCancel={(event) => {
+          event.preventDefault();
+          closeDialog();
+        }}
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) closeDialog();
         }}
       >
         {dialog && (
-          <>
-            <DialogTitle sx={{ pb: 1 }}>
-              <Stack spacing={0.75}>
-                <Typography variant="h6" fontWeight={800}>{dialog.title}</Typography>
-                {dialog.message && (
-                  <Typography variant="body2" color="text.secondary">{dialog.message}</Typography>
-                )}
-              </Stack>
-            </DialogTitle>
-            <DialogContent>
-              {dialog.messages && dialog.messages.length > 0 && (
-                <Alert severity={dialog.tone || 'info'} variant="outlined" sx={{ mt: 1 }}>
-                  <Stack component="ul" sx={{ pl: 2, m: 0 }} spacing={0.5}>
-                    {dialog.messages.map((item: string) => (
-                      <Typography component="li" variant="body2" key={item}>{item}</Typography>
-                    ))}
-                  </Stack>
-                </Alert>
-              )}
+          <div className="p-6">
+            <h2 id="feedback-dialog-title" className="text-lg font-extrabold">
+              {dialog.title}
+            </h2>
+            {dialog.message && <p className="mt-2 text-sm text-slate-600">{dialog.message}</p>}
 
-              {dialog.kind === 'prompt' && (
-                <Stack spacing={2} sx={{ mt: 1 }}>
-                  {dialog.fields.map((field) => (
-                    <TextField
-                      key={field.name}
-                      select={field.type === 'select'}
-                      label={field.label}
-                      value={promptValues[field.name] || ''}
-                      placeholder={field.placeholder}
-                      required={field.required}
-                      multiline={field.type === 'textarea'}
-                      minRows={field.type === 'textarea' ? 3 : undefined}
-                      error={!!promptErrors[field.name]}
-                      helperText={promptErrors[field.name] || (field.required ? 'Required' : ' ')}
-                      onChange={(event) => {
-                        setPromptValues((prev) => ({ ...prev, [field.name]: event.target.value }));
-                        setPromptErrors((prev) => ({ ...prev, [field.name]: '' }));
-                      }}
-                      fullWidth
-                      size="small"
-                    >
-                      {(field.options || []).map((option) => (
-                        <MenuItem key={option} value={option}>{option}</MenuItem>
-                      ))}
-                    </TextField>
-                  ))}
-                </Stack>
-              )}
-            </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 2 }}>
+            {dialog.messages?.length ? (
+              <ul className={`mt-4 list-disc space-y-1 rounded-md border px-8 py-3 text-sm ${toneClasses[dialog.tone || 'info']}`}>
+                {dialog.messages.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            ) : null}
+
+            {dialog.kind === 'prompt' && (
+              <div className="mt-5 space-y-4">
+                {dialog.fields.map((field) => {
+                  const inputClasses = `mt-1 w-full rounded-md border bg-white px-3 py-2 text-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                    promptErrors[field.name] ? 'border-red-500' : 'border-slate-300'
+                  }`;
+                  const sharedProps = {
+                    id: `feedback-${field.name}`,
+                    value: promptValues[field.name] || '',
+                    required: field.required,
+                    onChange: (
+                      event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+                    ) => {
+                      setPromptValues((previous) => ({
+                        ...previous,
+                        [field.name]: event.target.value
+                      }));
+                      setPromptErrors((previous) => ({ ...previous, [field.name]: '' }));
+                    }
+                  };
+
+                  return (
+                    <label key={field.name} className="block text-sm font-bold text-slate-800">
+                      {field.label}{field.required ? ' *' : ''}
+                      {field.type === 'select' ? (
+                        <select {...sharedProps} className={inputClasses}>
+                          <option value="">Select an option</option>
+                          {(field.options || []).map((option) => (
+                            <option key={option} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      ) : field.type === 'textarea' ? (
+                        <textarea {...sharedProps} className={inputClasses} rows={3} placeholder={field.placeholder} />
+                      ) : (
+                        <input {...sharedProps} className={inputClasses} type="text" placeholder={field.placeholder} />
+                      )}
+                      <span className={`mt-1 block min-h-4 text-xs ${promptErrors[field.name] ? 'text-red-700' : 'text-slate-500'}`}>
+                        {promptErrors[field.name] || (field.required ? 'Required' : '')}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end gap-2">
               {dialog.kind !== 'message' && (
-                <MuiButton onClick={closeDialog} color="inherit">
-                  {dialog.kind === 'confirm' ? dialog.cancelLabel || 'Cancel' : dialog.cancelLabel || 'Cancel'}
-                </MuiButton>
+                <button
+                  type="button"
+                  className="rounded-md px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600"
+                  onClick={closeDialog}
+                >
+                  {dialog.cancelLabel || 'Cancel'}
+                </button>
               )}
-              <MuiButton
+              <button
+                type="button"
+                className={`rounded-md px-4 py-2 text-sm font-extrabold text-white focus-visible:outline-2 focus-visible:outline-offset-2 ${
+                  dialog.kind === 'confirm' && dialog.tone === 'error'
+                    ? 'bg-red-700 hover:bg-red-800 focus-visible:outline-red-700'
+                    : 'bg-sky-700 hover:bg-sky-800 focus-visible:outline-sky-700'
+                }`}
                 onClick={acceptDialog}
-                variant="contained"
-                color={dialog.kind === 'confirm' && dialog.tone === 'error' ? 'error' : 'primary'}
-                sx={{
-                  textTransform: 'none',
-                  fontWeight: 800,
-                  borderRadius: '6px'
-                }}
               >
                 {dialog.kind === 'message' ? 'OK' : dialog.confirmLabel || 'Continue'}
-              </MuiButton>
-            </DialogActions>
-          </>
+              </button>
+            </div>
+          </div>
         )}
-      </Dialog>
+      </dialog>
 
-      <Snackbar
-        open={!!snackbar}
-        autoHideDuration={4200}
-        onClose={() => setSnackbar(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        {snackbar ? (
-          <Alert
-            severity={snackbar.tone || 'info'}
-            variant="filled"
-            onClose={() => setSnackbar(null)}
-            sx={{ alignItems: 'center', boxShadow: '0 16px 48px rgba(15, 23, 42, 0.18)' }}
-          >
-            {snackbar.title ? <strong>{snackbar.title}: </strong> : null}
-            {snackbar.message}
-          </Alert>
-        ) : undefined}
-      </Snackbar>
+      {notification && (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`fixed bottom-5 right-5 z-50 max-w-sm rounded-lg border px-4 py-3 text-sm shadow-xl ${toneClasses[notification.tone || 'info']}`}
+        >
+          <div className="flex items-start gap-3">
+            <p>
+              {notification.title ? <strong>{notification.title}: </strong> : null}
+              {notification.message}
+            </p>
+            <button
+              type="button"
+              aria-label="Dismiss notification"
+              className="rounded px-1 font-black hover:bg-black/10 focus-visible:outline-2"
+              onClick={() => setNotification(null)}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
     </FeedbackContext.Provider>
   );
 };

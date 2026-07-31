@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { LOCAL_HELPER_DEFAULT_PORT, WORKFLOW_FOLDER_KEYS, type SupportedFileKind, type WorkflowFolderKey } from '../../../shared/localHelperProtocol.js';
+import { LOCAL_HELPER_DEFAULT_PORT, WORKFLOW_FOLDER_KEYS, type SupportedFileKind, type WorkflowFolderKey } from '../contracts/localHelperProtocol.js';
 
 export type ApplicationMapping = 'bambu' | 'cura' | 'system';
 

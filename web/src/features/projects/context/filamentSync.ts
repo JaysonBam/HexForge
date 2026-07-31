@@ -1,8 +1,8 @@
-import type { Part } from '../../types';
+import type { Part } from '@/types';
 import {
   filamentSourceToOwnFilament,
   normalizeFilamentSource
-} from '../../domain/filamentSource.ts';
+} from '@/domain/filamentSource.ts';
 
 export const withSyncedFilamentFlags = (data: Partial<Part>): Partial<Part> => {
   const synced = { ...data };

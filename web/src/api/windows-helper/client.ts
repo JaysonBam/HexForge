@@ -17,9 +17,11 @@ import {
   type ProjectFilesResponse,
   type ProjectResolution,
   type SlicerHint
-} from '../../shared/localHelperProtocol';
+} from '@hexforge/windows-helper/contracts';
 
 const PORT_STORAGE_KEY = 'hexForge.fileHelperPort';
+
+export const getLocalHelperApiUrl = (port: number) => `http://127.0.0.1:${port}/v1`;
 
 type LocalNetworkRequestInit = RequestInit & {
   targetAddressSpace: 'loopback';
@@ -82,7 +84,7 @@ export class LocalHelperClient {
     this.port = port;
     this.fetcher = ((input: URL | RequestInfo, init?: RequestInit) =>
       fetcher.call(globalThis, input, init)) as typeof fetch;
-    this.baseUrl = `http://127.0.0.1:${port}/v1`;
+    this.baseUrl = getLocalHelperApiUrl(port);
   }
 
   private async requestJson<T>(args: {

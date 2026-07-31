@@ -1,16 +1,16 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '../components/ui/Button';
-import { Card } from '../components/ui/Card';
-import { StateBadge } from '../components/StateBadge';
-import { useProjects } from '../context/ProjectContext';
-import { projectStateMeta } from '../domain/operations';
-import type { ProjectState } from '../types';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { StateBadge } from '@/components/ui/StateBadge';
+import { useProjects } from '@/features/projects/context/ProjectContext';
+import { projectStateMeta } from '@/domain/operations';
+import type { ProjectState } from '@/types';
 import {
   downloadCollectionReportXlsx,
   getCollectionReportRows,
   getPartCollectionTimestamp
-} from '../utils/collectionReportXlsx';
+} from '@/lib/reports/collectionReportXlsx';
 import {
   ArrowRight,
   Calendar,
@@ -22,18 +22,12 @@ import {
   X
 } from 'lucide-react';
 
-const filterOptions: { label: string; value: string }[] = [
-  { label: 'All States', value: 'All' },
+const stateOptions: { label: string; value: ProjectState }[] = [
   ...Object.entries(projectStateMeta).map(([value, meta]) => ({
     label: meta.label,
-    value
+    value: value as ProjectState
   }))
 ];
-
-const projectMatchesFilter = (projectState: ProjectState, activeFilter: string) => {
-  if (activeFilter === 'All') return true;
-  return projectState === activeFilter;
-};
 
 const formatMonthValue = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -48,13 +42,38 @@ const formatMonthLabel = (monthValue: string) => {
 
 export const ProjectsPage = () => {
   const navigate = useNavigate();
-  const { projects, projectsLoading, projectsLoadError, activeFilter, setActiveFilter } = useProjects();
+  const { projects, projectsLoading, projectsLoadError } = useProjects();
   const [search, setSearch] = useState('');
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
+  const [selectedStates, setSelectedStates] = useState<Set<ProjectState>>(
+    () => new Set(stateOptions.map((option) => option.value))
+  );
+  const [stateFilterOpen, setStateFilterOpen] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [selectedReportMonth, setSelectedReportMonth] = useState(() => formatMonthValue(new Date()));
   const [reportExporting, setReportExporting] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
+  const stateFilterRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!stateFilterOpen) return;
+
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!stateFilterRef.current?.contains(event.target as Node)) {
+        setStateFilterOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setStateFilterOpen(false);
+    };
+
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [stateFilterOpen]);
 
   const yearOptions = useMemo(() => {
     const projectYears = projects
@@ -100,7 +119,7 @@ export const ProjectsPage = () => {
     return [...projects]
       .filter((project) => {
         if (new Date(project.createdAt).getFullYear() !== selectedYear) return false;
-        if (!projectMatchesFilter(project.state, activeFilter)) return false;
+        if (!selectedStates.has(project.state)) return false;
         if (!normalizedSearch) return true;
 
         return [
@@ -112,8 +131,25 @@ export const ProjectsPage = () => {
           project.printLabel
         ].some((value) => value?.toLowerCase().includes(normalizedSearch));
       })
-      .sort((a, b) => a.priorityNumber - b.priorityNumber || a.createdAt.localeCompare(b.createdAt));
-  }, [activeFilter, projects, search, selectedYear]);
+      .sort((a, b) => b.priorityNumber - a.priorityNumber || b.createdAt.localeCompare(a.createdAt));
+  }, [projects, search, selectedStates, selectedYear]);
+
+  const toggleState = (state: ProjectState) => {
+    setSelectedStates((currentStates) => {
+      const nextStates = new Set(currentStates);
+      if (nextStates.has(state)) {
+        nextStates.delete(state);
+      } else {
+        nextStates.add(state);
+      }
+      return nextStates;
+    });
+  };
+
+  const allStatesSelected = selectedStates.size === stateOptions.length;
+  const stateFilterLabel = allStatesSelected
+    ? 'States'
+    : `${selectedStates.size} of ${stateOptions.length} states`;
 
   const openReportModal = () => {
     setSelectedReportMonth((currentMonth) =>
@@ -151,21 +187,66 @@ export const ProjectsPage = () => {
             />
           </div>
 
-          <div className="relative">
-            <ListFilter className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sky-600" size={15} />
-            <select
-              id="projects-state-filter"
-              value={activeFilter}
-              onChange={(event) => setActiveFilter(event.target.value)}
-              className="forge-command-input h-10 min-w-[210px] appearance-none pl-10 pr-10 text-sm font-semibold"
+          <div ref={stateFilterRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setStateFilterOpen((open) => !open)}
+              className="forge-command-input flex h-10 min-w-[210px] items-center gap-2 px-3 text-left text-sm font-semibold"
+              aria-haspopup="menu"
+              aria-expanded={stateFilterOpen}
             >
-              {filterOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+              <ListFilter className="shrink-0 text-sky-600" size={15} />
+              <span className="min-w-0 flex-1 truncate">{stateFilterLabel}</span>
+              <ChevronDown
+                className={`shrink-0 text-slate-500 transition-transform ${stateFilterOpen ? 'rotate-180' : ''}`}
+                size={16}
+              />
+            </button>
+
+            {stateFilterOpen && (
+              <div
+                className="forge-modal absolute left-0 top-full z-30 mt-2 w-[min(20rem,calc(100vw-2rem))] overflow-hidden"
+                role="menu"
+                aria-label="Filter projects by state"
+              >
+                <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-3 py-2.5">
+                  <div>
+                    <div className="text-xs font-black uppercase tracking-[0.12em] text-slate-700">Project states</div>
+                    <div className="mt-0.5 text-xs font-semibold text-slate-500">
+                      {selectedStates.size} selected
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStates(
+                      allStatesSelected
+                        ? new Set<ProjectState>()
+                        : new Set(stateOptions.map((option) => option.value))
+                    )}
+                    className="rounded-md px-2 py-1 text-xs font-black text-sky-700 transition hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                  >
+                    {allStatesSelected ? 'Clear' : 'Select all'}
+                  </button>
+                </div>
+
+                <div className="max-h-72 overflow-y-auto p-2">
+                  {stateOptions.map((option) => (
+                    <label
+                      key={option.value}
+                      className="flex cursor-pointer items-center gap-3 rounded-md px-2.5 py-2 text-sm font-semibold text-slate-800 transition hover:bg-sky-50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedStates.has(option.value)}
+                        onChange={() => toggleState(option.value)}
+                        className="h-4 w-4 rounded border-slate-400 accent-sky-600"
+                      />
+                      <StateBadge state={option.value} />
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="relative">
@@ -205,7 +286,7 @@ export const ProjectsPage = () => {
           </div>
         ) : visibleProjects.length === 0 ? (
           <div className="forge-empty px-6 py-10 text-center text-sm font-semibold">
-            No projects match the current year, search, and state filter.
+            No projects match the current year, search, and selected states.
           </div>
         ) : (
           visibleProjects.map((project) => (

@@ -1,4 +1,4 @@
-import { WORKFLOW_FOLDER_KEYS, type WorkflowFolderKey } from '../../../shared/localHelperProtocol.js';
+import { WORKFLOW_FOLDER_KEYS, type WorkflowFolderKey } from '../contracts/localHelperProtocol.js';
 
 type SettingsState = {
   workflowFolders: Record<WorkflowFolderKey, string | null>;

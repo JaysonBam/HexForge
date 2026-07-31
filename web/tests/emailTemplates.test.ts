@@ -5,8 +5,8 @@ import {
   defaultEmailTemplates,
   renderEmailTemplate,
   type EmailTemplates
-} from '../src/domain/emailTemplates.ts';
-import type { Project } from '../src/types/index.ts';
+} from '@/domain/emailTemplates.ts';
+import type { Project } from '@/types/index.ts';
 
 const baseProject: Project = {
   id: 'project-123',

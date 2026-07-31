@@ -1,6 +1,6 @@
-import { filamentSourceShortLabel } from '../../domain/filamentSource.ts';
-import type { QuoteComparisonStatus } from '../../domain/quoteState';
-import type { QuoteSnapshot, QuoteSnapshotLine, QuoteSnapshotMaterialLine } from '../../types';
+import { filamentSourceShortLabel } from '@/domain/filamentSource.ts';
+import type { QuoteComparisonStatus } from '@/domain/quoteState';
+import type { QuoteSnapshot, QuoteSnapshotLine, QuoteSnapshotMaterialLine } from '@/types';
 
 export type QuoteView = {
   id: string;

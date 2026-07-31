@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { HelperConnectionState, HelperHealth } from '../../shared/localHelperProtocol';
-import { getStoredHelperPort, LocalHelperClient, LocalHelperError, storeHelperPort } from './localHelperClient';
+import type { HelperConnectionState, HelperHealth } from '@hexforge/windows-helper/contracts';
+import { getStoredHelperPort, LocalHelperClient, LocalHelperError, storeHelperPort } from '@/api/windows-helper/client';
 
 type LocalHelperContextValue = {
   state: HelperConnectionState;

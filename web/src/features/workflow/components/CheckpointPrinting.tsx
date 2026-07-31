@@ -1,14 +1,14 @@
 import { useState } from 'react';
-import type { Project } from '../../types';
-import { useProjects } from '../../context/ProjectContext';
-import { useSettings } from '../../context/SettingsContext';
-import { useStaffActionName } from '../../hooks/useStaffActionName';
-import { Button } from '../ui/Button';
-import { Card } from '../ui/Card';
-import { useFeedback } from '../ui/FeedbackProvider';
+import type { Project } from '@/types';
+import { useProjects } from '@/features/projects/context/ProjectContext';
+import { useSettings } from '@/features/settings/context/SettingsContext';
+import { useStaffActionName } from '@/features/auth/hooks/useStaffActionName';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { useFeedback } from '@/app/providers/FeedbackProvider';
 import { Play, Check, Undo2, AlertTriangle } from 'lucide-react';
-import { PartSourceFileButton } from '../../local-files/PartSourceFileButton';
-import { sourceFileName } from '../../local-files/sourceFileLink';
+import { PartSourceFileButton } from '@/features/local-files/PartSourceFileButton';
+import { sourceFileName } from '@/features/local-files/sourceFileLink';
 
 export const CheckpointPrinting = ({ project, onAdvanceToCollection }: { project: Project; onAdvanceToCollection?: () => void }) => {
     const { transitionPartStatus, transitionProjectState, updatePart } = useProjects();

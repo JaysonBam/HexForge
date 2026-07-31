@@ -1,13 +1,13 @@
-import type { Project } from '../types';
+import type { Project } from '@/types';
 import type { PDFFont, PDFPage } from 'pdf-lib';
 import {
   quoteContactSettings,
   type QuoteContactSettings
-} from '../domain/environmentSettings';
+} from '@/domain/environmentSettings';
 import {
   groupFilamentsByPrice,
   type Filament
-} from '../domain/settingsConfig';
+} from '@/domain/settingsConfig';
 
 export type QuotePdfLine = {
   partName: string;

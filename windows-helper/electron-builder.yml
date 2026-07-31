@@ -9,7 +9,7 @@ extraResources:
   - from: assets/icon.png
     to: icon.png
 directories:
-  output: ../release
+  output: release
 win:
   icon: assets/icon.png
   target:

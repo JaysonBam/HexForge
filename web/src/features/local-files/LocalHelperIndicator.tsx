@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { HardDrive, RotateCw, X } from 'lucide-react';
-import { useLocalHelper } from './LocalHelperContext';
+import { getLocalHelperApiUrl } from '@/api/windows-helper/client';
+import { useLocalHelper } from '@/features/local-files/LocalHelperContext';
 
 const LABELS = {
   connected: 'Files connected',
@@ -89,7 +90,7 @@ export const LocalHelperIndicator = () => {
             </button>
           </div>
           <div className="mt-3 flex items-center gap-2 text-[11px] font-semibold text-slate-500">
-            <HardDrive size={13} /> http://127.0.0.1:{port}/v1
+            <HardDrive size={13} /> {getLocalHelperApiUrl(port)}
           </div>
         </div>
       )}

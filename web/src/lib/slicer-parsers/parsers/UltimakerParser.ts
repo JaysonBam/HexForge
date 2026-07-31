@@ -1,6 +1,6 @@
 import JSZip from 'jszip';
-import type { Part, Material } from '../types/index';
-import { extractImage } from '../utils/imageUtils';
+import type { Part, Material } from '@/lib/slicer-parsers/types/index';
+import { extractImage } from '@/lib/slicer-parsers/utils/imageUtils';
 
 
 async function getPartName(UfpGlobalFile: JSZip.JSZipObject): Promise<string> {

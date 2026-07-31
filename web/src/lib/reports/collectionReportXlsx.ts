@@ -1,6 +1,6 @@
 import JSZip from 'jszip';
-import type { Part, PrintRun, Project } from '../types';
-import { filamentSourceLabel, getPartFilamentSource } from '../domain/filamentSource.ts';
+import type { Part, PrintRun, Project } from '@/types';
+import { filamentSourceLabel, getPartFilamentSource } from '@/domain/filamentSource.ts';
 
 export const COLLECTION_REPORT_COLUMNS = [
   'Timestamp:',

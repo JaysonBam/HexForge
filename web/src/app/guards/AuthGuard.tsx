@@ -1,26 +1,18 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
-import { supabase } from '../lib/supabaseClient';
-import {
-  clearGoogleProviderTokens,
-  syncGoogleProviderTokensFromSession
-} from '../utils/gmailDraftUtils';
+import { subscribeToAuthChanges } from '@/api/supabase/auth';
+import { clearGoogleProviderTokens } from '@/api/google/gmail/client';
 
 export function AuthGuard({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
-    const {
-      data: { subscription }
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    clearGoogleProviderTokens();
+    const subscription = subscribeToAuthChanges((_event, session) => {
       setAuthenticated(Boolean(session));
       setLoading(false);
-      if (session) {
-        syncGoogleProviderTokensFromSession(session);
-      } else {
-        clearGoogleProviderTokens();
-      }
+      if (!session) clearGoogleProviderTokens();
     });
 
     return () => {

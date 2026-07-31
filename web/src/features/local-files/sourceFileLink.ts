@@ -1,5 +1,5 @@
-import type { LocalProjectFile } from '../../shared/localHelperProtocol';
-import type { Part } from '../types';
+import type { LocalProjectFile } from '@hexforge/windows-helper/contracts';
+import type { Part } from '@/types';
 
 export const normalizeSourceFilePath = (value: string): string =>
   value.replaceAll('\\', '/').replace(/^\.\//, '').toLocaleLowerCase();

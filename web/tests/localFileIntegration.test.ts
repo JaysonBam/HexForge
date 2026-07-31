@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { Project } from '../src/types/index.ts';
-import { runSequentialImports } from '../src/local-files/importSequence.ts';
-import { isImportEligibleFilename } from '../src/local-files/projectFileImport.ts';
-import { findLinkedLocalFile, isFileLinkedToParts, normalizeSourceFilePath, sourceFileName } from '../src/local-files/sourceFileLink.ts';
-import type { LocalProjectFile } from '../shared/localHelperProtocol.ts';
-import { getExpectedWorkflowFolder, projectExpectsTbc } from '../src/local-files/projectFolderWorkflow.ts';
+import type { Project } from '@/types/index.ts';
+import { runSequentialImports } from '@/features/local-files/importSequence.ts';
+import { isImportEligibleFilename } from '@/features/local-files/projectFileImport.ts';
+import { findLinkedLocalFile, isFileLinkedToParts, normalizeSourceFilePath, sourceFileName } from '@/features/local-files/sourceFileLink.ts';
+import type { LocalProjectFile } from '@hexforge/windows-helper/contracts';
+import { getExpectedWorkflowFolder, projectExpectsTbc } from '@/features/local-files/projectFolderWorkflow.ts';
 
 test('only existing parser formats are import eligible', () => {
   assert.equal(isImportEligibleFilename('model.3mf'), true);

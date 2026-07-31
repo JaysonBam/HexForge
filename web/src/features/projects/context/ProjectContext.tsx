@@ -1,23 +1,33 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import type { Part, PrintRun, Project, QuoteSnapshot } from '../types';
-import { supabase } from '../lib/supabaseClient';
-import { normalizePartVerification } from '../domain/partVerification';
+import type { Part, Project } from '@/types';
+import {
+  createProjectRecord,
+  deleteProjectRecord,
+  getProjects,
+  transitionProjectRecord,
+  updateProjectRecord
+} from '@/api/supabase/projects';
+import {
+  createPartRecord,
+  createPartRecords,
+  deletePartRecord,
+  transitionPartRecord,
+  updatePartRecord
+} from '@/api/supabase/parts';
+import { removePartThumbnail, removeProjectPartThumbnails } from '@/api/supabase/storage';
+import type { SupabaseMutationResult } from '@/api/supabase/types';
+import { normalizePartVerification } from '@/domain/partVerification';
 import {
   filamentSourceToOwnFilament,
   normalizeFilamentSource
-} from '../domain/filamentSource.ts';
-import { withSyncedFilamentFlags } from './project/filamentSync';
+} from '@/domain/filamentSource.ts';
+import { withSyncedFilamentFlags } from '@/features/projects/context/filamentSync';
 import {
   applyOptimisticPartTransition,
   applyOptimisticProjectTransition
-} from './project/optimisticTransitions';
-import { getStoragePathFromImageUrl, removeProjectPartThumbnails } from './project/storage';
-import type {
-  PrintRunRow,
-  ProjectContextType,
-  QuoteSnapshotRow,
-  SupabaseMutationResult
-} from './project/types';
+} from '@/features/projects/context/optimisticTransitions';
+import type { ProjectContextType } from '@/features/projects/context/types';
+import { getNextProjectPriority } from '@/domain/projectPriority';
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 const EDIT_SAVE_DEBOUNCE_MS = 600;
@@ -46,7 +56,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [projectsLoadError, setProjectsLoadError] = useState<string | null>(null);
-  const [activeFilter, setActiveFilter] = useState<string>('All');
   const [pendingWrites, setPendingWrites] = useState(0);
   const [syncError, setSyncError] = useState<string | null>(null);
   const queuedProjectUpdatesRef = useRef<Map<string, QueuedProjectUpdate>>(new Map());
@@ -56,111 +65,14 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       setProjectsLoadError(null);
 
-      const { data: dbProjects, error: projectError } = await supabase.from('projects').select('*');
-      if (projectError || !dbProjects) {
-        console.error('Failed to fetch projects:', projectError);
-        setProjectsLoadError(projectError?.message || 'Failed to fetch projects.');
-        return;
+      const result = await getProjects();
+      if (result.quoteSnapshotError) {
+        console.error('Failed to fetch quote snapshots:', result.quoteSnapshotError);
       }
-
-      const { data: dbParts, error: partError } = await supabase.from('parts').select('*');
-      if (partError || !dbParts) {
-        console.error('Failed to fetch parts:', partError);
-        setProjectsLoadError(partError?.message || 'Failed to fetch project parts.');
-        return;
+      if (result.printRunError) {
+        console.error('Failed to fetch print runs:', result.printRunError);
       }
-
-      const { data: dbSnapshots, error: snapshotError } = await supabase
-        .from('project_cost_snapshots')
-        .select('project_id,snapshot_version,status,currency,total_cost,generated_at,line_summary')
-        .order('snapshot_version', { ascending: true });
-
-      if (snapshotError) {
-        console.error('Failed to fetch quote snapshots:', snapshotError);
-      }
-
-      const { data: dbPrintRuns, error: printRunError } = await supabase
-        .from('print_runs')
-        .select('id,part_id,project_id,machine_id,machine_name,started_by,ended_by,started_at,finished_at,failed_at,failure_reason,outcome')
-        .order('started_at', { ascending: false });
-
-      if (printRunError) {
-        console.error('Failed to fetch print runs:', printRunError);
-      }
-
-      const snapshotByProject = new Map<string, QuoteSnapshot>();
-      const snapshotsByProject = new Map<string, QuoteSnapshot[]>();
-      if (dbSnapshots) {
-        (dbSnapshots as QuoteSnapshotRow[]).forEach((snapshotRow) => {
-          const projectId = (snapshotRow?.project_id || '').toString();
-          if (!projectId) return;
-
-          const snapshot = {
-            snapshot_version: Number(snapshotRow?.snapshot_version || 0),
-            status: snapshotRow?.status || 'ISSUED',
-            currency: snapshotRow?.currency || 'ZAR',
-            total_cost: Number(snapshotRow?.total_cost || 0),
-            generated_at: snapshotRow?.generated_at || '',
-            line_summary: Array.isArray(snapshotRow?.line_summary)
-              ? snapshotRow.line_summary as QuoteSnapshot['line_summary']
-              : []
-          } as QuoteSnapshot;
-
-          const projectSnapshots = snapshotsByProject.get(projectId) ?? [];
-          projectSnapshots.push(snapshot);
-          snapshotsByProject.set(projectId, projectSnapshots);
-
-          if (snapshot.status === 'ISSUED') {
-            const existing = snapshotByProject.get(projectId);
-            const existingVersion = existing?.snapshot_version ?? -1;
-
-            if (snapshot.snapshot_version >= existingVersion) {
-              snapshotByProject.set(projectId, snapshot);
-            }
-          }
-        });
-      }
-
-      const printRunsByPart = new Map<string, PrintRun[]>();
-      if (dbPrintRuns) {
-        (dbPrintRuns as PrintRunRow[]).forEach((run) => {
-          const partId = (run?.part_id || '').toString();
-          if (!partId) return;
-
-          const runs = printRunsByPart.get(partId) ?? [];
-          runs.push({
-            id: Number(run.id),
-            part_id: run.part_id,
-            project_id: run.project_id,
-            machine_id: run.machine_id,
-            machine_name: run.machine_name,
-            started_by: run.started_by,
-            ended_by: run.ended_by,
-            started_at: run.started_at,
-            finished_at: run.finished_at,
-            failed_at: run.failed_at,
-            failure_reason: run.failure_reason,
-            outcome: run.outcome
-          });
-          printRunsByPart.set(partId, runs);
-        });
-      }
-
-      const fullProjects = dbProjects.map(p => ({
-        ...p,
-        email: typeof p.email === 'string' ? p.email : '',
-        parts: dbParts
-          .filter(part => part.projectId === p.id)
-          .sort((a, b) => Number(a.partNumber || 0) - Number(b.partNumber || 0))
-          .map(part => normalizePartVerification({
-            ...part,
-            printRuns: printRunsByPart.get(part.id) ?? []
-          })),
-        quoteSnapshot: snapshotByProject.get(p.id),
-        quoteSnapshots: snapshotsByProject.get(p.id) ?? []
-      })) as Project[];
-
-      setProjects(fullProjects);
+      setProjects(result.projects);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unexpected project load failure.';
       console.error('Failed to refresh projects:', error);
@@ -202,7 +114,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     window.clearTimeout(queued.timerId);
     queuedProjectUpdatesRef.current.delete(id);
 
-    return trackMutation('Update project', () => supabase.from('projects').update(queued.updates).eq('id', id));
+    return trackMutation('Update project', () => updateProjectRecord(id, queued.updates));
   }, [trackMutation]);
 
   const flushQueuedPartUpdate = useCallback((partId: string) => {
@@ -212,7 +124,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     window.clearTimeout(queued.timerId);
     queuedPartUpdatesRef.current.delete(partId);
 
-    return trackMutation('Update part', () => supabase.from('parts').update(queued.updates).eq('id', partId));
+    return trackMutation('Update part', () => updatePartRecord(partId, queued.updates));
   }, [trackMutation]);
 
   const queueProjectUpdate = useCallback((id: string, updates: Partial<Project>) => {
@@ -289,14 +201,14 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return () => {
       queuedProjectUpdates.forEach((queued, projectId) => {
         window.clearTimeout(queued.timerId);
-        void supabase.from('projects').update(queued.updates).eq('id', projectId)
+        void updateProjectRecord(projectId, queued.updates)
           .then(({ error }) => {
             if (error) console.error('Failed to persist a pending project update during teardown:', error);
           });
       });
       queuedPartUpdates.forEach((queued, partId) => {
         window.clearTimeout(queued.timerId);
-        void supabase.from('parts').update(queued.updates).eq('id', partId)
+        void updatePartRecord(partId, queued.updates)
           .then(({ error }) => {
             if (error) console.error('Failed to persist a pending part update during teardown:', error);
           });
@@ -319,8 +231,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const addProject = async (data: Partial<Project>) => {
     const newId = generateProjectId();
 
-    const maxPriority = projects.reduce((max, p) => Math.max(max, p.priorityNumber), 0);
-    const assignedPriority = data.priorityNumber ?? (maxPriority + 1);
+    const assignedPriority = data.priorityNumber ?? getNextProjectPriority(projects);
 
     const newProject: Project = {
       id: newId,
@@ -349,7 +260,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const { parts: _parts, quoteSnapshot: _quoteSnapshot, ...projectData } = newProject;
     void _parts;
     void _quoteSnapshot;
-    const saved = await trackMutation('Create project', () => supabase.from('projects').insert([projectData]));
+    const saved = await trackMutation('Create project', () => createProjectRecord(projectData));
     if (!saved) {
       setProjects(prev => prev.filter(project => project.id !== newId));
       return null;
@@ -392,7 +303,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     setProjects(prev => prev.filter(p => p.id !== id));
-    return trackMutation('Delete project', () => supabase.from('projects').delete().eq('id', id));
+    return trackMutation('Delete project', () => deleteProjectRecord(id));
   };
 
   const addPart = (projectId: string) => {
@@ -422,7 +333,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return { ...p, parts: [...p.parts, newPart] };
     }));
 
-    void trackMutation('Add part', () => supabase.from('parts').insert([{ ...newPart, projectId }]));
+    void trackMutation('Add part', () => createPartRecord(projectId, newPart));
   };
 
   const updatePart = (projectId: string, partId: string, data: Partial<Part>) => {
@@ -454,23 +365,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const part = project.parts.find(p => p.id === partId);
         if (!part) return;
 
-        if (part.imageUrl) {
-          const { data: sessionData } = await supabase.auth.getSession();
-          const session = sessionData.session;
-          if (!session) {
-            console.warn('Not authenticated: skipping storage object deletion');
-          } else {
-            const url = part.imageUrl as string;
-            const filePath = getStoragePathFromImageUrl(url);
-
-            if (filePath) {
-              const { error } = await supabase.storage.from('Thumbnails').remove([filePath]);
-              if (error) console.error('Error deleting storage object for part:', error);
-            } else {
-              console.warn('Could not determine storage path from imageUrl:', url);
-            }
-          }
-        }
+        if (part.imageUrl) await removePartThumbnail(part.imageUrl);
       } catch (e) {
         console.error('Failed to remove part thumbnail:', e);
       }
@@ -481,7 +376,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return { ...p, parts: p.parts.filter(part => part.id !== partId) };
     }));
 
-    void trackMutation('Delete part', () => supabase.from('parts').delete().eq('id', partId));
+    void trackMutation('Delete part', () => deletePartRecord(partId));
   };
 
   const addExtractedParts = async (projectId: string, extractedParts: Partial<Part>[]) => {
@@ -529,7 +424,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     if (newParts.length) {
       const insertedParts = newParts.map(np => ({ ...np, projectId }));
-      return trackMutation('Add extracted parts', () => supabase.from('parts').insert(insertedParts));
+      return trackMutation('Add extracted parts', () => createPartRecords(insertedParts));
     }
     return true;
   };
@@ -557,14 +452,14 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setSyncError(null);
 
     try {
-      const { data, error } = await supabase.rpc('transition_project_state', {
-          p_project_id: projectId,
-          p_action: action,
-          p_technician_name: technicianName,
-          p_reason: reason ?? null,
-          p_override_note: overrideNote ?? null,
-          p_print_label: printLabel ?? null
-        });
+      const { data, error } = await transitionProjectRecord({
+        projectId,
+        action,
+        technicianName,
+        reason,
+        overrideNote,
+        printLabel
+      });
 
       if (error) {
         console.error('Project transition RPC failed:', error);
@@ -630,14 +525,14 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setSyncError(null);
 
     try {
-      const { data, error } = await supabase.rpc('transition_part_status', {
-          p_project_id: projectId,
-          p_part_id: partId,
-          p_action: action,
-          p_technician_name: technicianName,
-          p_machine_name: machineName ?? null,
-          p_reason: reason ?? null
-        });
+      const { data, error } = await transitionPartRecord({
+        projectId,
+        partId,
+        action,
+        technicianName,
+        machineName,
+        reason
+      });
 
       if (error) {
         console.error('Part transition RPC failed:', error);
@@ -689,9 +584,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       deletePart,
       addExtractedParts,
       transitionProjectState,
-      transitionPartStatus,
-      activeFilter,
-      setActiveFilter
+      transitionPartStatus
     }}>
       {children}
     </ProjectContext.Provider>

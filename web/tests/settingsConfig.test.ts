@@ -3,7 +3,7 @@ import test from 'node:test';
 import {
   groupFilamentsByPrice,
   normalizeFilamentSettings,
-} from '../src/domain/settingsConfig.ts';
+} from '@/domain/settingsConfig.ts';
 
 test('filament settings keep configured materials only', () => {
   const filaments = normalizeFilamentSettings([

@@ -14,7 +14,7 @@ import {
   type ProjectResolution,
   type SlicerHint,
   type WorkflowFolderKey
-} from '../../../shared/localHelperProtocol.js';
+} from '../contracts/localHelperProtocol.js';
 import type { ConfigStore, HelperConfig } from './config.js';
 import type { CopyOperationManager } from './copyOperations.js';
 import { classifySupportedFile, scanProjectFiles } from './fileScanner.js';

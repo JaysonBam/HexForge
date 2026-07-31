@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
-import type { Project } from '../types';
-import { canUseProjectGmailThread, GMAIL_THREAD_ACCOUNT_MISMATCH } from './gmailThreadOwnership';
+import { getAuthSession, subscribeToAuthChanges } from '@/api/supabase/auth';
+import type { Project } from '@/types';
+import { canUseProjectGmailThread, GMAIL_THREAD_ACCOUNT_MISMATCH } from '@/features/gmail/gmailThreadOwnership';
 
-export { GMAIL_THREAD_ACCOUNT_MISMATCH } from './gmailThreadOwnership';
+export { GMAIL_THREAD_ACCOUNT_MISMATCH } from '@/features/gmail/gmailThreadOwnership';
 
 export const assertProjectGmailThreadAccess = async (
   project: Pick<Project, 'gmailThreadId' | 'gmailAccountEmail'>
 ) => {
-  const { data, error } = await supabase.auth.getSession();
+  const { data, error } = await getAuthSession();
   if (error) throw new Error(error.message);
   if (!canUseProjectGmailThread(project, data.session?.user.email)) {
     throw new Error(GMAIL_THREAD_ACCOUNT_MISMATCH);
@@ -23,12 +23,12 @@ export const useProjectGmailThreadAccess = (
 
   useEffect(() => {
     let active = true;
-    void supabase.auth.getSession().then(({ data }) => {
+    void getAuthSession().then(({ data }) => {
       if (!active) return;
       setAccountEmail(data.session?.user.email || null);
       setResolved(true);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const subscription = subscribeToAuthChanges((_event, session) => {
       setAccountEmail(session?.user.email || null);
       setResolved(true);
     });

@@ -1,11 +1,6 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
-import { Readable } from 'node:stream';
 import test from 'node:test';
-import type { LocalProjectFile } from '../shared/localHelperProtocol.ts';
-import { saveProjectAttachment } from '../helper/src/main/attachmentWriter.ts';
+import type { LocalProjectFile } from '@hexforge/windows-helper/contracts';
 import {
   buildRecentPrintEmailQuery,
   buildUnreadPrintEmailQuery,
@@ -14,14 +9,14 @@ import {
   findStudentNumbers,
   getGmailMessageDirection,
   isSupportedGmailAttachment
-} from '../src/gmail/gmailParsing.ts';
-import { stripQuotedReplyContent } from '../src/gmail/gmailBody.ts';
-import { getGmailThreadUrl } from '../src/gmail/gmailUrls.ts';
-import { canUseProjectGmailThread, GMAIL_THREAD_ACCOUNT_MISMATCH } from '../src/gmail/gmailThreadOwnership.ts';
-import { isGmailAttachmentDownloadEligible, isGmailAttachmentSavedLocally } from '../src/gmail/gmailAttachmentAvailability.ts';
-import type { GmailThreadSnapshot } from '../src/gmail/types.ts';
-import type { Project } from '../src/types/index.ts';
-import { isValidModuleCode, normalizeModuleCode } from '../src/domain/moduleCode.ts';
+} from '@/features/gmail/gmailParsing.ts';
+import { stripQuotedReplyContent } from '@/api/google/gmail/decoding.ts';
+import { getGmailThreadUrl } from '@/api/google/gmail/urls.ts';
+import { canUseProjectGmailThread, GMAIL_THREAD_ACCOUNT_MISMATCH } from '@/features/gmail/gmailThreadOwnership.ts';
+import { isGmailAttachmentDownloadEligible, isGmailAttachmentSavedLocally } from '@/features/gmail/gmailAttachmentAvailability.ts';
+import type { GmailThreadSnapshot } from '@/api/google/gmail/types.ts';
+import type { Project } from '@/types/index.ts';
+import { isValidModuleCode, normalizeModuleCode } from '@/domain/moduleCode.ts';
 
 const baseThread = (body: string, overrides: Partial<GmailThreadSnapshot> = {}): GmailThreadSnapshot => ({
   id: 'thread-1',
@@ -46,13 +41,11 @@ const baseThread = (body: string, overrides: Partial<GmailThreadSnapshot> = {}):
   }],
   ...overrides
 });
-
 test('recent print Gmail query includes read and unread messages', () => {
   const query = buildRecentPrintEmailQuery('3d print');
   assert.equal(query, 'newer_than:30d "3d print"');
   assert.doesNotMatch(query, /is:unread/i);
 });
-
 test('dashboard Gmail query finds unread messages in print threads from the last three months', () => {
   const query = buildUnreadPrintEmailQuery('3d print');
   assert.equal(query, 'newer_than:90d is:unread -from:linkedin.com "3d print"');
@@ -183,52 +176,4 @@ test('Gmail reply cache preserves ambiguous thanks and unseparated closing text'
     stripQuotedReplyContent('Please print two copies.\nKind regards,\nPlease let me know if that is possible.'),
     'Please print two copies.\nKind regards,\nPlease let me know if that is possible.'
   );
-});
-
-test('helper saves supported Gmail attachments, skips exact duplicates, and safely renames conflicts', async () => {
-  const projectFolder = await mkdtemp(path.join(os.tmpdir(), 'hexforge-gmail-files-'));
-  try {
-    const firstBytes = Buffer.from('solid model');
-    const first = await saveProjectAttachment({
-      projectFolderPath: projectFolder,
-      projectFolderName: 'P42 Test u12345678 - TBC',
-      filename: 'part.STL',
-      expectedSize: firstBytes.byteLength,
-      stream: Readable.from(firstBytes)
-    });
-    assert.equal(first.status, 'saved');
-    assert.equal((await readFile(path.join(projectFolder, 'part.STL'))).toString(), 'solid model');
-
-    const duplicate = await saveProjectAttachment({
-      projectFolderPath: projectFolder,
-      projectFolderName: 'P42 Test u12345678 - TBC',
-      filename: 'part.STL',
-      expectedSize: firstBytes.byteLength,
-      stream: Readable.from(firstBytes)
-    });
-    assert.equal(duplicate.status, 'skipped');
-
-    const differentBytes = Buffer.from('different model bytes');
-    const conflict = await saveProjectAttachment({
-      projectFolderPath: projectFolder,
-      projectFolderName: 'P42 Test u12345678 - TBC',
-      filename: 'part.STL',
-      expectedSize: differentBytes.byteLength,
-      stream: Readable.from(differentBytes)
-    });
-    assert.equal(conflict.status, 'renamed');
-    assert.equal(conflict.filename, 'part (2).STL');
-    assert.equal((await readFile(path.join(projectFolder, 'part.STL'))).toString(), 'solid model');
-    assert.equal((await readFile(path.join(projectFolder, 'part (2).STL'))).toString(), 'different model bytes');
-
-    await assert.rejects(() => saveProjectAttachment({
-      projectFolderPath: projectFolder,
-      projectFolderName: 'P42 Test u12345678 - TBC',
-      filename: 'notes.pdf',
-      expectedSize: 3,
-      stream: Readable.from(Buffer.from('pdf'))
-    }), /UNSUPPORTED_ATTACHMENT/);
-  } finally {
-    await rm(projectFolder, { recursive: true, force: true });
-  }
 });

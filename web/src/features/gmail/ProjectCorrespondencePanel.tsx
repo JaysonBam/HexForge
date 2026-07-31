@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Download, ExternalLink, Loader2, Mail, Paperclip, RefreshCw, X } from 'lucide-react';
-import type { Project } from '../types';
-import { Button } from '../components/ui/Button';
-import { useFeedback } from '../components/ui/FeedbackProvider';
-import { useLocalHelper } from '../local-files/LocalHelperContext';
-import { getAvailableProjectFiles } from '../local-files/projectLocalFileAvailability';
-import { downloadPreparedGmailAttachments, prepareGmailAttachmentDownload, type PreparedGmailAttachmentDownload } from './gmailAttachmentDownload';
-import { isGmailAttachmentSavedLocally } from './gmailAttachmentAvailability';
-import { isSupportedGmailAttachment } from './gmailParsing';
-import { loadProjectGmailMessages, syncProjectGmailThread } from './gmailProjectService';
-import type { GmailThreadMessage } from './types';
-import { openGmailThread } from './gmailUrls';
-import { GMAIL_THREAD_ACCOUNT_MISMATCH, useProjectGmailThreadAccess } from './gmailThreadAccess';
+import type { Project } from '@/types';
+import { Button } from '@/components/ui/Button';
+import { useFeedback } from '@/app/providers/FeedbackProvider';
+import { useLocalHelper } from '@/features/local-files/LocalHelperContext';
+import { getAvailableProjectFiles } from '@/features/local-files/projectLocalFileAvailability';
+import { downloadPreparedGmailAttachments, prepareGmailAttachmentDownload, type PreparedGmailAttachmentDownload } from '@/features/gmail/gmailAttachmentDownload';
+import { isGmailAttachmentSavedLocally } from '@/features/gmail/gmailAttachmentAvailability';
+import { isSupportedGmailAttachment } from '@/features/gmail/gmailParsing';
+import { loadProjectGmailMessages, syncProjectGmailThread } from '@/features/gmail/gmailProjectService';
+import type { GmailThreadMessage } from '@/api/google/gmail/types';
+import { openGmailThread } from '@/api/google/gmail/urls';
+import { GMAIL_THREAD_ACCOUNT_MISMATCH, useProjectGmailThreadAccess } from '@/features/gmail/gmailThreadAccess';
 
 const formatDateTime = (value: string) => {
   const date = new Date(value);

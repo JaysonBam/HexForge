@@ -1,4 +1,4 @@
-import type { Part, PrintStatus } from '../types';
+import type { Part, PrintStatus } from '@/types';
 
 const reviewVerifiedStatuses = new Set<PrintStatus>([
   'VERIFIED',

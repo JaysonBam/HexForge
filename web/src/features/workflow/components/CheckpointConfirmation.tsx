@@ -1,31 +1,31 @@
-import type { Project, Part } from '../../types';
-import { useProjects } from '../../context/ProjectContext';
-import { useSettings } from '../../context/SettingsContext';
-import { useStaffActionName } from '../../hooks/useStaffActionName';
-import { compareQuoteSnapshot } from '../../domain/quoteState';
+import type { Project, Part } from '@/types';
+import { useProjects } from '@/features/projects/context/ProjectContext';
+import { useSettings } from '@/features/settings/context/SettingsContext';
+import { useStaffActionName } from '@/features/auth/hooks/useStaffActionName';
+import { compareQuoteSnapshot } from '@/domain/quoteState';
 import { useEffect, useMemo, useState } from 'react';
-import { Button } from '../ui/Button';
-import { useFeedback } from '../ui/FeedbackProvider';
-import { getStudentEmail } from '../../domain/operations';
-import { createGmailDraft, GmailAuthError, requestGmailDraftAccess } from '../../utils/gmailDraftUtils';
-import { createQuotePdfBytes, loadQuoteLogoImage } from '../../utils/quotePdfUtils';
-import { renderEmailTemplate } from '../../domain/emailTemplates';
-import { buildProjectQuoteAttachment } from '../../utils/projectQuoteAttachment';
-import { copyRichTextToClipboard } from '../../utils/clipboardUtils';
+import { Button } from '@/components/ui/Button';
+import { useFeedback } from '@/app/providers/FeedbackProvider';
+import { getStudentEmail } from '@/domain/operations';
+import { createGmailDraft, GmailAuthError, requestGmailDraftAccess } from '@/api/google/gmail/client';
+import { createQuotePdfBytes, loadQuoteLogoImage } from '@/lib/reports/quotePdf';
+import { renderEmailTemplate } from '@/domain/emailTemplates';
+import { buildProjectQuoteAttachment } from '@/lib/reports/projectQuoteAttachment';
+import { copyRichTextToClipboard } from '@/lib/clipboard';
 import {
   getPartFilamentSource,
   isProvidedFilamentSource
-} from '../../domain/filamentSource.ts';
+} from '@/domain/filamentSource.ts';
 import { Archive, CheckCircle, Copy } from 'lucide-react';
-import gmailIcon from '../../assets/icons/gmail.svg';
-import { QuoteCostSummary } from './QuoteCostSummary';
-import { GmailReplyComposer } from '../../gmail/GmailReplyComposer';
+import gmailIcon from '@/assets/icons/gmail.svg';
+import { QuoteCostSummary } from '@/features/workflow/components/QuoteCostSummary';
+import { GmailReplyComposer } from '@/features/gmail/GmailReplyComposer';
 import {
   buildQuoteViews,
   formatCurrency,
   formatLineMaterialLabel,
   formatLineWeight
-} from './quoteCostSummaryModel';
+} from '@/features/workflow/components/quoteCostSummaryModel';
 
 export const CheckpointConfirmation = ({ project, onAdvanceToProduction }: { project: Project; onAdvanceToProduction?: () => void }) => {
   const { updateProject, transitionProjectState } = useProjects();

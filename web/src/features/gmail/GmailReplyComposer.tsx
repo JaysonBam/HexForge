@@ -1,13 +1,13 @@
 import { useRef, useState } from 'react';
 import { Loader2, Send, X } from 'lucide-react';
-import type { Project } from '../types';
-import { Button } from '../components/ui/Button';
-import { useFeedback } from '../components/ui/FeedbackProvider';
-import { RichEmailEditor } from '../components/settings/RichEmailEditor';
-import gmailIcon from '../assets/icons/gmail.svg';
-import { GmailAuthError, requestGmailDraftAccess, type GmailAttachment } from '../utils/gmailDraftUtils';
-import { sendProjectGmailReply } from './gmailProjectService';
-import { GMAIL_THREAD_ACCOUNT_MISMATCH, useProjectGmailThreadAccess } from './gmailThreadAccess';
+import type { Project } from '@/types';
+import { Button } from '@/components/ui/Button';
+import { useFeedback } from '@/app/providers/FeedbackProvider';
+import { RichEmailEditor } from '@/features/settings/components/RichEmailEditor';
+import gmailIcon from '@/assets/icons/gmail.svg';
+import { GmailAuthError, requestGmailDraftAccess, type GmailAttachment } from '@/api/google/gmail/client';
+import { sendProjectGmailReply } from '@/features/gmail/gmailProjectService';
+import { GMAIL_THREAD_ACCOUNT_MISMATCH, useProjectGmailThreadAccess } from '@/features/gmail/gmailThreadAccess';
 
 export const GmailReplyComposer = ({
   project,

@@ -1,5 +1,5 @@
-import type { Part, PrintStatus, Project, ProjectState } from '../types';
-import { isPartVerifiedForReview } from './partVerification.ts';
+import type { Part, PrintStatus, Project, ProjectState } from '@/types';
+import { isPartVerifiedForReview } from '@/domain/partVerification.ts';
 
 export type WorkspaceTab = 'overview' | 'parts' | 'quote' | 'production' | 'collection' | 'audit';
 

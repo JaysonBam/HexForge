@@ -1,7 +1,7 @@
-import type { LocalProjectFile } from '../../shared/localHelperProtocol';
-import { findLinkedLocalFile } from '../local-files/sourceFileLink';
-import { isSupportedGmailAttachment } from './gmailParsing';
-import type { GmailThreadAttachment } from './types';
+import type { LocalProjectFile } from '@hexforge/windows-helper/contracts';
+import { findLinkedLocalFile } from '@/features/local-files/sourceFileLink';
+import { isSupportedGmailAttachment } from '@/features/gmail/gmailParsing';
+import type { GmailThreadAttachment } from '@/api/google/gmail/types';
 
 const savedStatuses = new Set<NonNullable<GmailThreadAttachment['downloadStatus']>>(['downloaded', 'skipped', 'renamed']);
 

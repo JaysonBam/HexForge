@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Loader2, Usb } from 'lucide-react';
-import type { LocalProjectFile } from '../../shared/localHelperProtocol';
-import type { Part, Project } from '../types';
-import { useFeedback } from '../components/ui/FeedbackProvider';
-import { Button } from '../components/ui/Button';
-import { useLocalHelper } from './LocalHelperContext';
-import { findLinkedLocalFile, sourceFileName } from './sourceFileLink';
-import { getAvailableProjectFiles } from './projectLocalFileAvailability';
+import type { LocalProjectFile } from '@hexforge/windows-helper/contracts';
+import type { Part, Project } from '@/types';
+import { useFeedback } from '@/app/providers/FeedbackProvider';
+import { Button } from '@/components/ui/Button';
+import { useLocalHelper } from '@/features/local-files/LocalHelperContext';
+import { findLinkedLocalFile, sourceFileName } from '@/features/local-files/sourceFileLink';
+import { getAvailableProjectFiles } from '@/features/local-files/projectLocalFileAvailability';
 
 export const PartSourceFileButton = ({
   part,

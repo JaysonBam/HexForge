@@ -4,7 +4,7 @@ import { access, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
-import { LOCAL_HELPER_CLIENT_HEADER, LOCAL_HELPER_CLIENT_VALUE, LOCAL_HELPER_IDEMPOTENCY_HEADER } from '../../shared/localHelperProtocol.ts';
+import { LOCAL_HELPER_CLIENT_HEADER, LOCAL_HELPER_CLIENT_VALUE, LOCAL_HELPER_IDEMPOTENCY_HEADER } from '../src/contracts/localHelperProtocol.ts';
 import { ConfigStore } from '../src/main/config.ts';
 
 const availablePort = () => new Promise<number>((resolve, reject) => {

@@ -1,4 +1,4 @@
-import type { Project } from '../types';
+import type { Project } from '@/types';
 
 export const GMAIL_THREAD_ACCOUNT_MISMATCH = 'This thread is not linked to your Gmail account.';
 

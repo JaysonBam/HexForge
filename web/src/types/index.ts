@@ -1,4 +1,4 @@
-import type { FilamentSource } from '../domain/filamentSource.ts';
+import type { FilamentSource } from '@/domain/filamentSource.ts';
 
 export type ProjectState =
   | "INTAKE"

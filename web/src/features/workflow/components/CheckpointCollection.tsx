@@ -1,23 +1,23 @@
-import type { Project, Part } from '../../types';
-import { useProjects } from '../../context/ProjectContext';
-import { useSettings } from '../../context/SettingsContext';
-import { useStaffActionName } from '../../hooks/useStaffActionName';
+import type { Project, Part } from '@/types';
+import { useProjects } from '@/features/projects/context/ProjectContext';
+import { useSettings } from '@/features/settings/context/SettingsContext';
+import { useStaffActionName } from '@/features/auth/hooks/useStaffActionName';
 import { useState } from 'react';
-import { Button } from '../ui/Button';
-import { Card } from '../ui/Card';
-import { useFeedback } from '../ui/FeedbackProvider';
-import { getStudentEmail, isCollectionBlocked } from '../../domain/operations';
-import { createGmailDraft, GmailAuthError, requestGmailDraftAccess } from '../../utils/gmailDraftUtils';
-import { renderEmailTemplate } from '../../domain/emailTemplates';
-import { buildProjectQuoteAttachment } from '../../utils/projectQuoteAttachment';
-import { copyRichTextToClipboard } from '../../utils/clipboardUtils';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { useFeedback } from '@/app/providers/FeedbackProvider';
+import { getStudentEmail, isCollectionBlocked } from '@/domain/operations';
+import { createGmailDraft, GmailAuthError, requestGmailDraftAccess } from '@/api/google/gmail/client';
+import { renderEmailTemplate } from '@/domain/emailTemplates';
+import { buildProjectQuoteAttachment } from '@/lib/reports/projectQuoteAttachment';
+import { copyRichTextToClipboard } from '@/lib/clipboard';
 import {
     getPartFilamentSource,
     isProvidedFilamentSource
-} from '../../domain/filamentSource.ts';
+} from '@/domain/filamentSource.ts';
 import { Copy, CheckSquare } from 'lucide-react';
-import gmailIcon from '../../assets/icons/gmail.svg';
-import { GmailReplyComposer } from '../../gmail/GmailReplyComposer';
+import gmailIcon from '@/assets/icons/gmail.svg';
+import { GmailReplyComposer } from '@/features/gmail/GmailReplyComposer';
 
 export const CheckpointCollection = ({ project }: { project: Project }) => {
     const { updateProject, transitionPartStatus } = useProjects();

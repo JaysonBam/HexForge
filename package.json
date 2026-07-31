@@ -1,0 +1,31 @@
+{
+  "name": "hexforge",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "workspaces": [
+    "web",
+    "windows-helper"
+  ],
+  "scripts": {
+    "dev": "npm run dev:web",
+    "dev:web": "npm run dev -w web",
+    "build:web": "npm run build -w web",
+    "lint:web": "npm run lint -w web",
+    "typecheck:web": "npm run typecheck -w web",
+    "test:web": "npm run test -w web",
+    "dev:helper": "npm run dev -w windows-helper",
+    "build:helper": "npm run build -w windows-helper",
+    "typecheck:helper": "npm run typecheck -w windows-helper",
+    "test:helper": "npm run test -w windows-helper",
+    "package:helper": "npm run package -w windows-helper",
+    "smoke:helper": "npm run smoke -w windows-helper",
+    "lint": "npm run lint:web",
+    "typecheck": "npm run typecheck:web && npm run typecheck:helper",
+    "test": "npm run test:web && npm run test:helper",
+    "build": "npm run build:web && npm run build:helper"
+  },
+  "devDependencies": {
+    "supabase": "^2.84.5"
+  }
+}

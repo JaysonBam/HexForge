@@ -1,70 +1,141 @@
 # HexForge
 
-React/Vite workstation app for managing MISC 3D printing intake, quote approval, production, collection, Gmail drafts, and Supabase-backed project data.
+HexForge is a workspace for the MISC 3D-printing intake, quote, production, collection, Gmail, reporting, and optional local-file workflows.
 
-## Main Gmail Thread setup
-
-HexForge can link one Main Gmail Thread to a project, cache its messages in Supabase, send replies through the existing Google OAuth connection, and pass downloaded STL/3MF attachment bytes to helper version 1.2.0. Gmail tokens stay in the browser and are never sent to the helper.
-
-Apply the Gmail project migration before using the feature:
-
-```powershell
-supabase link --project-ref <PROJECT_REF>
-supabase db push
+```text
+HexForge/
+├─ web/             React/Vite application
+├─ supabase/        Database configuration, migrations, schemas, and Edge Functions
+└─ windows-helper/  Optional Electron Windows helper
 ```
 
-The migration is `supabase/migrations/20260718120000_main_gmail_thread.sql`. Existing projects remain valid with no linked thread. Rebuild or repackage the helper so the workstation has the attachment-save endpoint:
+The three domains are independently owned. The root package coordinates the two JavaScript workspaces; Supabase remains the backend source of truth.
+
+## Prerequisites
+
+- Node.js 22 or newer and npm
+- Docker Desktop for local Supabase
+- Supabase CLI access (provided by the root development dependency)
+- Windows when building or smoke-testing the portable helper
+
+Install all workspace dependencies from the repository root:
 
 ```powershell
-npm.cmd run build:helper
-npm.cmd run package:helper
+npm install
 ```
 
-## Main Commands
+The root `package-lock.json` is the workspace lockfile. The legacy `windows-helper/package-lock.json` is temporarily retained because a fresh Electron Builder packaging run could not complete in the restricted environment; remove it only after `npm run package:helper` succeeds from a clean workspace.
+
+Frontend environment files belong in `web/`. Copy `web/.env.example` to `web/.env` for local development and keep secret-bearing environment files untracked.
+
+## Workspace commands
 
 ```powershell
-npm run dev
-npm run lint
-npm run build
-npm.cmd test
-```
+npm run dev:web
+npm run build:web
+npm run lint:web
+npm run typecheck:web
+npm run test:web
 
-## Local File Helper
-
-The optional Windows helper connects the authenticated HexForge workspace to project files stored on the same workstation. HexForge remains fully functional when the helper is absent or stopped.
-
-```powershell
 npm run dev:helper
 npm run build:helper
+npm run typecheck:helper
+npm run test:helper
 npm run package:helper
+npm run smoke:helper
+
+npm run lint
+npm run typecheck
+npm test
+npm run build
 ```
 
-The portable production artifact is written to `release/HexForgeFileHelper.exe`. Copy that single executable to a workstation, run it, choose the four HexForge workflow folders, and add the exact deployed HexForge origin in its settings. The workstation does not need Node.js or development tools.
+The web production output is written to `web/dist/`. `npm run dev:web` starts the Vite development server.
 
-See `helper/README.md` for configuration, security, update, and smoke-test instructions.
+## Windows Helper
 
-Use `npm.cmd test` on Windows if PowerShell blocks `npm.ps1`.
+The optional Windows Helper connects the authenticated web application to project files stored on the same workstation. HexForge continues to support authentication, project editing, uploads, quotations, production, collection, Gmail, and reporting when the helper is absent or stopped.
 
-## Supabase Local Setup
+The portable artifact is written to:
 
-Prerequisites:
+```text
+windows-helper/release/HexForgeFileHelper.exe
+```
 
-- Docker Desktop running
-- Supabase CLI installed and logged in
+The helper owns the platform-neutral browser/helper contract at:
+
+```text
+windows-helper/src/contracts/localHelperProtocol.ts
+```
+
+The helper package exports it as `@hexforge/windows-helper/contracts`. The web application imports that public contract and never imports privileged Electron, filesystem, process-launching, or helper server implementation.
+
+See `windows-helper/README.md` for workstation setup, security controls, packaging, and smoke-test details.
+
+## Gmail and Google sign-in
+
+HexForge sign-in requests only Google identity scopes. Gmail authorization is a separate, incremental OAuth flow. Google refresh and access tokens are encrypted by Edge Functions, stored in service-role-only tables, and never returned to browser JavaScript. Gmail API traffic passes through an authenticated, rate-limited route allowlist.
+
+The related migrations are:
+
+```text
+supabase/migrations/20260718120000_main_gmail_thread.sql
+supabase/migrations/20260731120000_server_owned_gmail_credentials.sql
+```
+
+The server-owned Gmail boundary requires these Edge Function secrets:
+
+```text
+GOOGLE_OAUTH_CLIENT_ID
+GOOGLE_OAUTH_CLIENT_SECRET
+GMAIL_OAUTH_REDIRECT_URI
+GMAIL_TOKEN_ENCRYPTION_KEY
+GMAIL_TOKEN_ENCRYPTION_KEY_VERSION
+HEXFORGE_WEB_ORIGINS
+```
+
+`GMAIL_TOKEN_ENCRYPTION_KEY` must be a base64-encoded 32-byte random key. Keep old keys as `GMAIL_TOKEN_ENCRYPTION_KEY_V<version>` during key rotation until every credential has been re-encrypted. `HEXFORGE_WEB_ORIGINS` is a comma-separated exact-origin allowlist.
+
+Configure the Google OAuth client with this authorized redirect URI:
+
+```text
+https://<project-ref>.supabase.co/functions/v1/gmail-oauth-callback
+```
+
+For local development, copy `supabase/.env.example` to `supabase/.env`, provide a unique development encryption key, and use the local callback URI already shown in the example.
+
+Deploy the migration and the three functions together:
 
 ```powershell
-supabase login
-supabase start
-supabase status
-supabase stop
+npx supabase db push
+npx supabase functions deploy gmail-connection
+npx supabase functions deploy gmail-oauth-callback
+npx supabase functions deploy gmail-proxy
 ```
 
-When linked to a remote project:
+After the new web build is live, remove the retired `refresh-google-token` function from the remote project. Existing staff must reconnect Gmail once; the web client deletes the legacy browser token keys on startup, sign-in, and callback.
+
+## Supabase local development
+
+Supabase commands run from the repository root so the CLI discovers `supabase/config.toml`:
 
 ```powershell
-supabase link --project-ref <PROJECT_REF>
-supabase db diff
-supabase db push
+npx supabase login
+npx supabase start
+npx supabase status
+npx supabase stop
 ```
 
-The main Supabase assets live under `supabase/`; schema snapshots are in `supabase/schemas/` and migrations are in `supabase/migrations/`.
+For an explicitly linked remote project:
+
+```powershell
+npx supabase link --project-ref <PROJECT_REF>
+npx supabase db diff
+npx supabase db push
+```
+
+Schema snapshots are under `supabase/schemas/`, migrations are under `supabase/migrations/`, and Edge Functions are under `supabase/functions/`.
+
+## Deployment
+
+The repository contains local Vite, Vercel, Electron Builder, and Supabase configuration, but no command above deploys the web application, database, migrations, or Edge Functions automatically. Deployment remains an explicit separate operation.

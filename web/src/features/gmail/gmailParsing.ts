@@ -1,6 +1,12 @@
-import type { Project } from '../types';
-import { normalizeModuleCode } from '../domain/moduleCode';
-import type { GmailProjectSuggestions, GmailThreadSnapshot } from './types';
+import type { Project } from '@/types';
+import { normalizeModuleCode } from '@/domain/moduleCode';
+import type { GmailProjectSuggestions, GmailThreadSnapshot } from '@/api/google/gmail/types';
+export {
+  buildRecentPrintEmailQuery,
+  buildUnreadPrintEmailQuery,
+  getGmailMessageDirection,
+  isSupportedGmailAttachment
+} from '@/api/google/gmail/search';
 
 const STUDENT_NUMBER_PATTERN = /(?<!\d)(\d{8})(?!\d)/g;
 const LABELLED_NAME_PATTERN = /\b(?:student\s*name|full\s*name|name)\s*[:-]\s*([A-Za-z][A-Za-z .'-]{1,80})/i;
@@ -9,7 +15,6 @@ const MODULE_CODE_PATTERN = /(?<![A-Za-z0-9])([A-Za-z]{3})[ \t]?(\d{3})(?![A-Za-
 export const formatModuleCode = (value: string): string => {
   return normalizeModuleCode(value) ?? value.trim();
 };
-
 export const findModuleCode = (values: string[]): string => {
   const matches = new Set<string>();
   values.forEach((value) => {
@@ -20,7 +25,6 @@ export const findModuleCode = (values: string[]): string => {
   });
   return matches.size === 1 ? [...matches][0] : '';
 };
-
 export const findStudentNumbers = (values: string[]): string[] => {
   const matches = new Set<string>();
   values.forEach((value) => {
@@ -73,22 +77,3 @@ export const extractProjectSuggestions = (
     moduleCode: findModuleCode(searchableValues)
   };
 };
-
-export const isSupportedGmailAttachment = (filename: string): boolean => /\.(stl|3mf|zip)$/i.test(filename.trim());
-
-export const buildRecentPrintEmailQuery = (term: string): string => {
-  const searchTerm = /\s/.test(term) ? `"${term}"` : term;
-  return `newer_than:30d ${searchTerm}`;
-};
-
-export const buildUnreadPrintEmailQuery = (term: string): string => {
-  const searchTerm = /\s/.test(term) ? `"${term}"` : term;
-  return `newer_than:90d is:unread -from:linkedin.com ${searchTerm}`;
-};
-
-export const getGmailMessageDirection = (
-  senderEmail: string,
-  accountEmail: string,
-  hasSentLabel = false
-): 'incoming' | 'outgoing' =>
-  hasSentLabel || senderEmail.trim().toLowerCase() === accountEmail.trim().toLowerCase() ? 'outgoing' : 'incoming';

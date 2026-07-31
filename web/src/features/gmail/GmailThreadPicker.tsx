@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Mail, Paperclip, RefreshCw, X } from 'lucide-react';
-import { Button } from '../components/ui/Button';
-import { useFeedback } from '../components/ui/FeedbackProvider';
-import { GmailAuthError, requestGmailReadAccess } from '../utils/gmailDraftUtils';
-import { listRecent3dPrintThreads } from './gmailThreadApi';
-import type { GmailThreadListItem } from './types';
+import { Button } from '@/components/ui/Button';
+import { useFeedback } from '@/app/providers/FeedbackProvider';
+import { GmailAuthError, requestGmailReadAccess } from '@/api/google/gmail/client';
+import { listRecent3dPrintThreads } from '@/api/google/gmail/threads';
+import type { GmailThreadListItem } from '@/api/google/gmail/types';
 
 const formatDate = (value: string) => {
   const date = new Date(value);

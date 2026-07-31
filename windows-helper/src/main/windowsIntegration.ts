@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { access } from 'node:fs/promises';
 import path from 'node:path';
 import { shell } from 'electron';
-import type { SlicerHint, SupportedFileKind } from '../../../shared/localHelperProtocol.js';
+import type { SlicerHint, SupportedFileKind } from '../contracts/localHelperProtocol.js';
 import type { HelperConfig } from './config.js';
 
 const existingPath = async (candidate: string | undefined): Promise<string | null> => {

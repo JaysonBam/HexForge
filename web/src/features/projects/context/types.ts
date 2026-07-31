@@ -1,33 +1,4 @@
-import type { Part, PrintRun, Project, QuoteSnapshot } from '../../types';
-
-export type SupabaseMutationResult = {
-  error: { message?: string } | null;
-};
-
-export type QuoteSnapshotRow = {
-  project_id?: string | null;
-  snapshot_version?: number | string | null;
-  status?: QuoteSnapshot['status'] | null;
-  currency?: string | null;
-  total_cost?: number | string | null;
-  generated_at?: string | null;
-  line_summary?: unknown;
-};
-
-export type PrintRunRow = {
-  id: number | string;
-  part_id: string;
-  project_id: string;
-  machine_id?: string | null;
-  machine_name?: string | null;
-  started_by: string;
-  ended_by?: string | null;
-  started_at: string;
-  finished_at?: string | null;
-  failed_at?: string | null;
-  failure_reason?: string | null;
-  outcome?: PrintRun['outcome'];
-};
+import type { Part, Project } from '@/types';
 
 export type TransitionResult = {
   ok: boolean;
@@ -88,6 +59,4 @@ export interface ProjectContextType {
     machineName?: string;
     reason?: string;
   }) => Promise<TransitionResult>;
-  activeFilter: string;
-  setActiveFilter: (filter: string) => void;
 }

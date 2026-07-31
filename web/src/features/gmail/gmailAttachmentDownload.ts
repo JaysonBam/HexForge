@@ -1,12 +1,12 @@
-import type { ProjectResolution } from '../../shared/localHelperProtocol';
-import { projectFolderDescriptor } from '../local-files/projectFolderWorkflow';
-import type { LocalHelperClient } from '../local-files/localHelperClient';
-import type { Project } from '../types';
-import { downloadGmailAttachment } from './gmailThreadApi';
-import { loadProjectGmailMessages, updateAttachmentDownloadStatus } from './gmailProjectService';
-import { assertProjectGmailThreadAccess } from './gmailThreadAccess';
-import { isGmailAttachmentDownloadEligible } from './gmailAttachmentAvailability';
-import type { GmailThreadAttachment } from './types';
+import type { ProjectResolution } from '@hexforge/windows-helper/contracts';
+import { projectFolderDescriptor } from '@/features/local-files/projectFolderWorkflow';
+import type { LocalHelperClient } from '@/api/windows-helper/client';
+import type { Project } from '@/types';
+import { downloadGmailAttachment } from '@/api/google/gmail/threads';
+import { loadProjectGmailMessages, updateAttachmentDownloadStatus } from '@/features/gmail/gmailProjectService';
+import { assertProjectGmailThreadAccess } from '@/features/gmail/gmailThreadAccess';
+import { isGmailAttachmentDownloadEligible } from '@/features/gmail/gmailAttachmentAvailability';
+import type { GmailThreadAttachment } from '@/api/google/gmail/types';
 
 type MatchedResolution = Extract<ProjectResolution, { status: 'matched' | 'created' }>;
 

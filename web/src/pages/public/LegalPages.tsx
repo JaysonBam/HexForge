@@ -1,15 +1,5 @@
-import {
-  Box,
-  Button,
-  Chip,
-  Divider,
-  Link as MuiLink,
-  Paper,
-  Stack,
-  Typography
-} from '@mui/material';
-import { Link as RouterLink } from 'react-router-dom';
-import { quoteContactSettings } from '../../domain/environmentSettings';
+import { Link } from 'react-router-dom';
+import { quoteContactSettings } from '@/domain/environmentSettings';
 
 const appName = 'HexForge';
 
@@ -18,49 +8,30 @@ const SupportContactLink = () => {
 
   if (!supportEmail) return <>the configured support contact</>;
 
-  return <MuiLink href={`mailto:${supportEmail}`}>{supportEmail}</MuiLink>;
+  return <a className="font-bold text-sky-700 underline-offset-2 hover:underline dark:text-sky-300" href={`mailto:${supportEmail}`}>{supportEmail}</a>;
 };
 
 const PageShell = ({ children }: { children: React.ReactNode }) => (
-  <Box
-    sx={{
-      minHeight: '100vh',
-      bgcolor: 'background.default',
-      color: 'text.primary',
-      px: { xs: 2, sm: 4 },
-      py: { xs: 3, md: 5 }
-    }}
-  >
-    <Stack spacing={3} sx={{ maxWidth: 980, mx: 'auto' }}>
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        spacing={2}
-        alignItems={{ xs: 'flex-start', sm: 'center' }}
-        justifyContent="space-between"
-      >
-        <MuiLink
-          component={RouterLink}
-          to="/about"
-          underline="none"
-          sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.25, color: 'text.primary' }}
-        >
-          <Box component="img" src="/favicon.svg" alt="" sx={{ width: 44, height: 44 }} />
-          <Typography component="span" sx={{ fontWeight: 900, fontSize: '1.25rem' }}>
-            Hex<Box component="span" sx={{ color: 'var(--forge-gold)' }}>Forge</Box>
-          </Typography>
-        </MuiLink>
+  <main className="min-h-screen bg-slate-100 px-4 py-6 text-slate-950 dark:bg-slate-900 dark:text-slate-50 sm:px-8 md:py-10">
+    <div className="mx-auto max-w-[980px] space-y-6">
+      <header className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+        <Link to="/about" className="inline-flex items-center gap-3 text-inherit">
+          <img src="/favicon.svg" alt="" className="h-11 w-11" />
+          <span className="text-xl font-black">
+            Hex<span className="text-[var(--forge-gold)]">Forge</span>
+          </span>
+        </Link>
 
-        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-          <Button component={RouterLink} to="/about" variant="text">Overview</Button>
-          <Button component={RouterLink} to="/privacy" variant="text">Privacy</Button>
-          <Button component={RouterLink} to="/terms" variant="text">Terms</Button>
-          <Button component={RouterLink} to="/login" variant="contained">Sign in</Button>
-        </Stack>
-      </Stack>
-
+        <nav aria-label="Public pages" className="flex flex-wrap gap-2">
+          <Link className="rounded-md px-3 py-2 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-800" to="/about">Overview</Link>
+          <Link className="rounded-md px-3 py-2 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-800" to="/privacy">Privacy</Link>
+          <Link className="rounded-md px-3 py-2 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-800" to="/terms">Terms</Link>
+          <Link className="rounded-md bg-sky-700 px-3 py-2 text-sm font-bold text-white shadow hover:bg-sky-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600" to="/login">Sign in</Link>
+        </nav>
+      </header>
       {children}
-    </Stack>
-  </Box>
+    </div>
+  </main>
 );
 
 const ContentPage = ({
@@ -75,53 +46,42 @@ const ContentPage = ({
   children: React.ReactNode;
 }) => (
   <PageShell>
-    <Paper elevation={0} sx={{ p: { xs: 3, md: 5 }, borderRadius: 1 }}>
-      <Stack spacing={3}>
-        <Stack spacing={1.25}>
-          <Typography sx={{ color: 'primary.main', fontWeight: 900, textTransform: 'uppercase', fontSize: '0.78rem' }}>
-            {eyebrow}
-          </Typography>
-          <Typography component="h1" variant="h3" sx={{ fontWeight: 900, letterSpacing: 0 }}>
-            {title}
-          </Typography>
-          {updated && (
-            <Typography color="text.secondary">
-              Last updated: {updated}
-            </Typography>
-          )}
-        </Stack>
-        <Divider />
+    <article className="rounded-lg border border-[rgba(214,168,79,0.35)] bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.08)] dark:border-[rgba(214,168,79,0.28)] dark:bg-slate-950 md:p-10">
+      <div className="space-y-6">
+        <header className="space-y-1">
+          <p className="text-xs font-black uppercase tracking-wide text-sky-700 dark:text-sky-300">{eyebrow}</p>
+          <h1 className="text-3xl font-black tracking-normal md:text-5xl">{title}</h1>
+          {updated && <p className="text-slate-600 dark:text-slate-300">Last updated: {updated}</p>}
+        </header>
+        <hr className="border-slate-300 dark:border-slate-700" />
         {children}
-      </Stack>
-    </Paper>
+      </div>
+    </article>
   </PageShell>
 );
 
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <Stack component="section" spacing={1.2}>
-    <Typography component="h2" variant="h6" sx={{ fontWeight: 900 }}>
-      {title}
-    </Typography>
-    <Box sx={{ color: 'text.secondary', '& p': { mt: 0, mb: 1.2 }, '& li': { mb: 0.8 } }}>
+  <section className="space-y-2">
+    <h2 className="text-lg font-black">{title}</h2>
+    <div className="space-y-3 text-slate-600 [&_li]:mb-2 dark:text-slate-300">
       {children}
-    </Box>
-  </Stack>
+    </div>
+  </section>
 );
 
 export const PublicAppInfoPage = () => (
   <ContentPage eyebrow="Internal departmental tool" title="HexForge" updated="21 July 2026">
-    <Stack spacing={3}>
-      <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 760 }}>
+    <div className="space-y-6">
+      <p className="max-w-[760px] text-slate-600 dark:text-slate-300">
         HexForge helps authorized departmental staff manage student 3D printing work from intake through review,
         quoting, production, collection, and student communication.
-      </Typography>
+      </p>
 
-      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-        <Chip label="Authorized staff only" />
-        <Chip label="Google sign-in" />
-        <Chip label="Gmail correspondence" />
-        <Chip label="Project workflow records" />
-      </Stack>
+      <div className="flex flex-wrap gap-2">
+        {['Authorized staff only', 'Google sign-in', 'Gmail correspondence', 'Project workflow records'].map((label) => (
+          <span key={label} className="rounded-full border border-slate-300 bg-slate-100 px-3 py-1 text-sm font-bold dark:border-slate-600 dark:bg-slate-800">{label}</span>
+        ))}
+      </div>
 
       <Section title="What the app does">
         <ul>
@@ -159,17 +119,17 @@ export const PublicAppInfoPage = () => (
 
       <Section title="Policies">
         <p>
-          Review the <MuiLink component={RouterLink} to="/privacy">Privacy Policy</MuiLink> and{' '}
-          <MuiLink component={RouterLink} to="/terms">Terms of Service</MuiLink> before authorizing Google access.
+          Review the <Link className="font-bold text-sky-700 hover:underline dark:text-sky-300" to="/privacy">Privacy Policy</Link> and{' '}
+          <Link className="font-bold text-sky-700 hover:underline dark:text-sky-300" to="/terms">Terms of Service</Link> before authorizing Google access.
         </p>
       </Section>
-    </Stack>
+    </div>
   </ContentPage>
 );
 
 export const PrivacyPolicyPage = () => (
   <ContentPage eyebrow="Privacy Policy" title={`${appName} Privacy Policy`} updated="21 July 2026">
-    <Stack spacing={3}>
+    <div className="space-y-6">
       <Section title="Scope">
         <p>
           This policy explains how HexForge handles personal information and Google user data for the internal 3D printing
@@ -288,13 +248,13 @@ export const PrivacyPolicyPage = () => (
           <SupportContactLink />.
         </p>
       </Section>
-    </Stack>
+    </div>
   </ContentPage>
 );
 
 export const TermsOfServicePage = () => (
   <ContentPage eyebrow="Terms of Service" title={`${appName} Terms of Service`} updated="21 July 2026">
-    <Stack spacing={3}>
+    <div className="space-y-6">
       <Section title="Internal Use">
         <p>
           HexForge is provided for authorized internal departmental use. You may use the app only if you are permitted to
@@ -322,7 +282,7 @@ export const TermsOfServicePage = () => (
 
       <Section title="Privacy and Google User Data">
         <p>
-          The <MuiLink component={RouterLink} to="/privacy">HexForge Privacy Policy</MuiLink> explains the Google and project
+          The <Link className="font-bold text-sky-700 hover:underline dark:text-sky-300" to="/privacy">HexForge Privacy Policy</Link> explains the Google and project
           information the app accesses, why it is needed, where it is stored, who may see it, when it is deleted, and how to
           withdraw permission. Please read it before connecting your Google Account.
         </p>
@@ -364,6 +324,6 @@ export const TermsOfServicePage = () => (
           <SupportContactLink />.
         </p>
       </Section>
-    </Stack>
+    </div>
   </ContentPage>
 );

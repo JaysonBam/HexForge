@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { LocalHelperClient, LocalHelperError } from '../src/local-files/localHelperClient.ts';
-import { LOCAL_HELPER_VERSION } from '../shared/localHelperProtocol.ts';
+import { LocalHelperClient, LocalHelperError } from '@/api/windows-helper/client.ts';
+import { LOCAL_HELPER_VERSION } from '@hexforge/windows-helper/contracts';
 
 const health = {
   apiVersion: 'v1',

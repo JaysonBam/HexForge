@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell, Tray } f
 import { access, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { LOCAL_HELPER_VERSION, WORKFLOW_FOLDER_KEYS, WORKFLOW_FOLDER_LABELS, type WorkflowFolderKey } from '../../../shared/localHelperProtocol.js';
+import { LOCAL_HELPER_VERSION, WORKFLOW_FOLDER_KEYS, WORKFLOW_FOLDER_LABELS, type WorkflowFolderKey } from '../contracts/localHelperProtocol.js';
 import { LocalApiServer } from './apiServer.js';
 import { ConfigStore, normalizeAllowedOrigin, type HelperConfig } from './config.js';
 import { CopyOperationManager } from './copyOperations.js';

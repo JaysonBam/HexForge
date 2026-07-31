@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Project } from '../../types';
-import { useProjects } from '../../context/ProjectContext';
-import { useSettings } from '../../context/SettingsContext';
-import { useStaffActionName } from '../../hooks/useStaffActionName';
-import { PartItem } from './PartItem';
+import type { Project } from '@/types';
+import { useProjects } from '@/features/projects/context/ProjectContext';
+import { useSettings } from '@/features/settings/context/SettingsContext';
+import { useStaffActionName } from '@/features/auth/hooks/useStaffActionName';
+import { PartItem } from '@/features/workflow/components/PartItem';
 import { Upload, Plus, ArrowRight, Loader2 } from 'lucide-react';
-import { Button } from '../ui/Button';
-import { useFeedback } from '../ui/FeedbackProvider';
-import { uploadThumbnailFromBlobUrl } from '../../utils/storageUtils';
-import { isPartVerifiedForReview } from '../../domain/partVerification';
-import { analyzeProjectFiles } from '../../local-files/projectFileImport';
+import { Button } from '@/components/ui/Button';
+import { useFeedback } from '@/app/providers/FeedbackProvider';
+import { uploadThumbnailFromBlobUrl } from '@/api/supabase/thumbnailUploads';
+import { isPartVerifiedForReview } from '@/domain/partVerification';
+import { analyzeProjectFiles } from '@/features/local-files/projectFileImport';
 
 type CheckpointReviewProps = {
   project: Project;

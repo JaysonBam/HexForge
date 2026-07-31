@@ -1,7 +1,7 @@
-import type { LocalProjectFile } from '../../shared/localHelperProtocol';
-import type { Project } from '../types';
-import type { LocalHelperClient } from './localHelperClient';
-import { projectFolderDescriptor } from './projectFolderWorkflow';
+import type { LocalProjectFile } from '@hexforge/windows-helper/contracts';
+import type { Project } from '@/types';
+import type { LocalHelperClient } from '@/api/windows-helper/client';
+import { projectFolderDescriptor } from '@/features/local-files/projectFolderWorkflow';
 
 type CachedProjectFiles = {
   files: LocalProjectFile[];

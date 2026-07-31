@@ -10,8 +10,8 @@ import { TextStyle } from '@tiptap/extension-text-style';
 import Color from '@tiptap/extension-color';
 import FontFamily from '@tiptap/extension-font-family';
 import { Bold, Highlighter, ImagePlus, Italic, Link as LinkIcon, List, ListOrdered, Redo2, Undo2 } from 'lucide-react';
-import { supabase } from '../../lib/supabaseClient';
-import type { EmailTokenType } from '../../domain/emailTemplates';
+import { uploadEmailSignatureImage } from '@/api/supabase/storage';
+import type { EmailTokenType } from '@/domain/emailTemplates';
 
 type RichEmailEditorProps = {
   value: string;
@@ -263,24 +263,8 @@ export const RichEmailEditor = ({
   const uploadSignatureImage = async (file: File) => {
     setUploadingImage(true);
     try {
-      const extension = file.name.split('.').pop()?.toLowerCase() || 'png';
-      const path = `signatures/${crypto.randomUUID()}.${extension}`;
-      const { data, error } = await supabase.storage
-        .from('email-assets')
-        .upload(path, file, {
-          cacheControl: '31536000',
-          contentType: file.type || 'image/png',
-          upsert: false
-        });
-
-      if (error) throw error;
-
-      const { data: publicUrlData } = supabase.storage
-        .from('email-assets')
-        .getPublicUrl(data?.path || path);
-
-      if (!publicUrlData.publicUrl) throw new Error('Supabase did not return a public image URL.');
-      editor.chain().focus().setImage({ src: publicUrlData.publicUrl, alt: file.name }).run();
+      const publicUrl = await uploadEmailSignatureImage(file);
+      editor.chain().focus().setImage({ src: publicUrl, alt: file.name }).run();
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'Signature image upload failed.');
     } finally {

@@ -1,22 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card } from '../components/ui/Card';
-import { useProjects } from '../context/ProjectContext';
+import { Card } from '@/components/ui/Card';
+import { useProjects } from '@/features/projects/context/ProjectContext';
 import {
   buildDashboardLanes,
   dashboardLaneMeta,
   getPartCounts,
   type DashboardLaneKey
-} from '../domain/operations';
+} from '@/domain/operations';
 import {
   GmailAuthError,
   getUnread3dPrintEmailSummary,
   requestGmailReadAccess,
   type GmailUnreadPrintEmail,
   type GmailUnreadPrintEmailSummary
-} from '../utils/gmailDraftUtils';
+} from '@/api/google/gmail/client';
 import { AlertTriangle, ExternalLink, RefreshCw, Search, Settings, X } from 'lucide-react';
-import gmailIcon from '../assets/icons/gmail.svg';
+import gmailIcon from '@/assets/icons/gmail.svg';
 
 const laneOrder: DashboardLaneKey[] = [
   'toBeConfirmed',

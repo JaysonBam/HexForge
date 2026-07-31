@@ -3,8 +3,8 @@ import path from 'node:path';
 
 const helperRoot = path.resolve(import.meta.dirname, '..');
 const rendererSource = path.join(helperRoot, 'src', 'renderer');
-const rendererOutput = path.join(helperRoot, 'dist', 'helper', 'src', 'renderer');
-const websiteFavicon = path.resolve(helperRoot, '..', 'public', 'favicon.svg');
+const rendererOutput = path.join(helperRoot, 'dist', 'src', 'renderer');
+const websiteFavicon = path.resolve(helperRoot, '..', 'web', 'public', 'favicon.svg');
 
 await mkdir(rendererOutput, { recursive: true });
 await Promise.all(['settings.html', 'settings.css'].map((filename) =>

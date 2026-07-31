@@ -1,28 +1,28 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
-import { Button } from '../components/ui/Button';
-import { Card } from '../components/ui/Card';
-import { useFeedback } from '../components/ui/FeedbackProvider';
-import { StateBadge } from '../components/StateBadge';
-import { CheckpointNew } from '../components/checkpoints/CheckpointNew';
-import { CheckpointReview } from '../components/checkpoints/CheckpointReview';
-import { CheckpointConfirmation } from '../components/checkpoints/CheckpointConfirmation';
-import { CheckpointPrinting } from '../components/checkpoints/CheckpointPrinting';
-import { CheckpointCollection } from '../components/checkpoints/CheckpointCollection';
-import { useProjects } from '../context/ProjectContext';
-import { useStaffSession } from '../context/StaffSessionContext';
-import { useSettings } from '../context/SettingsContext';
-import { supabase } from '../lib/supabaseClient';
-import type { Project } from '../types';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { useFeedback } from '@/app/providers/FeedbackProvider';
+import { StateBadge } from '@/components/ui/StateBadge';
+import { CheckpointNew } from '@/features/workflow/components/CheckpointNew';
+import { CheckpointReview } from '@/features/workflow/components/CheckpointReview';
+import { CheckpointConfirmation } from '@/features/workflow/components/CheckpointConfirmation';
+import { CheckpointPrinting } from '@/features/workflow/components/CheckpointPrinting';
+import { CheckpointCollection } from '@/features/workflow/components/CheckpointCollection';
+import { useProjects } from '@/features/projects/context/ProjectContext';
+import { useStaffSession } from '@/features/auth/context/StaffSessionContext';
+import { useSettings } from '@/features/settings/context/SettingsContext';
+import { getRecentProjectAuditEvents } from '@/api/supabase/auditEvents';
+import type { Project } from '@/types';
 import {
   getNextAction,
   getPartCounts,
   getProjectBlockers,
   type WorkspaceTab
-} from '../domain/operations';
-import type { ProjectWorkspaceNavigationContext } from '../components/Layout';
-import { LocalFilesCard } from '../local-files/LocalFilesCard';
-import { ProjectCorrespondencePanel } from '../gmail/ProjectCorrespondencePanel';
+} from '@/domain/operations';
+import type { ProjectWorkspaceNavigationContext } from '@/app/layout/Layout';
+import { LocalFilesCard } from '@/features/local-files/LocalFilesCard';
+import { ProjectCorrespondencePanel } from '@/features/gmail/ProjectCorrespondencePanel';
 import {
   ArrowLeft,
   Archive,
@@ -495,12 +495,7 @@ const AuditTab = ({ projectId }: { projectId: string }) => {
     const loadEvents = async () => {
       setLoading(true);
       setError(null);
-      const { data, error: auditError } = await supabase
-        .from('audit_events')
-        .select('id,created_at,technician_name,action_type,from_project_state,to_project_state,from_part_status,to_part_status,reason,override_note')
-        .eq('project_id', projectId)
-        .order('created_at', { ascending: false })
-        .limit(50);
+      const { data, error: auditError } = await getRecentProjectAuditEvents(projectId);
 
       if (!mounted) return;
       if (auditError) {

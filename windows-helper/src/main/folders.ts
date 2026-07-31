@@ -1,6 +1,6 @@
 import { cp, mkdir, readdir, realpath, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
-import { WORKFLOW_FOLDER_KEYS, WORKFLOW_FOLDER_LABELS, type FolderSyncState, type ProjectDescriptor, type WorkflowFolderKey } from '../../../shared/localHelperProtocol.js';
+import { WORKFLOW_FOLDER_KEYS, WORKFLOW_FOLDER_LABELS, type FolderSyncState, type ProjectDescriptor, type WorkflowFolderKey } from '../contracts/localHelperProtocol.js';
 
 const INVALID_WINDOWS_CHARS = /[<>:"/\\|?*]/g;
 const RESERVED_WINDOWS_NAMES = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;

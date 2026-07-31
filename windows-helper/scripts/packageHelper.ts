@@ -5,8 +5,8 @@ import path from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 
 const workspaceRoot = path.resolve(import.meta.dirname, '..', '..');
-const helperRoot = path.join(workspaceRoot, 'helper');
-const releaseRoot = path.join(workspaceRoot, 'release');
+const helperRoot = path.resolve(import.meta.dirname, '..');
+const releaseRoot = path.join(helperRoot, 'release');
 // Use a per-build directory. Antivirus/indexing can briefly retain handles to a
 // previous Electron output directory, which must not prevent the next build.
 const stagingRoot = path.join(tmpdir(), `HexForgeFileHelper-build-${process.pid}`);

@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, ExternalLink, FileInput, Folder, FolderOpen, FolderPlus, Loader2, RefreshCw, Settings, Usb } from 'lucide-react';
-import { WORKFLOW_FOLDER_LABELS, type DefaultApplication, type LocalProjectFile, type ProjectResolution, type SlicerHint, type SupportedFileKind } from '../../shared/localHelperProtocol';
-import type { Project } from '../types';
-import { useProjects } from '../context/ProjectContext';
-import { useSettings } from '../context/SettingsContext';
-import { useFeedback } from '../components/ui/FeedbackProvider';
-import { Button } from '../components/ui/Button';
-import { Card } from '../components/ui/Card';
-import { uploadThumbnailFromBlobUrl } from '../utils/storageUtils';
-import { useLocalHelper } from './LocalHelperContext';
-import { runSequentialImports } from './importSequence';
-import { analyzeProjectFiles } from './projectFileImport';
-import { isFileLinkedToParts } from './sourceFileLink';
-import { projectFolderDescriptor } from './projectFolderWorkflow';
+import { WORKFLOW_FOLDER_LABELS, type DefaultApplication, type LocalProjectFile, type ProjectResolution, type SlicerHint, type SupportedFileKind } from '@hexforge/windows-helper/contracts';
+import type { Project } from '@/types';
+import { useProjects } from '@/features/projects/context/ProjectContext';
+import { useSettings } from '@/features/settings/context/SettingsContext';
+import { useFeedback } from '@/app/providers/FeedbackProvider';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { uploadThumbnailFromBlobUrl } from '@/api/supabase/thumbnailUploads';
+import { useLocalHelper } from '@/features/local-files/LocalHelperContext';
+import { runSequentialImports } from '@/features/local-files/importSequence';
+import { analyzeProjectFiles } from '@/features/local-files/projectFileImport';
+import { isFileLinkedToParts } from '@/features/local-files/sourceFileLink';
+import { projectFolderDescriptor } from '@/features/local-files/projectFolderWorkflow';
 
 type MatchedResolution = Extract<ProjectResolution, { status: 'matched' | 'created' }>;
 

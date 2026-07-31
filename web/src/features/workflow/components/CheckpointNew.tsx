@@ -1,44 +1,47 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Project } from '../../types';
-import { useProjects } from '../../context/ProjectContext';
-import { useSettings } from '../../context/SettingsContext';
-import { Button } from '../ui/Button';
-import { Card, CardContent, CardHeader } from '../ui/Card';
-import { useFeedback } from '../ui/FeedbackProvider';
-import { getStudentEmail, isValidEmail, isValidStudentNumber } from '../../domain/operations';
-import { normalizeModuleCode } from '../../domain/moduleCode';
+import type { Project } from '@/types';
+import { useProjects } from '@/features/projects/context/ProjectContext';
+import { useSettings } from '@/features/settings/context/SettingsContext';
+import { Button } from '@/components/ui/Button';
+import { Card, CardContent, CardHeader } from '@/components/ui/Card';
+import { useFeedback } from '@/app/providers/FeedbackProvider';
+import { getStudentEmail, isValidEmail, isValidStudentNumber } from '@/domain/operations';
+import { normalizeModuleCode } from '@/domain/moduleCode';
 import {
   DEFAULT_FILAMENT_SOURCE,
   FILAMENT_SOURCE_VALUES,
   filamentSourceLabel,
   normalizeFilamentSource
-} from '../../domain/filamentSource.ts';
-import { GmailThreadPicker } from '../../gmail/GmailThreadPicker';
-import { extractProjectSuggestions, isSupportedGmailAttachment } from '../../gmail/gmailParsing';
-import { linkProjectGmailThread, unlinkProjectGmailThread } from '../../gmail/gmailProjectService';
-import { downloadPreparedGmailAttachments, prepareGmailAttachmentDownload, type PreparedGmailAttachmentDownload } from '../../gmail/gmailAttachmentDownload';
-import type { GmailThreadListItem } from '../../gmail/types';
-import { openGmailThread } from '../../gmail/gmailUrls';
-import { GMAIL_THREAD_ACCOUNT_MISMATCH, useProjectGmailThreadAccess } from '../../gmail/gmailThreadAccess';
-import { useLocalHelper } from '../../local-files/LocalHelperContext';
+} from '@/domain/filamentSource.ts';
+import { GmailThreadPicker } from '@/features/gmail/GmailThreadPicker';
+import { extractProjectSuggestions, isSupportedGmailAttachment } from '@/features/gmail/gmailParsing';
+import { linkProjectGmailThread, unlinkProjectGmailThread } from '@/features/gmail/gmailProjectService';
+import { downloadPreparedGmailAttachments, prepareGmailAttachmentDownload, type PreparedGmailAttachmentDownload } from '@/features/gmail/gmailAttachmentDownload';
+import type { GmailThreadListItem } from '@/api/google/gmail/types';
+import { openGmailThread } from '@/api/google/gmail/urls';
+import { GMAIL_THREAD_ACCOUNT_MISMATCH, useProjectGmailThreadAccess } from '@/features/gmail/gmailThreadAccess';
+import { useLocalHelper } from '@/features/local-files/LocalHelperContext';
 import { ExternalLink, Mail, Paperclip, Unlink } from 'lucide-react';
+import { getNextProjectPriority } from '@/domain/projectPriority';
 
 const buildInitialEmail = (project?: Project) => project?.email || getStudentEmail(project?.studentNumber || '');
 
 export const CheckpointNew = ({ project }: { project?: Project }) => {
   const navigate = useNavigate();
   const { addProject, updateProject, projects } = useProjects();
-  const { modules, nextPriority, setNextPriority } = useSettings();
+  const { modules } = useSettings();
   const { confirm, notify, prompt, showMessage } = useFeedback();
   const { state: helperState, client: helperClient } = useLocalHelper();
   const { canUseGmail } = useProjectGmailThreadAccess(project || { gmailThreadId: null, gmailAccountEmail: null });
+  const automaticPriority = useMemo(() => getNextProjectPriority(projects), [projects]);
+  const priorityManuallyAdjustedRef = useRef(false);
 
   const [formData, setFormData] = useState({
     studentName: project?.studentName || '',
     studentNumber: project?.studentNumber || '',
     email: buildInitialEmail(project),
-    priorityNumber: project?.priorityNumber ?? nextPriority,
+    priorityNumber: project?.priorityNumber ?? automaticPriority,
     course: project?.course ? normalizeModuleCode(project.course) ?? project.course : '',
     lecturer: project?.lecturer || '',
     needsPayment: project?.needsPayment ?? true,
@@ -50,6 +53,11 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
   const [selectedGmailThread, setSelectedGmailThread] = useState<GmailThreadListItem | null>(null);
   const [gmailLinking, setGmailLinking] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (project || priorityManuallyAdjustedRef.current) return;
+    setFormData((previous) => ({ ...previous, priorityNumber: automaticPriority }));
+  }, [automaticPriority, project]);
 
   const applySelectedThread = async (item: GmailThreadListItem) => {
     if (project) {
@@ -161,6 +169,7 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
     }
 
     if (name === 'priorityNumber') {
+      priorityManuallyAdjustedRef.current = true;
       setFormData(prev => ({
         ...prev,
         priorityNumber: Math.max(1, Number.parseInt(value, 10) || 1)
@@ -239,6 +248,9 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
 
     const payload = {
       ...formData,
+      priorityNumber: project || priorityManuallyAdjustedRef.current
+        ? formData.priorityNumber
+        : automaticPriority,
       email: trimmedEmail,
       course: normalizedCourse || '',
       needsPayment: formData.moduleOrLecturerPays ? false : formData.needsPayment,
@@ -339,7 +351,6 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
         }
       }
 
-      setNextPriority(Math.max(nextPriority, formData.priorityNumber) + 1);
       navigate(`/project/${newId}`, { state: selectedGmailThread ? undefined : { autoCreateLocalFolderFor: newId } });
     } finally {
       setSaving(false);

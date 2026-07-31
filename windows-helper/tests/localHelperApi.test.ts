@@ -4,11 +4,11 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { LOCAL_HELPER_CLIENT_HEADER, LOCAL_HELPER_CLIENT_VALUE } from '../shared/localHelperProtocol.ts';
-import { LocalApiServer } from '../helper/src/main/apiServer.ts';
-import { ConfigStore } from '../helper/src/main/config.ts';
-import { RotatingLogger } from '../helper/src/main/logger.ts';
-import { OpaqueRegistry } from '../helper/src/main/registry.ts';
+import { LOCAL_HELPER_CLIENT_HEADER, LOCAL_HELPER_CLIENT_VALUE } from '../src/contracts/localHelperProtocol.ts';
+import { LocalApiServer } from '../src/main/apiServer.ts';
+import { ConfigStore } from '../src/main/config.ts';
+import { RotatingLogger } from '../src/main/logger.ts';
+import { OpaqueRegistry } from '../src/main/registry.ts';
 
 const availablePort = () => new Promise<number>((resolve, reject) => {
   const server = net.createServer();

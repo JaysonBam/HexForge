@@ -1,7 +1,7 @@
-import { gmailApiFetch } from '../utils/gmailDraftUtils';
-import { stripQuotedReplyContent } from './gmailBody';
+import { gmailApiFetch } from '@/api/google/gmail/client';
+import { stripQuotedReplyContent } from './decoding';
 import type { GmailThreadAttachment, GmailThreadListItem, GmailThreadMessage, GmailThreadSnapshot } from './types';
-import { buildRecentPrintEmailQuery, getGmailMessageDirection, isSupportedGmailAttachment } from './gmailParsing';
+import { buildRecentPrintEmailQuery, getGmailMessageDirection, isSupportedGmailAttachment } from './search';
 
 type GmailHeader = { name?: string; value?: string };
 type GmailPart = {

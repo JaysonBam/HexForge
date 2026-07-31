@@ -1,10 +1,10 @@
-import type { Part, Project, QuoteSnapshot, QuoteSnapshotLine, QuoteSnapshotMaterialLine } from '../types';
+import type { Part, Project, QuoteSnapshot, QuoteSnapshotLine, QuoteSnapshotMaterialLine } from '@/types';
 import {
   filamentSourceLabel,
   getPartFilamentSource,
   normalizeFilamentSource,
   type FilamentSource
-} from './filamentSource.ts';
+} from '@/domain/filamentSource.ts';
 
 export type QuoteComparisonStatus = 'no_quote' | 'up_to_date' | 'outdated';
 

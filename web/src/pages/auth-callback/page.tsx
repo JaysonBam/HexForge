@@ -1,10 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect } from 'react'
-import { supabase } from '../../lib/supabaseClient'
 import {
-  captureGoogleProviderTokenFromUrl,
-  syncGoogleProviderTokensFromSession
-} from '../../utils/gmailDraftUtils'
+  completeOAuthSessionFromCurrentUrl,
+  getAuthSession,
+  signOut
+} from '@/api/supabase/auth'
+import { getProfileByEmail, updateProfileByEmail } from '@/api/supabase/profiles'
+import { clearGoogleProviderTokens } from '@/api/google/gmail/client'
 
 export default function AuthCallbackPage() {
   useEffect(() => {
@@ -15,44 +17,10 @@ export default function AuthCallbackPage() {
         let data: any = undefined
         let error: any = undefined
 
-        captureGoogleProviderTokenFromUrl()
+        clearGoogleProviderTokens()
 
         const params = new URLSearchParams(window.location.search)
-        const code = params.get('code')
-        const exchangeCodeForSession = (supabase.auth as unknown as { exchangeCodeForSession?: (...args: unknown[]) => Promise<any> }).exchangeCodeForSession
-        const getSessionFromUrl = (supabase.auth as unknown as { getSessionFromUrl?: (...args: unknown[]) => Promise<any> }).getSessionFromUrl
-
-        if (code && typeof exchangeCodeForSession === 'function') {
-          ;({ data, error } = await exchangeCodeForSession.call(supabase.auth, code))
-        } else if (typeof getSessionFromUrl === 'function') {
-          ;({ data, error } = await getSessionFromUrl.call(supabase.auth, { storeSession: true }))
-        } else {
-          try {
-            const hash = window.location.hash || window.location.search || ''
-            const params = new URLSearchParams(hash.replace(/^#/, ''))
-            const access_token = params.get('access_token')
-            const refresh_token = params.get('refresh_token')
-            if (access_token) {
-              const setSession = (supabase.auth as unknown as { setSession?: (...args: unknown[]) => Promise<any> }).setSession
-              if (typeof setSession === 'function') {
-                const res = await setSession.call(supabase.auth, { access_token, refresh_token })
-                data = res?.data || { session: res?.session }
-                error = res?.error
-              } else {
-                // final fallback: try to get current session
-                const res = await supabase.auth.getSession()
-                data = res?.data || res
-                error = res?.error
-              }
-            } else {
-              const res = await supabase.auth.getSession()
-              data = res?.data || res
-              error = res?.error
-            }
-          } catch (e) {
-            error = e
-          }
-        }
+        ;({ data, error } = await completeOAuthSessionFromCurrentUrl())
 
         if (error) {
           console.error('Error getting session from URL', error)
@@ -62,30 +30,24 @@ export default function AuthCallbackPage() {
         }
 
         let session = data?.session || data?.session?.value || data
-        const storedSessionResult = await supabase.auth.getSession()
+        const storedSessionResult = await getAuthSession()
         if (storedSessionResult.data.session) {
-          syncGoogleProviderTokensFromSession(storedSessionResult.data.session as any)
           session = storedSessionResult.data.session
         }
-        syncGoogleProviderTokensFromSession(session)
         const user = session?.user
         const email = user?.email
         if (!user || !email) {
-          await supabase.auth.signOut()
+          await signOut()
           window.location.href = '/?error=oauth'
           return
         }
 
         // Check profiles table for access
-        const { data: profile, error: selectErr } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('email', email)
-          .maybeSingle()
+        const { data: profile, error: selectErr } = await getProfileByEmail(email)
 
         if (selectErr) {
           console.error('Profile select error', selectErr)
-          await supabase.auth.signOut()
+          await signOut()
           const msg = (selectErr && (selectErr.message || String(selectErr))) || 'select_error'
           window.location.href = '/login?error=' + encodeURIComponent('server: ' + msg)
           return
@@ -93,7 +55,7 @@ export default function AuthCallbackPage() {
 
         if (!profile) {
           // Not on the allow-list -> sign out and show message
-          await supabase.auth.signOut()
+          await signOut()
           window.location.href = '/login?access=denied'
           return
         }
@@ -116,15 +78,12 @@ export default function AuthCallbackPage() {
         }
 
         if (Object.keys(updates).length > 0) {
-          const { error: updateErr } = await supabase
-            .from('profiles')
-            .update(updates)
-            .eq('email', email)
+          const { error: updateErr } = await updateProfileByEmail(email, updates)
 
           if (updateErr) {
             console.error('Profile update error', updateErr)
             if (!profile.id || profile.status === 'pending') {
-              await supabase.auth.signOut()
+              await signOut()
               const msg = (updateErr && (updateErr.message || String(updateErr))) || 'update_error'
               window.location.href = '/login?error=' + encodeURIComponent('update: ' + msg)
               return
@@ -141,7 +100,7 @@ export default function AuthCallbackPage() {
         window.location.href = redirectTo
       } catch (err) {
         console.error('Auth callback unexpected error', err)
-        await supabase.auth.signOut().catch(() => {})
+        await signOut().catch(() => {})
         const msg = err && (err instanceof Error ? err.message : String(err))
         window.location.href = '/login?error=' + encodeURIComponent('unexpected: ' + (msg || 'unknown'))
       }

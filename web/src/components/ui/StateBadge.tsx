@@ -1,5 +1,5 @@
-import type { ProjectState } from '../types';
-import { projectStateMeta } from '../domain/operations';
+import type { ProjectState } from '@/types';
+import { projectStateMeta } from '@/domain/operations';
 
 export const StateBadge = ({ state }: { state: ProjectState }) => {
   const meta = projectStateMeta[state] || projectStateMeta.INTAKE;

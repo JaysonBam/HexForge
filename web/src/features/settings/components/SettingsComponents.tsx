@@ -1,19 +1,25 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Paperclip, Plus, Save, Trash2 } from 'lucide-react';
-import { RichEmailEditor, TokenSubjectEditor } from '../../components/settings/RichEmailEditor';
-import { Button } from '../../components/ui/Button';
+import { RichEmailEditor, TokenSubjectEditor } from './RichEmailEditor';
+import { Button } from '@/components/ui/Button';
 import {
   emailTemplateKeys,
   emailTemplateLabels,
   type EmailEditorSelection
-} from '../../domain/emailTemplates';
+} from '@/domain/emailTemplates';
 import {
   FILAMENT_SOURCE_VALUES,
   filamentSourceLabel,
   normalizeFilamentSource
-} from '../../domain/filamentSource.ts';
-import type { Filament, Module, useSettings } from '../../context/SettingsContext';
-import type { FilamentPriceGroup } from '../../domain/settingsConfig';
+} from '@/domain/filamentSource.ts';
+import type { Filament, Module, useSettings } from '@/features/settings/context/SettingsContext';
+import type { FilamentPriceGroup } from '@/domain/settingsConfig';
+import {
+  disconnectGmailConnection,
+  getGmailConnection
+} from '@/api/supabase/edgeFunctions';
+import { requestGmailReadAccess } from '@/api/google/gmail/client';
+import { useFeedback } from '@/app/providers/FeedbackProvider';
 
 export type TextListKey = 'staff' | 'printer' | 'brand';
 
@@ -48,6 +54,93 @@ export const SettingsSection = ({
     {children}
   </section>
 );
+
+export const GmailConnectionSettings = () => {
+  const { confirm, notify } = useFeedback();
+  const [loading, setLoading] = useState(true);
+  const [working, setWorking] = useState(false);
+  const [connectedEmail, setConnectedEmail] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void getGmailConnection()
+      .then(({ response, payload }) => {
+        if (!active) return;
+        if (!response.ok) throw new Error('Could not check the Gmail connection.');
+        setConnectedEmail(payload.connected ? payload.account_email || null : null);
+      })
+      .catch(() => {
+        if (active) setError('Could not check the Gmail connection.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const connect = async () => {
+    setWorking(true);
+    setError(null);
+    try {
+      await requestGmailReadAccess();
+    } catch {
+      setWorking(false);
+      setError('Gmail authorization could not be started.');
+    }
+  };
+
+  const disconnect = async () => {
+    const approved = await confirm({
+      title: 'Disconnect Gmail',
+      message: 'Revoke HexForge Gmail access and permanently delete the stored credential?',
+      confirmLabel: 'Disconnect',
+      tone: 'warning'
+    });
+    if (!approved) return;
+
+    setWorking(true);
+    setError(null);
+    try {
+      const response = await disconnectGmailConnection();
+      if (!response.ok) throw new Error('Disconnect failed.');
+      setConnectedEmail(null);
+      notify({ message: 'Gmail disconnected.', tone: 'success' });
+    } catch {
+      setError('Gmail could not be disconnected.');
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  return (
+    <div className="forge-panel-muted flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <div className="font-black text-slate-950">
+          {loading ? 'Checking Gmail connection…' : connectedEmail ? 'Gmail connected' : 'Gmail not connected'}
+        </div>
+        <p className="mt-1 text-sm font-semibold text-slate-600">
+          {connectedEmail
+            ? `${connectedEmail}. Google tokens are encrypted and used only by HexForge server functions.`
+            : 'Connect Gmail when you need thread search, attachments, drafts, or replies.'}
+        </p>
+        {error && <p role="alert" className="mt-2 text-sm font-bold text-rose-800">{error}</p>}
+      </div>
+      <Button
+        type="button"
+        size="sm"
+        variant={connectedEmail ? 'secondary' : 'primary'}
+        disabled={loading || working}
+        loading={working}
+        onClick={connectedEmail ? disconnect : connect}
+      >
+        {connectedEmail ? 'Disconnect Gmail' : 'Connect Gmail'}
+      </Button>
+    </div>
+  );
+};
 
 export const TextListEditor = ({
   config,

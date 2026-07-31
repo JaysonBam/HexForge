@@ -5,7 +5,7 @@ import { pipeline } from 'node:stream/promises';
 import { randomUUID } from 'node:crypto';
 import type { BrowserWindow } from 'electron';
 import { dialog } from 'electron';
-import type { CopyOperation } from '../../../shared/localHelperProtocol.js';
+import type { CopyOperation } from '../contracts/localHelperProtocol.js';
 import type { ConfigStore } from './config.js';
 
 const compoundExtension = (filename: string) => filename.toLocaleLowerCase().endsWith('.gcode.3mf') ? '.gcode.3mf' : path.extname(filename);

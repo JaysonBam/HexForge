@@ -1,7 +1,7 @@
 import JSZip from 'jszip';
-import type { Part } from '../types';
-import { parseBambu } from '../lib/slicer-parsers/parsers/BambuParser';
-import { parseUltimaker } from '../lib/slicer-parsers/parsers/UltimakerParser';
+import type { Part } from '@/types';
+import { parseBambu } from '@/lib/slicer-parsers/parsers/BambuParser';
+import { parseUltimaker } from '@/lib/slicer-parsers/parsers/UltimakerParser';
 
 type ParsedMaterial = {
   type?: string;

@@ -4,7 +4,7 @@ import { realpath, rename, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import type { Readable } from 'node:stream';
-import type { AttachmentSaveResult } from '../../../shared/localHelperProtocol.js';
+import type { AttachmentSaveResult } from '../contracts/localHelperProtocol.js';
 import { isPathWithinRoot, sanitizeWindowsComponent } from './folders.js';
 
 const MAX_GMAIL_ATTACHMENT_BYTES = 100 * 1024 * 1024;

@@ -13,7 +13,7 @@ npm run package:helper
 npm run smoke:helper
 ```
 
-The portable, runtime-inclusive artifact is `release/HexForgeFileHelper.exe`. The target workstation does not need Node.js, npm, Git, or the repository.
+The portable, runtime-inclusive artifact is `windows-helper/release/HexForgeFileHelper.exe`. The target workstation does not need Node.js, npm, Git, or the repository.
 
 For development, run `npm run dev:helper`. The helper still binds only to `127.0.0.1`.
 

@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react';
-import { useSettings } from '../context/SettingsContext';
-import { useStaffSession } from '../context/StaffSessionContext';
-import { useFeedback } from '../components/ui/FeedbackProvider';
+import { useSettings } from '@/features/settings/context/SettingsContext';
+import { useStaffSession } from '@/features/auth/context/StaffSessionContext';
+import { useFeedback } from '@/app/providers/FeedbackProvider';
 
 export const useStaffActionName = () => {
   const { staffList } = useSettings();

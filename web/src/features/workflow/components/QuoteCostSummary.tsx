@@ -1,8 +1,8 @@
 import { Download } from 'lucide-react';
-import type { QuoteComparisonStatus } from '../../domain/quoteState';
-import { filamentSourceShortLabel } from '../../domain/filamentSource.ts';
-import { Button } from '../ui/Button';
-import { formatCurrency, formatLineWeight, type QuoteView } from './quoteCostSummaryModel';
+import type { QuoteComparisonStatus } from '@/domain/quoteState';
+import { filamentSourceShortLabel } from '@/domain/filamentSource.ts';
+import { Button } from '@/components/ui/Button';
+import { formatCurrency, formatLineWeight, type QuoteView } from '@/features/workflow/components/quoteCostSummaryModel';
 
 export function QuoteCostSummary({
   quoteViews,

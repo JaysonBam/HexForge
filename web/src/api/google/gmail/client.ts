@@ -1,5 +1,6 @@
-import { supabase } from '../lib/supabaseClient';
-import { buildUnreadPrintEmailQuery } from '../gmail/gmailParsing';
+import { signInWithGoogleOAuth } from '@/api/supabase/auth';
+import { beginGmailConnection, invokeGmailProxy } from '@/api/supabase/edgeFunctions';
+import { buildUnreadPrintEmailQuery } from './search';
 
 export type GmailAttachment = {
   filename: string;
@@ -67,10 +68,7 @@ type GmailMessageMetadataResponse = {
 const gmailProviderTokenStorageKey = 'misc.gmail.provider_token';
 const gmailProviderRefreshTokenStorageKey = 'misc.gmail.provider_refresh_token';
 const gmailProviderRefreshTokenInvalidKey = 'misc.gmail.provider_refresh_token_invalid';
-const googleClientIdStorageKey = 'misc.gmail.google_client_id';
-const googleGmailScopes = 'email profile https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/gmail.readonly';
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const googleIdentityScopes = 'email profile';
 
 const printEmailSearchTerms = [
   '3d',
@@ -88,27 +86,6 @@ const printEmailSearchTerms = [
 const gmailMetadataConcurrency = 4;
 const gmailRateLimitRetryCount = 3;
 const gmailRateLimitBaseDelayMs = 500;
-
-type SupabaseGoogleSession = {
-  provider_token?: string | null;
-  provider_refresh_token?: string | null;
-  expires_at?: number | null;
-};
-
-type GoogleRefreshResponse = {
-  access_token?: string;
-  expires_in?: number;
-  refresh_token?: string;
-  scope?: string;
-  token_type?: string;
-  error?: string;
-  error_description?: string;
-};
-
-type RefreshGoogleTokenFunctionResponse = GoogleRefreshResponse & {
-  google_status?: number;
-  details?: string;
-};
 
 export class GmailAuthError extends Error {
   constructor(message = 'Gmail authorization is required.') {
@@ -128,37 +105,6 @@ class GmailApiStatusError extends Error {
     this.googleError = googleError;
   }
 }
-
-const safeJson = (value: unknown) => {
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-};
-
-const getStoredTokenDiagnostics = () => ({
-  hasStoredGoogleAccessToken: Boolean(window.localStorage.getItem(gmailProviderTokenStorageKey)),
-  hasStoredGoogleRefreshToken: Boolean(window.localStorage.getItem(gmailProviderRefreshTokenStorageKey)),
-  refreshTokenMarkedInvalid: hasInvalidGoogleProviderRefreshToken(),
-  hasStoredGoogleClientId: Boolean(window.localStorage.getItem(googleClientIdStorageKey))
-});
-
-const getGmailAuthDiagnostics = async (context: Record<string, unknown> = {}) => {
-  const { data, error } = await supabase.auth.getSession();
-  const session = data.session as (typeof data.session & SupabaseGoogleSession) | null;
-
-  return {
-    ...getStoredTokenDiagnostics(),
-    supabaseSessionPresent: Boolean(session),
-    supabaseSessionExpiresAt: session?.expires_at ?? null,
-    supabaseUserEmail: session?.user?.email ?? null,
-    hasSessionProviderToken: Boolean(session?.provider_token),
-    hasSessionProviderRefreshToken: Boolean(session?.provider_refresh_token),
-    supabaseSessionError: error?.message ?? null,
-    ...context
-  };
-};
 
 const readGoogleError = async (response: Response) => {
   const errorText = await response.text();
@@ -265,140 +211,20 @@ const buildMimeMessage = ({
   return parts.join('\r\n');
 };
 
-export const persistGoogleProviderToken = (providerToken?: string | null) => {
-  if (!providerToken) return;
-  window.localStorage.setItem(gmailProviderTokenStorageKey, providerToken);
-};
-
-export const persistGoogleProviderRefreshToken = (providerRefreshToken?: string | null) => {
-  if (!providerRefreshToken) return;
-  window.localStorage.setItem(gmailProviderRefreshTokenStorageKey, providerRefreshToken);
-  window.localStorage.removeItem(gmailProviderRefreshTokenInvalidKey);
-};
-
-export const persistGoogleProviderTokens = (
-  providerToken?: string | null,
-  providerRefreshToken?: string | null
-) => {
-  persistGoogleProviderToken(providerToken);
-  persistGoogleProviderRefreshToken(providerRefreshToken);
-};
-
 export const clearGoogleProviderTokens = () => {
   window.localStorage.removeItem(gmailProviderTokenStorageKey);
   window.localStorage.removeItem(gmailProviderRefreshTokenStorageKey);
   window.localStorage.removeItem(gmailProviderRefreshTokenInvalidKey);
 };
 
-const hasGoogleProviderRefreshToken = () =>
-  Boolean(window.localStorage.getItem(gmailProviderRefreshTokenStorageKey));
-
-const hasInvalidGoogleProviderRefreshToken = () =>
-  window.localStorage.getItem(gmailProviderRefreshTokenInvalidKey) === 'true';
-
-export const captureGoogleProviderTokenFromUrl = () => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-  persistGoogleProviderTokens(
-    urlParams.get('provider_token') || hashParams.get('provider_token'),
-    urlParams.get('provider_refresh_token') || hashParams.get('provider_refresh_token')
-  );
-};
-
-export const syncGoogleProviderTokensFromSession = (session?: SupabaseGoogleSession | null) => {
-  persistGoogleProviderTokens(session?.provider_token, session?.provider_refresh_token);
-};
-
-const refreshGoogleAccessToken = async () => {
-  const refreshToken = window.localStorage.getItem(gmailProviderRefreshTokenStorageKey);
-  if (!refreshToken) return null;
-
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError || !sessionData.session?.access_token) {
-    throw new GmailAuthError([
-      'Cannot renew Gmail access because there is no active Supabase session for the refresh function.',
-      `Supabase session error: ${sessionError?.message || 'none'}`,
-      `Local Gmail auth diagnostics: ${safeJson(await getGmailAuthDiagnostics({ stage: 'missing_supabase_session_for_refresh' }))}`
-    ].join('\n'));
-  }
-
-  const response = await fetch(`${supabaseUrl}/functions/v1/refresh-google-token`, {
+const sendDraftRequest = async (raw: string) =>
+  gmailApiFetch('/drafts', {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${sessionData.session.access_token}`,
-      apikey: supabaseAnonKey,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      refresh_token: refreshToken
-    })
-  });
-
-  const payload = await response.json().catch(() => ({})) as RefreshGoogleTokenFunctionResponse;
-  if (!response.ok) {
-    if (payload.error === 'invalid_grant') {
-      window.localStorage.setItem(gmailProviderRefreshTokenInvalidKey, 'true');
-      window.localStorage.removeItem(gmailProviderTokenStorageKey);
-      window.localStorage.removeItem(gmailProviderRefreshTokenStorageKey);
-    }
-
-    throw new GmailAuthError([
-      `Could not renew Gmail access: ${payload.error_description || payload.error || `HTTP ${response.status}`}`,
-      `Refresh function status: ${response.status} ${response.statusText || ''}`.trim(),
-      `Google token endpoint status: ${payload.google_status ?? 'unknown'}`,
-      `Google token endpoint error: ${payload.error || 'none'}`,
-      `Google token endpoint error_description: ${payload.error_description || 'none'}`,
-      `OAuth scope returned by Google: ${payload.scope || 'none'}`,
-      `Refresh function details: ${payload.details || 'none'}`,
-      `Local Gmail auth diagnostics: ${safeJson(await getGmailAuthDiagnostics({ refreshAttempt: true, stage: 'edge_refresh_failed' }))}`
-    ].join('\n'));
-  }
-
-  if (!payload.access_token) return null;
-
-  persistGoogleProviderTokens(payload.access_token, payload.refresh_token || refreshToken);
-  return payload.access_token;
-};
-
-const getCachedGoogleAccessToken = async () => {
-  const { data, error } = await supabase.auth.getSession();
-  if (error) throw new GmailAuthError(error.message);
-
-  const session = data.session as (typeof data.session & { provider_token?: string }) | null;
-  syncGoogleProviderTokensFromSession(session);
-
-  return {
-    accessToken: session?.provider_token || window.localStorage.getItem(gmailProviderTokenStorageKey),
-    session
-  };
-};
-
-const getGoogleAccessToken = async (refreshPromise?: Promise<string | null> | null) => {
-  const { accessToken, session } = await getCachedGoogleAccessToken();
-  if (accessToken) return accessToken;
-
-  const refreshedToken = refreshPromise ? await refreshPromise : await refreshGoogleAccessToken();
-  if (refreshedToken) return refreshedToken;
-
-  throw new GmailAuthError([
-    'No Google Gmail access token is available, and no refresh token could renew it.',
-    `Supabase session present: ${Boolean(session)}`,
-    `Supabase session expires_at: ${session?.expires_at ?? 'unknown'}`,
-    `Local Gmail auth diagnostics: ${safeJson(await getGmailAuthDiagnostics({ stage: 'no_access_token' }))}`
-  ].join('\n'));
-};
-
-const sendDraftRequest = async (accessToken: string, raw: string) =>
-  fetch('https://gmail.googleapis.com/gmail/v1/users/me/drafts', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message: { raw } })
   });
 
-const listUnreadPrintEmailIds = async (accessToken: string) => {
+const listUnreadPrintEmailIds = async () => {
   const messageIdsByThread = new Map<string, string>();
   const groupedTerms = printEmailSearchTerms
     .map((term) => /\s/.test(term) ? `"${term}"` : term)
@@ -414,11 +240,7 @@ const listUnreadPrintEmailIds = async (accessToken: string) => {
       url.searchParams.set('pageToken', pageToken);
     }
 
-    const response = await fetch(url.toString(), {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    });
+    const response = await gmailApiFetch(`${url.pathname.replace('/gmail/v1/users/me', '')}${url.search}`);
 
     if (!response.ok) {
       throw new GmailApiStatusError(response.status, await readGoogleError(response));
@@ -481,7 +303,7 @@ const getRetryDelayMs = (response: Response, retryIndex: number) => {
   return gmailRateLimitBaseDelayMs * (2 ** retryIndex);
 };
 
-const getFlaggedPrintEmail = async (accessToken: string, messageId: string): Promise<GmailUnreadPrintEmail> => {
+const getFlaggedPrintEmail = async (messageId: string): Promise<GmailUnreadPrintEmail> => {
   const url = new URL(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}`);
   url.searchParams.set('format', 'metadata');
   url.searchParams.append('metadataHeaders', 'Subject');
@@ -491,11 +313,7 @@ const getFlaggedPrintEmail = async (accessToken: string, messageId: string): Pro
   let retryIndex = 0;
 
   while (true) {
-    response = await fetch(url.toString(), {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    });
+    response = await gmailApiFetch(`${url.pathname.replace('/gmail/v1/users/me', '')}${url.search}`);
 
     if (response.status !== 429 || retryIndex >= gmailRateLimitRetryCount) {
       break;
@@ -522,7 +340,7 @@ const getFlaggedPrintEmail = async (accessToken: string, messageId: string): Pro
   };
 };
 
-const getFlaggedPrintEmails = async (accessToken: string, messageIds: Set<string>) => {
+const getFlaggedPrintEmails = async (messageIds: Set<string>) => {
   const ids = Array.from(messageIds);
   const emails = new Array<GmailUnreadPrintEmail>(ids.length);
   let nextIndex = 0;
@@ -531,7 +349,7 @@ const getFlaggedPrintEmails = async (accessToken: string, messageIds: Set<string
     while (nextIndex < ids.length) {
       const index = nextIndex;
       nextIndex += 1;
-      emails[index] = await getFlaggedPrintEmail(accessToken, ids[index]);
+      emails[index] = await getFlaggedPrintEmail(ids[index]);
     }
   };
 
@@ -561,11 +379,9 @@ const logFlaggedPrintEmails = (emails: GmailUnreadPrintEmail[]) => {
   console.groupEnd();
 };
 
-const buildUnreadPrintEmailSummary = async (
-  accessToken: string
-): Promise<GmailUnreadPrintEmailSummary> => {
-  const messageIds = await listUnreadPrintEmailIds(accessToken);
-  const flaggedEmails = await getFlaggedPrintEmails(accessToken, messageIds);
+const buildUnreadPrintEmailSummary = async (): Promise<GmailUnreadPrintEmailSummary> => {
+  const messageIds = await listUnreadPrintEmailIds();
+  const flaggedEmails = await getFlaggedPrintEmails(messageIds);
   const flaggedSubjects = flaggedEmails.map((email) => email.subject);
   logFlaggedPrintEmails(flaggedEmails);
 
@@ -588,59 +404,36 @@ const getReturnPath = () => {
   return returnPath;
 };
 
-const startGoogleOAuth = async ({ forceConsent = false }: { forceConsent?: boolean } = {}) => {
+const startGoogleSignIn = async () => {
   const redirectTo = `${window.location.origin}/auth-callback?next=${encodeURIComponent(getReturnPath())}`;
-  await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo,
-      scopes: googleGmailScopes,
-      queryParams: {
-        access_type: 'offline',
-        include_granted_scopes: 'true',
-        ...(forceConsent ? { prompt: 'consent' } : {})
-      }
-    }
+  await signInWithGoogleOAuth({
+    redirectTo,
+    scopes: googleIdentityScopes,
+    queryParams: { prompt: 'select_account' }
   });
 };
 
-export const createGmailDraft = async (draftRequest: GmailDraftRequest) => {
-  const refreshPromise = hasGoogleProviderRefreshToken() ? refreshGoogleAccessToken() : null;
-  refreshPromise?.catch((error: unknown) => {
-    console.warn('Background Gmail access refresh failed', error);
-  });
-
-  let accessToken = await getGoogleAccessToken(refreshPromise);
-  const raw = base64UrlFromUtf8(buildMimeMessage(draftRequest));
-
-  let response = await sendDraftRequest(accessToken, raw);
-
-  if (response.status === 401) {
-    const refreshedToken = refreshPromise ? await refreshPromise : await refreshGoogleAccessToken();
-    if (refreshedToken) {
-      accessToken = refreshedToken;
-      response = await sendDraftRequest(accessToken, raw);
-    }
+const startGmailConnection = async () => {
+  clearGoogleProviderTokens();
+  const { response, payload } = await beginGmailConnection(getReturnPath());
+  if (!response.ok || !payload.authorization_url) {
+    throw new GmailAuthError(payload.error_description || 'Gmail authorization could not be started.');
   }
+  window.location.assign(payload.authorization_url);
+};
+
+export const createGmailDraft = async (draftRequest: GmailDraftRequest) => {
+  const raw = base64UrlFromUtf8(buildMimeMessage(draftRequest));
+  const response = await sendDraftRequest(raw);
 
   if (response.status === 401) {
-    const diagnostics = await getGmailAuthDiagnostics({
-      stage: 'gmail_401_after_refresh_attempt',
-      hadAccessTokenForRequest: Boolean(accessToken)
-    });
-    clearGoogleProviderTokens();
-    throw new GmailAuthError([
-      'Google rejected the Gmail access token after a refresh attempt.',
-      `Gmail API response: ${await readGoogleError(response)}`,
-      `Local Gmail auth diagnostics: ${safeJson(diagnostics)}`
-    ].join('\n'));
+    throw new GmailAuthError('Connect Gmail again to create drafts.');
   }
 
   if (response.status === 403) {
     const googleError = await readGoogleError(response);
     if (googleError.toLowerCase().includes('insufficient') || googleError.toLowerCase().includes('scope')) {
-      clearGoogleProviderTokens();
-      throw new GmailAuthError(`Google says the Gmail token does not have draft permission: ${googleError}`);
+      throw new GmailAuthError('Gmail did not grant draft permission.');
     }
     throw new Error(`Gmail API returned 403: ${googleError}`);
   }
@@ -658,39 +451,15 @@ export const createGmailDraft = async (draftRequest: GmailDraftRequest) => {
 };
 
 export const gmailApiFetch = async (path: string, init: RequestInit = {}): Promise<Response> => {
-  const refreshPromise = hasGoogleProviderRefreshToken() ? refreshGoogleAccessToken() : null;
-  refreshPromise?.catch((error: unknown) => {
-    console.warn('Background Gmail access refresh failed', error);
-  });
-
-  let accessToken = await getGoogleAccessToken(refreshPromise);
-  const send = () => fetch(`https://gmail.googleapis.com/gmail/v1/users/me${path}`, {
-    ...init,
-    headers: {
-      ...init.headers,
-      Authorization: `Bearer ${accessToken}`
-    }
-  });
-  let response = await send();
-
+  const response = await invokeGmailProxy(path, init);
   if (response.status === 401) {
-    const refreshedToken = refreshPromise ? await refreshPromise : await refreshGoogleAccessToken();
-    if (refreshedToken) {
-      accessToken = refreshedToken;
-      response = await send();
-    }
-  }
-
-  if (response.status === 401) {
-    clearGoogleProviderTokens();
-    throw new GmailAuthError(`Google rejected the Gmail access token: ${await readGoogleError(response)}`);
+    throw new GmailAuthError('Connect Gmail to continue.');
   }
 
   if (response.status === 403) {
     const googleError = await readGoogleError(response);
     if (googleError.toLowerCase().includes('insufficient') || googleError.toLowerCase().includes('scope')) {
-      clearGoogleProviderTokens();
-      throw new GmailAuthError(`Google says the Gmail token does not have the required permission: ${googleError}`);
+      throw new GmailAuthError('Gmail did not grant the required permission.');
     }
     throw new Error(`Gmail API returned 403: ${googleError}`);
   }
@@ -710,35 +479,16 @@ export const sendGmailThreadReply = async (request: GmailReplyRequest) => {
 };
 
 export const getUnread3dPrintEmailSummary = async (): Promise<GmailUnreadPrintEmailSummary> => {
-  const refreshPromise = hasGoogleProviderRefreshToken() ? refreshGoogleAccessToken() : null;
-  refreshPromise?.catch((error: unknown) => {
-    console.warn('Background Gmail access refresh failed', error);
-  });
-
-  let accessToken = await getGoogleAccessToken(refreshPromise);
-
   try {
-    return await buildUnreadPrintEmailSummary(accessToken);
+    return await buildUnreadPrintEmailSummary();
   } catch (error) {
     if (error instanceof GmailApiStatusError && error.status === 401) {
-      const refreshedToken = refreshPromise ? await refreshPromise : await refreshGoogleAccessToken();
-      if (refreshedToken) {
-        accessToken = refreshedToken;
-        return await buildUnreadPrintEmailSummary(accessToken);
-      }
-
-      clearGoogleProviderTokens();
-      throw new GmailAuthError([
-        'Google rejected the Gmail access token while checking unread print emails.',
-        `Gmail API response: ${error.googleError}`,
-        `Local Gmail auth diagnostics: ${safeJson(await getGmailAuthDiagnostics({ stage: 'unread_print_email_401' }))}`
-      ].join('\n'));
+      throw new GmailAuthError('Connect Gmail to check unread print emails.');
     }
 
     if (error instanceof GmailApiStatusError && error.status === 403) {
       if (error.googleError.toLowerCase().includes('insufficient') || error.googleError.toLowerCase().includes('scope')) {
-        clearGoogleProviderTokens();
-        throw new GmailAuthError(`Google says the Gmail token does not have read permission: ${error.googleError}`);
+        throw new GmailAuthError('Gmail did not grant read permission.');
       }
       throw new Error(`Gmail API returned 403: ${error.googleError}`);
     }
@@ -748,13 +498,14 @@ export const getUnread3dPrintEmailSummary = async (): Promise<GmailUnreadPrintEm
 };
 
 export const requestGmailDraftAccess = async () => {
-  await startGoogleOAuth({ forceConsent: true });
+  await startGmailConnection();
 };
 
 export const requestGmailReadAccess = async () => {
-  await startGoogleOAuth({ forceConsent: true });
+  await startGmailConnection();
 };
 
 export const requestGoogleSignIn = async () => {
-  await startGoogleOAuth({ forceConsent: !hasGoogleProviderRefreshToken() || hasInvalidGoogleProviderRefreshToken() });
+  clearGoogleProviderTokens();
+  await startGoogleSignIn();
 };
