@@ -12,7 +12,7 @@ import { useLocalHelper } from '@/features/local-files/LocalHelperContext';
 import { runSequentialImports } from '@/features/local-files/importSequence';
 import { analyzeProjectFiles } from '@/features/local-files/projectFileImport';
 import { isFileLinkedToParts } from '@/features/local-files/sourceFileLink';
-import { projectFolderDescriptor } from '@/features/local-files/projectFolderWorkflow';
+import { getExpectedWorkflowFolder, projectExpectsTbc } from '@/features/local-files/projectFolderWorkflow';
 
 type MatchedResolution = Extract<ProjectResolution, { status: 'matched' | 'created' }>;
 
@@ -64,7 +64,23 @@ export const LocalFilesCard = ({ project, autoCreateIfMissing = false }: { proje
   const activeRequest = useRef<AbortController | null>(null);
   const lastExpectation = useRef<{ projectId: string; key: string } | null>(null);
   const lastResolutionWasInSync = useRef(false);
-  const descriptor = useMemo(() => projectFolderDescriptor(project), [project]);
+  const expectedWorkflowFolder = getExpectedWorkflowFolder(project);
+  const expectTbc = projectExpectsTbc(project);
+  const descriptor = useMemo(() => ({
+    projectId: project.id,
+    priorityNumber: project.priorityNumber,
+    studentName: project.studentName,
+    studentNumber: project.studentNumber,
+    expectedWorkflowFolder,
+    expectTbc
+  }), [
+    expectTbc,
+    expectedWorkflowFolder,
+    project.id,
+    project.priorityNumber,
+    project.studentName,
+    project.studentNumber
+  ]);
   const expectedKey = `${descriptor.projectId}:${descriptor.expectedWorkflowFolder}:${descriptor.expectTbc}:${descriptor.priorityNumber}:${descriptor.studentName}:${descriptor.studentNumber}`;
 
   const loadFiles = useCallback(async (matched: MatchedResolution, signal?: AbortSignal) => {
@@ -136,8 +152,10 @@ export const LocalFilesCard = ({ project, autoCreateIfMissing = false }: { proje
     if (!sameProject) lastResolutionWasInSync.current = false;
     lastExpectation.current = { projectId: project.id, key: expectedKey };
     const timer = window.setTimeout(() => {
-      setResolution(null);
-      setFiles([]);
+      if (!sameProject) {
+        setResolution(null);
+        setFiles([]);
+      }
       if (state === 'connected') void resolveFolder(shouldAutoSync);
     }, 0);
     return () => {

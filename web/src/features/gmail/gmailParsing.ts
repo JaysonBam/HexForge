@@ -51,8 +51,10 @@ export const extractProjectSuggestions = (
   thread: GmailThreadSnapshot,
   existingProjects: Project[]
 ): GmailProjectSuggestions => {
-  const externalMessages = thread.messages.filter((message) => message.senderEmail.toLowerCase() !== thread.accountEmail.toLowerCase());
   const accountEmail = thread.accountEmail.toLowerCase();
+  const externalMessages = thread.messages.filter((message) =>
+    message.senderEmail.trim()
+    && message.senderEmail.toLowerCase() !== accountEmail);
   const searchableValues = thread.messages.flatMap((message) => [
     message.subject,
     message.body,
@@ -60,19 +62,35 @@ export const extractProjectSuggestions = (
     ...message.recipientEmails.filter((email) => email.toLowerCase() !== accountEmail),
     ...message.attachments.map((attachment) => attachment.filename)
   ]);
-  const studentNumberCandidates = findStudentNumbers(searchableValues);
+  const contactStudentNumbers = findStudentNumbers([
+    thread.mainContactEmail,
+    ...externalMessages.map((message) => message.senderEmail)
+  ]);
+  const studentNumberCandidates = contactStudentNumbers.length === 1
+    ? contactStudentNumbers
+    : findStudentNumbers([thread.mainContactEmail, thread.subject, ...searchableValues]);
   const studentNumber = studentNumberCandidates.length === 1 ? studentNumberCandidates[0] : '';
   const email = thread.mainContactEmail;
-  const labelledName = extractLabelledName(thread.messages.flatMap((message) => [message.body, message.subject]));
+  const labelledName = extractLabelledName([
+    ...externalMessages.flatMap((message) => [message.body, message.subject]),
+    ...thread.messages.flatMap((message) => [message.body, message.subject])
+  ]);
   const displayName = externalMessages.map((message) => message.senderName.trim()).find(Boolean) || '';
   const matchingProject = existingProjects.find((project) =>
     (email && project.email?.trim().toLowerCase() === email.toLowerCase())
     || (studentNumber && project.studentNumber === studentNumber));
+  const emailNameParts = email
+    .split('@', 1)[0]
+    .split(/[._-]+/)
+    .filter((part) => /^[A-Za-z]{2,}$/.test(part));
+  const inferredEmailName = emailNameParts.length >= 2
+    ? emailNameParts.map((part) => `${part[0].toUpperCase()}${part.slice(1).toLowerCase()}`).join(' ')
+    : '';
 
   return {
     studentNumber,
     studentNumberCandidates,
-    studentName: labelledName || displayName || matchingProject?.studentName || '',
+    studentName: labelledName || displayName || matchingProject?.studentName || inferredEmailName,
     email,
     moduleCode: findModuleCode(searchableValues)
   };
