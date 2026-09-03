@@ -364,6 +364,13 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
 
   return (
     <Card className="overflow-hidden">
+      <form
+        id={project ? undefined : 'new-project-form'}
+        onSubmit={(event) => {
+          event.preventDefault();
+          void handleSave();
+        }}
+      >
       <CardHeader className="border-b border-slate-300 bg-gradient-to-r from-slate-100 via-white to-sky-50">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-2">
@@ -371,11 +378,13 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
               {project ? 'Project Details' : 'New Project Details'}
             </h2>
           </div>
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button onClick={handleSave} size="lg" className="min-w-[180px]" loading={saving} loadingText="Creating Project…">
-            {project ? 'Save Details' : 'Create Project'}
-          </Button>
-          </div>
+          {project && (
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button onClick={handleSave} size="lg" className="min-w-[180px]" loading={saving} loadingText="Creating Project…">
+                Save Details
+              </Button>
+            </div>
+          )}
         </div>
       </CardHeader>
 
@@ -611,6 +620,7 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
         </section>
       </CardContent>
       <GmailThreadPicker open={gmailPickerOpen} onClose={() => setGmailPickerOpen(false)} onSelect={(item) => void applySelectedThread(item)} />
+      </form>
     </Card>
   );
 };
