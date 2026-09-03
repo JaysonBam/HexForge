@@ -64,7 +64,7 @@ export const GmailThreadPicker = ({
           <div>
             <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Gmail intake</p>
             <h2 id="gmail-picker-title" className="text-lg font-black text-slate-950">Choose Main Gmail Thread</h2>
-            <p className="mt-1 text-xs font-semibold text-slate-600">The 10 most recent read or unread 3D-printing-related threads.</p>
+            <p className="mt-1 text-xs font-semibold text-slate-600">The 50 most recent read or unread 3D-printing-related threads.</p>
           </div>
           <div className="flex gap-1">
             <Button variant="ghost" size="icon" onClick={() => void load()} disabled={loading} aria-label="Refresh recent Gmail threads">

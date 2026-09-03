@@ -145,7 +145,7 @@ export const listRecent3dPrintThreads = async (): Promise<GmailThreadListItem[]>
   const result = await fetchJson<{ messages?: Array<{ id?: string; threadId?: string }> }>(
     `/messages?maxResults=50&q=${encodeURIComponent(query)}`
   );
-  const threadIds = [...new Set((result.messages || []).map((message) => message.threadId).filter((id): id is string => Boolean(id)))].slice(0, 10);
+  const threadIds = [...new Set((result.messages || []).map((message) => message.threadId).filter((id): id is string => Boolean(id)))].slice(0, 50);
   const accountEmail = await getGmailAccountEmail();
   const snapshots = await Promise.all(threadIds.map((threadId) => getGmailThread(threadId, accountEmail)));
   return snapshots.map((snapshot) => {
