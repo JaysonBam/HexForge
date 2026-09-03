@@ -83,7 +83,7 @@ test('dashboard lanes put pre-production work into the to-be-confirmed lane', ()
   assert.equal(lanes.printing.length, 0);
 });
 
-test('dashboard lanes keep started production work in printing even without an active print', () => {
+test('dashboard lanes return partially printed production work to ready to print when no print is active', () => {
   const project = {
     ...baseProject,
     state: 'IN_PRODUCTION',
@@ -105,11 +105,11 @@ test('dashboard lanes keep started production work in printing even without an a
   const lanes = buildDashboardLanes([project]);
 
   assert.equal(lanes.toBeConfirmed.length, 0);
-  assert.equal(lanes.readyToPrint.length, 0);
-  assert.equal(lanes.printing.length, 1);
+  assert.equal(lanes.readyToPrint.length, 1);
+  assert.equal(lanes.printing.length, 0);
 });
 
-test('dashboard lanes keep fully completed production work in printing until collection is released', () => {
+test('dashboard lanes return fully printed production work to ready to print until collection is released', () => {
   const project = {
     ...baseProject,
     state: 'IN_PRODUCTION',
@@ -124,6 +124,32 @@ test('dashboard lanes keep fully completed production work in printing until col
         partNumber: 2,
         partName: 'Plate 2',
         printStatus: 'POST_PROCESSING'
+      }
+    ]
+  };
+
+  const lanes = buildDashboardLanes([project]);
+
+  assert.equal(lanes.toBeConfirmed.length, 0);
+  assert.equal(lanes.readyToPrint.length, 1);
+  assert.equal(lanes.printing.length, 0);
+});
+
+test('dashboard lanes put production work in printing while any part is actively printing', () => {
+  const project = {
+    ...baseProject,
+    state: 'IN_PRODUCTION',
+    parts: [
+      {
+        ...baseProject.parts[0],
+        printStatus: 'PRINTED'
+      },
+      {
+        ...baseProject.parts[0],
+        id: 'part-2',
+        partNumber: 2,
+        partName: 'Plate 2',
+        printStatus: 'PRINTING'
       }
     ]
   };
@@ -161,7 +187,7 @@ test('dashboard lanes keep all-queued production work in ready to print until a 
   assert.equal(lanes.printing.length, 0);
 });
 
-test('dashboard lanes use part progress to keep started work in printing even if the project state lags behind', () => {
+test('dashboard lanes keep printed work ready to print if the project state lags behind', () => {
   const project = {
     ...baseProject,
     state: 'READY_FOR_PRINTING',
@@ -183,8 +209,8 @@ test('dashboard lanes use part progress to keep started work in printing even if
   const lanes = buildDashboardLanes([project]);
 
   assert.equal(lanes.toBeConfirmed.length, 0);
-  assert.equal(lanes.readyToPrint.length, 0);
-  assert.equal(lanes.printing.length, 1);
+  assert.equal(lanes.readyToPrint.length, 1);
+  assert.equal(lanes.printing.length, 0);
 });
 
 test('collection stays blocked if a required receipt number is later cleared', () => {
