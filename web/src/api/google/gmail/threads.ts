@@ -142,10 +142,10 @@ export const getGmailThread = async (threadId: string, knownAccountEmail?: strin
 export const listRecent3dPrintThreads = async (): Promise<GmailThreadListItem[]> => {
   const groupedTerms = PRINT_TERMS.map((term) => /\s/.test(term) ? `"${term}"` : term).join(' ');
   const query = `${buildRecentPrintEmailQuery('3d').replace(/\s+3d$/, '')} {${groupedTerms}}`;
-  const result = await fetchJson<{ threads?: Array<{ id?: string }> }>(
-    `/threads?maxResults=50&q=${encodeURIComponent(query)}`
+  const result = await fetchJson<{ messages?: Array<{ threadId?: string }> }>(
+    `/messages?maxResults=100&q=${encodeURIComponent(query)}`
   );
-  const threadIds = (result.threads || []).map((thread) => thread.id).filter((id): id is string => Boolean(id)).slice(0, 50);
+  const threadIds = [...new Set((result.messages || []).map((message) => message.threadId).filter((id): id is string => Boolean(id)))].slice(0, 50);
   const accountEmail = await getGmailAccountEmail();
   const snapshots = await Promise.all(threadIds.map((threadId) => getGmailThread(threadId, accountEmail)));
   return snapshots.map((snapshot) => {
