@@ -102,6 +102,7 @@ export const Layout = () => {
 
   const projectRouteMatch = matchPath('/project/:id', location.pathname);
   const projectRouteId = projectRouteMatch?.params.id;
+  const isNewProjectRoute = projectRouteId === 'new';
   const isProjectWorkspacePath = Boolean(projectRouteId && projectRouteId !== 'new');
   const projectForNavigation = isProjectWorkspacePath && projectRouteId
     ? getProject(projectRouteId)
@@ -366,8 +367,14 @@ export const Layout = () => {
             )}
 
             {!isProjectWorkspaceRoute && (
-              <Button onClick={() => navigate('/project/new')} className="gap-2 shadow-sm" size="md">
-                <Plus size={17} /> New Project
+              <Button
+                type={isNewProjectRoute ? 'submit' : 'button'}
+                form={isNewProjectRoute ? 'new-project-form' : undefined}
+                onClick={isNewProjectRoute ? undefined : () => navigate('/project/new')}
+                className="gap-2 shadow-sm"
+                size="md"
+              >
+                <Plus size={17} /> {isNewProjectRoute ? 'Create Project' : 'New Project'}
               </Button>
             )}
 
