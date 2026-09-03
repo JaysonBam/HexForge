@@ -13,6 +13,7 @@ const read = (relativePath: string) =>
 test('Gmail proxy permits only the operations used by HexForge', () => {
   assert.equal(classifyGmailProxyRequest('/profile', 'GET')?.operation, 'gmail_read');
   assert.equal(classifyGmailProxyRequest('/threads/thread_1?format=full', 'GET')?.operation, 'gmail_read');
+  assert.equal(classifyGmailProxyRequest('/threads?maxResults=50&q=3d%20print', 'GET')?.operation, 'gmail_read');
   assert.equal(
     classifyGmailProxyRequest('/messages?maxResults=100&q=is%3Aunread&pageToken=next_1', 'GET')?.operation,
     'gmail_read'
