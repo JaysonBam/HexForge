@@ -125,7 +125,7 @@ export const getProjectLane = (project: Project): DashboardLaneKey | null => {
 
   if (project.state === 'CLOSED' || project.state === 'CANCELLED') return null;
   if (project.state === 'READY_FOR_COLLECTION' || project.state === 'PARTIALLY_COLLECTED') return null;
-  if (counts.printing > 0 || counts.printed > 0) return 'printing';
+  if (counts.printing > 0) return 'printing';
   if (project.state === 'READY_FOR_PRINTING' || project.state === 'IN_PRODUCTION') return 'readyToPrint';
   return 'toBeConfirmed';
 };
