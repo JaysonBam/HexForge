@@ -1,7 +1,7 @@
 import { gmailApiFetch } from '@/api/google/gmail/client';
 import { stripQuotedReplyContent } from './decoding';
 import type { GmailThreadAttachment, GmailThreadListItem, GmailThreadMessage, GmailThreadSnapshot } from './types';
-import { getGmailMessageDirection, isSupportedGmailAttachment } from './search';
+import { buildRecentPrintEmailQuery, getGmailMessageDirection, isSupportedGmailAttachment } from './search';
 
 type GmailHeader = { name?: string; value?: string };
 type GmailPart = {
@@ -141,7 +141,7 @@ export const getGmailThread = async (threadId: string, knownAccountEmail?: strin
 
 export const listRecent3dPrintThreads = async (): Promise<GmailThreadListItem[]> => {
   const groupedTerms = PRINT_TERMS.map((term) => /\s/.test(term) ? `"${term}"` : term).join(' ');
-  const query = `{${groupedTerms}}`;
+  const query = `${buildRecentPrintEmailQuery('3d').replace(/\s+3d$/, '')} {${groupedTerms}}`;
   const result = await fetchJson<{ threads?: Array<{ id?: string }> }>(
     `/threads?maxResults=50&q=${encodeURIComponent(query)}`
   );

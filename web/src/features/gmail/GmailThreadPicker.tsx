@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Loader2, Mail, Paperclip, RefreshCw, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Loader2, Mail, Paperclip, RefreshCw, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useFeedback } from '@/app/providers/FeedbackProvider';
 import { GmailAuthError, requestGmailReadAccess } from '@/api/google/gmail/client';
@@ -24,6 +24,29 @@ export const GmailThreadPicker = ({
   const [items, setItems] = useState<GmailThreadListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+
+  const filteredItems = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return items;
+    return items.filter((item) => [
+      item.senderName,
+      item.senderEmail,
+      item.subject,
+      item.preview,
+      ...item.attachmentFilenames,
+      item.snapshot.accountEmail,
+      item.snapshot.mainContactEmail,
+      ...item.snapshot.messages.flatMap((message) => [
+        message.senderName,
+        message.senderEmail,
+        ...message.recipientEmails,
+        message.subject,
+        message.body,
+        ...message.attachments.map((attachment) => attachment.filename)
+      ])
+    ].join('\n').toLowerCase().includes(query));
+  }, [items, search]);
 
   const load = async () => {
     setLoading(true);
@@ -49,7 +72,10 @@ export const GmailThreadPicker = ({
 
   useEffect(() => {
     if (!open) return;
-    const timer = window.setTimeout(() => void load(), 0);
+    const timer = window.setTimeout(() => {
+      setSearch('');
+      void load();
+    }, 0);
     return () => window.clearTimeout(timer);
     // Loading is intentionally tied only to opening the picker; Refresh is explicit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -64,7 +90,7 @@ export const GmailThreadPicker = ({
           <div>
             <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Gmail intake</p>
             <h2 id="gmail-picker-title" className="text-lg font-black text-slate-950">Choose Main Gmail Thread</h2>
-            <p className="mt-1 text-xs font-semibold text-slate-600">The 50 most recent read or unread 3D-printing-related threads.</p>
+            <p className="mt-1 text-xs font-semibold text-slate-600">Showing up to 50 of the most recent 3D-printing-related email threads from the last 30 days.</p>
           </div>
           <div className="flex gap-1">
             <Button variant="ghost" size="icon" onClick={() => void load()} disabled={loading} aria-label="Refresh recent Gmail threads">
@@ -74,6 +100,24 @@ export const GmailThreadPicker = ({
           </div>
         </header>
         <div className="overflow-y-auto bg-slate-100 p-4">
+          {!error && items.length > 0 && (
+            <div className="relative mb-4">
+              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sky-600" size={16} />
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search names, emails, subjects, or message text"
+                aria-label="Search recent Gmail threads"
+                className="forge-command-input h-10 w-full pl-10 pr-10 text-sm font-semibold"
+              />
+              {search && (
+                <button type="button" onClick={() => setSearch('')} aria-label="Clear Gmail thread search" className="forge-focus-ring absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-500 hover:text-slate-900">
+                  <X size={15} />
+                </button>
+              )}
+            </div>
+          )}
           {loading && items.length === 0 && (
             <div className="flex min-h-48 items-center justify-center gap-2 text-sm font-bold text-slate-600"><Loader2 size={18} className="animate-spin" /> Loading Gmail threads…</div>
           )}
@@ -86,8 +130,13 @@ export const GmailThreadPicker = ({
           {!loading && !error && items.length === 0 && (
             <div className="rounded-md border border-slate-300 bg-white p-8 text-center text-sm font-semibold text-slate-600">No recent print-related Gmail threads were found.</div>
           )}
+          {!loading && !error && items.length > 0 && filteredItems.length === 0 && (
+            <div className="rounded-md border border-slate-300 bg-white p-8 text-center text-sm font-semibold text-slate-600">
+              No email threads matched “{search.trim()}” within the recent 3D-printing emails from the last 30 days. Try a different name, email address, or phrase.
+            </div>
+          )}
           <div className="space-y-3">
-            {items.map((item) => (
+            {filteredItems.map((item) => (
               <button
                 type="button"
                 key={item.threadId}
