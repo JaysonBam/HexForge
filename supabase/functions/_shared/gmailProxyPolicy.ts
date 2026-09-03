@@ -40,7 +40,7 @@ export const classifyGmailProxyRequest = (
 
   if (
     method === 'GET'
-    && url.pathname === '/messages'
+    && (url.pathname === '/messages' || url.pathname === '/threads')
     && hasOnlyParams(url, ['maxResults', 'q', 'pageToken'])
   ) {
     const maxResults = Number(url.searchParams.get('maxResults'));

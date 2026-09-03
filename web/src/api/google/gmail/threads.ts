@@ -1,7 +1,7 @@
 import { gmailApiFetch } from '@/api/google/gmail/client';
 import { stripQuotedReplyContent } from './decoding';
 import type { GmailThreadAttachment, GmailThreadListItem, GmailThreadMessage, GmailThreadSnapshot } from './types';
-import { buildRecentPrintEmailQuery, getGmailMessageDirection, isSupportedGmailAttachment } from './search';
+import { getGmailMessageDirection, isSupportedGmailAttachment } from './search';
 
 type GmailHeader = { name?: string; value?: string };
 type GmailPart = {
@@ -141,11 +141,11 @@ export const getGmailThread = async (threadId: string, knownAccountEmail?: strin
 
 export const listRecent3dPrintThreads = async (): Promise<GmailThreadListItem[]> => {
   const groupedTerms = PRINT_TERMS.map((term) => /\s/.test(term) ? `"${term}"` : term).join(' ');
-  const query = `${buildRecentPrintEmailQuery('3d').replace(/\s+3d$/, '')} {${groupedTerms}}`;
-  const result = await fetchJson<{ messages?: Array<{ id?: string; threadId?: string }> }>(
-    `/messages?maxResults=50&q=${encodeURIComponent(query)}`
+  const query = `{${groupedTerms}}`;
+  const result = await fetchJson<{ threads?: Array<{ id?: string }> }>(
+    `/threads?maxResults=50&q=${encodeURIComponent(query)}`
   );
-  const threadIds = [...new Set((result.messages || []).map((message) => message.threadId).filter((id): id is string => Boolean(id)))].slice(0, 50);
+  const threadIds = (result.threads || []).map((thread) => thread.id).filter((id): id is string => Boolean(id)).slice(0, 50);
   const accountEmail = await getGmailAccountEmail();
   const snapshots = await Promise.all(threadIds.map((threadId) => getGmailThread(threadId, accountEmail)));
   return snapshots.map((snapshot) => {
