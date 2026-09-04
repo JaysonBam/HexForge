@@ -6,9 +6,63 @@ interface BBoxObject {
     name: string;
 }
 
-async function generatePartName(zip: JSZip, plateIndex: number, defaultName: string): Promise<string> {
+interface MetadataEntry {
+    getAttribute(name: string): string | null;
+}
+
+function getMetadataValue(metadataEntries: Iterable<MetadataEntry>, key: string): string | null {
+    for (const metadata of metadataEntries) {
+        if (metadata.getAttribute("key") === key) {
+            return metadata.getAttribute("value");
+        }
+    }
+
+    return null;
+}
+
+export function getBambuPlateIndex(metadataEntries: Iterable<MetadataEntry>, fallbackIndex: number): number {
+    const rawIndex = getMetadataValue(metadataEntries, "index")?.trim();
+    if (!rawIndex || !/^\d+$/.test(rawIndex)) return fallbackIndex;
+
+    const plateIndex = Number(rawIndex);
+    return Number.isSafeInteger(plateIndex) && plateIndex > 0 ? plateIndex : fallbackIndex;
+}
+
+function normalizeArchivePath(path: string): string {
+    return path.trim().replaceAll('\\', '/').replace(/^\/+/, '');
+}
+
+export function findBambuPlateFile(
+    zip: JSZip,
+    metadataEntries: Iterable<MetadataEntry>,
+    metadataKey: string,
+    indexedPath: string,
+    positionalPath: string
+): JSZip.JSZipObject | null {
+    const referencedPath = getMetadataValue(metadataEntries, metadataKey);
+    const candidates = [
+        referencedPath ? normalizeArchivePath(referencedPath) : null,
+        indexedPath,
+        positionalPath
+    ];
+
+    for (const candidate of new Set(candidates)) {
+        if (!candidate) continue;
+        const file = zip.file(candidate);
+        if (file) return file;
+    }
+
+    return null;
+}
+
+async function generatePartName(
+    zip: JSZip,
+    plateIndex: number,
+    positionalIndex: number,
+    defaultName: string
+): Promise<string> {
     const jsonFilename = `Metadata/plate_${plateIndex}.json`;
-    const jsonFile = zip.file(jsonFilename);
+    const jsonFile = zip.file(jsonFilename) ?? zip.file(`Metadata/plate_${positionalIndex}.json`);
 
     if (!jsonFile) {
         console.warn(`${jsonFilename} not found, using default name.`);
@@ -75,6 +129,9 @@ export async function parseBambu(zip: JSZip, startPartNumber: number, filename: 
         const parts: Part[] = [];
         for (let i = 0; i < plates.length; i++) {
             const plate = plates[i];
+            const positionalIndex = i + 1;
+            const metadataEntries = Array.from(plate.querySelectorAll("metadata"));
+            const plateIndex = getBambuPlateIndex(metadataEntries, positionalIndex);
 
             const number = startPartNumber + i;
             let name = filename;
@@ -82,7 +139,7 @@ export async function parseBambu(zip: JSZip, startPartNumber: number, filename: 
                 name = `${filename}_${i + 1}`; 
             }
             // Generate Name from Plate JSON (e.g. "Torus x6, wipe_tower")
-            name = await generatePartName(zip, i + 1, name);
+            name = await generatePartName(zip, plateIndex, positionalIndex, name);
 
             const predictionEl = plate.querySelector('metadata[key="prediction"]');
             const printingTime = predictionEl ? parseFloat(predictionEl.getAttribute("value") || "0") : 0;
@@ -142,9 +199,15 @@ export async function parseBambu(zip: JSZip, startPartNumber: number, filename: 
                 .sort((a, b) => b.weight - a.weight)
                 .slice(0, 2);         
 
-            const imageFile = zip.file(`Metadata/plate_${i+1}.png`);
+            const imageFile = findBambuPlateFile(
+                zip,
+                metadataEntries,
+                "thumbnail_file",
+                `Metadata/plate_${plateIndex}.png`,
+                `Metadata/plate_${positionalIndex}.png`
+            );
             
-            const imageUrl = await extractImage(imageFile, `Part ${i+1}`);
+            const imageUrl = await extractImage(imageFile, `Part ${positionalIndex}`);
 
             parts.push({
                 number,
