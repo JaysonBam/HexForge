@@ -407,7 +407,7 @@ export const CheckpointPrinting = ({ project, onAdvanceToCollection }: { project
                                     {part.imageUrl && (
                                         <img src={part.imageUrl} alt={part.partName} className="h-12 w-12 rounded border bg-white object-contain" />
                                     )}
-                                    <div>
+                                    <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
                                         <div className="font-medium">{part.partName}</div>
                                         {part.sourceFilePath && <div className="mt-1 truncate font-mono text-[11px] text-slate-600" title={part.sourceFilePath}>File: {sourceFileName(part.sourceFilePath)}</div>}
                                         {part.specialInstruction && part.specialInstruction.trim() !== '' && (
@@ -447,7 +447,7 @@ export const CheckpointPrinting = ({ project, onAdvanceToCollection }: { project
                                     {part.imageUrl && (
                                         <img src={part.imageUrl} alt={part.partName} className="h-12 w-12 rounded border bg-white object-contain" />
                                     )}
-                                    <div>
+                                    <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
                                         <div className="font-medium">{part.partName}</div>
                                         {part.sourceFilePath && <div className="mt-1 truncate font-mono text-[11px] text-slate-600" title={part.sourceFilePath}>File: {sourceFileName(part.sourceFilePath)}</div>}
                                         {part.specialInstruction && part.specialInstruction.trim() !== '' && (
@@ -497,7 +497,7 @@ export const CheckpointPrinting = ({ project, onAdvanceToCollection }: { project
                                     {part.imageUrl && (
                                         <img src={part.imageUrl} alt={part.partName} className="h-12 w-12 rounded border bg-white object-contain" />
                                     )}
-                                    <div>
+                                    <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
                                         <div className="font-medium text-slate-800">{part.partName}</div>
                                         {part.sourceFilePath && <div className="mt-1 truncate font-mono text-[11px] text-slate-600" title={part.sourceFilePath}>File: {sourceFileName(part.sourceFilePath)}</div>}
                                         {part.specialInstruction && part.specialInstruction.trim() !== '' && (
