@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { PrintLocationBadge } from '@/components/ui/PrintLocationBadge';
 import { useFeedback } from '@/app/providers/FeedbackProvider';
 import { StateBadge } from '@/components/ui/StateBadge';
 import { CheckpointNew } from '@/features/workflow/components/CheckpointNew';
@@ -207,7 +208,10 @@ export const ProjectTimeline = () => {
             <div className="space-y-1.5">
               <div className="project-summary-row">
                 <p className="project-summary-label">Priority</p>
-                <p className="project-summary-priority">#{project.priorityNumber}</p>
+                <div className="flex min-w-0 items-center justify-end gap-2">
+                  <PrintLocationBadge label={project.printLabel} className="max-w-36" />
+                  <p className="project-summary-priority shrink-0">#{project.priorityNumber}</p>
+                </div>
               </div>
 
               <div className="project-summary-row">

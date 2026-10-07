@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/Card';
+import { PrintLocationBadge } from '@/components/ui/PrintLocationBadge';
 import { useProjects } from '@/features/projects/context/ProjectContext';
 import {
   buildDashboardLanes,
@@ -551,6 +552,7 @@ const ProjectRow = ({ project, onOpen }: { project: ReturnType<typeof useProject
             {project.studentNumber || 'No student number'} {project.course ? `- ${project.course}` : ''}
           </p>
         </div>
+        <PrintLocationBadge label={project.printLabel} className="mt-0.5 max-w-[35%] shrink-0" />
       </div>
 
       <div className="mt-4 grid min-h-[3.55rem] grid-cols-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
