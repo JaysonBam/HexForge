@@ -14,3 +14,4 @@ export {
   downloadPreparedGmailAttachments
 } from '../../src/features/gmail/gmailAttachmentDownload';
 export { supabase } from '../../src/api/supabase/client';
+export { classifyGmailProxyRequest } from '../../../supabase/functions/_shared/gmailProxyPolicy.ts';

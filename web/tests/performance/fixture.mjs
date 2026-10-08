@@ -17,6 +17,7 @@ export function createFixture({ delay = 120, threadCount = 30, tailDelay = 480, 
     threadIds: Array.from({ length: threadCount }, (_, i) => `thread-${threadCount - 1 - i}`),
     changes: [],
     historyPages: null,
+    threadPages: null,
     threadResponses: new Map()
   };
   let activeGmail = 0;
@@ -54,6 +55,12 @@ export function createFixture({ delay = 120, threadCount = 30, tailDelay = 480, 
         : { historyId: mailbox.historyId, history: mailbox.changes.filter(change => Number(change.id) > Number(params.get('startHistoryId'))) };
     }
     else if (gmailPath?.startsWith('/messages?')) payload = { messages: mailbox.threadIds.map(id => ({ id: id.replace('thread', 'message'), threadId: id })) };
+    else if (gmailPath?.startsWith('/threads?')) {
+      const params = new URL(gmailPath, 'https://fixture.invalid').searchParams;
+      payload = mailbox.threadPages
+        ? mailbox.threadPages[Number(params.get('pageToken') || 0)]
+        : { threads: mailbox.threadIds.slice(0, Number(params.get('maxResults'))).map(id => ({ id })) };
+    }
     else if (isThread) {
       const id = gmailPath.split('/')[2].split('?')[0];
       payload = { id, messages: [{ id: id.replace('thread', 'message'), threadId: id, internalDate: String(1791356400000 + Number(id.split('-')[1]) * 1000), payload: { headers: [{ name: 'From', value: 'Fixture Student <student@example.com>' }, { name: 'To', value: 'printing@example.com' }, { name: 'Subject', value: 'Fixture print request' }, { name: 'Message-ID', value: '<fixture@example.com>' }], parts: [{ partId: '0', mimeType: 'text/plain', body: { data: Buffer.from('Please print the fixture.').toString('base64url') } }, ...attachments.map(a => ({ partId: a.partId, filename: a.filename, mimeType: a.mimeType, body: { attachmentId: a.attachmentId, size: a.size } }))] } }] };
