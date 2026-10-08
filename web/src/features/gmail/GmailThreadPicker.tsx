@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Mail, Paperclip, RefreshCw, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useFeedback } from '@/app/providers/FeedbackProvider';
@@ -19,41 +19,46 @@ export const GmailThreadPicker = ({
   open: boolean;
   onClose: () => void;
   onSelect: (item: GmailThreadListItem) => void;
+}) => open ? <GmailThreadPickerDialog onClose={onClose} onSelect={onSelect} /> : null;
+
+const GmailThreadPickerDialog = ({ onClose, onSelect }: {
+  onClose: () => void;
+  onSelect: (item: GmailThreadListItem) => void;
 }) => {
   const { confirm } = useFeedback();
   const [items, setItems] = useState<GmailThreadListItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const request = useRef<AbortController | null>(null);
 
   const filteredItems = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return items;
-    return items.filter((item) => [
-      item.senderName,
-      item.senderEmail,
-      item.subject,
-      item.preview,
-      ...item.attachmentFilenames,
-      item.snapshot.accountEmail,
-      item.snapshot.mainContactEmail,
-      ...item.snapshot.messages.flatMap((message) => [
-        message.senderName,
-        message.senderEmail,
-        ...message.recipientEmails,
-        message.subject,
-        message.body,
-        ...message.attachments.map((attachment) => attachment.filename)
-      ])
+    return items.filter(item => [item.senderName, item.senderEmail, item.subject, item.preview,
+      ...item.attachmentFilenames, item.snapshot.accountEmail, item.snapshot.mainContactEmail,
+      ...item.snapshot.messages.flatMap(message => [message.senderName, message.senderEmail,
+        ...message.recipientEmails, message.subject, message.body,
+        ...message.attachments.map(attachment => attachment.filename)])
     ].join('\n').toLowerCase().includes(query));
   }, [items, search]);
 
-  const load = async () => {
+  const load = async (forceRefresh = false) => {
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
     setLoading(true);
     setError(null);
+    setItems([]);
     try {
-      setItems(await listRecent3dPrintThreads());
+      const result = await listRecent3dPrintThreads({
+        signal: controller.signal,
+        forceRefresh,
+        onProgress: next => { if (!controller.signal.aborted) setItems(next); }
+      });
+      if (!controller.signal.aborted) setItems(result);
     } catch (loadError) {
+      if (controller.signal.aborted) return;
       if (loadError instanceof GmailAuthError) {
         const reconnect = await confirm({
           title: 'Gmail access needed',
@@ -66,22 +71,18 @@ export const GmailThreadPicker = ({
         setError(loadError instanceof Error ? loadError.message : 'Recent Gmail threads could not be loaded.');
       }
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!open) return;
     const timer = window.setTimeout(() => {
-      setSearch('');
       void load();
     }, 0);
-    return () => window.clearTimeout(timer);
+    return () => { window.clearTimeout(timer); request.current?.abort(); };
     // Loading is intentionally tied only to opening the picker; Refresh is explicit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
-  if (!open) return null;
+  }, []);
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]" onClick={onClose}>
@@ -93,14 +94,14 @@ export const GmailThreadPicker = ({
             <p className="mt-1 text-xs font-semibold text-slate-600">Showing up to 50 of the most recent 3D-printing-related email threads from the last 30 days.</p>
           </div>
           <div className="flex gap-1">
-            <Button variant="ghost" size="icon" onClick={() => void load()} disabled={loading} aria-label="Refresh recent Gmail threads">
+            <Button variant="ghost" size="icon" onClick={() => void load(true)} disabled={loading} aria-label="Refresh recent Gmail threads">
               <RefreshCw size={17} className={loading ? 'animate-spin' : ''} />
             </Button>
             <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close Gmail picker"><X size={18} /></Button>
           </div>
         </header>
         <div className="overflow-y-auto bg-slate-100 p-4">
-          {!error && items.length > 0 && (
+          {items.length > 0 && (
             <div className="relative mb-4">
               <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sky-600" size={16} />
               <input
@@ -121,10 +122,11 @@ export const GmailThreadPicker = ({
           {loading && items.length === 0 && (
             <div className="flex min-h-48 items-center justify-center gap-2 text-sm font-bold text-slate-600"><Loader2 size={18} className="animate-spin" /> Loading Gmail threads…</div>
           )}
+          {loading && items.length > 0 && <p role="status" className="mb-3 flex items-center gap-2 text-xs font-semibold text-slate-600"><Loader2 size={14} className="animate-spin" /> Loading remaining threads… You can choose an email now.</p>}
           {error && (
             <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
               <p>{error}</p>
-              <Button variant="outline" size="sm" className="mt-3 gap-2" onClick={() => void load()}><RefreshCw size={14} /> Try again</Button>
+              <Button variant="outline" size="sm" className="mt-3 gap-2" onClick={() => void load(true)}><RefreshCw size={14} /> Try again</Button>
             </div>
           )}
           {!loading && !error && items.length === 0 && (

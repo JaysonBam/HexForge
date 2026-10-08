@@ -5,6 +5,7 @@ export type AllowedGmailRequest = {
 };
 
 const idPattern = /^[A-Za-z0-9_-]{1,1024}$/;
+const pageTokenPattern = /^[-A-Za-z0-9_+/=]{1,1024}$/;
 
 const hasOnlyParams = (url: URL, allowed: string[]) =>
   [...url.searchParams.keys()].every((key) => allowed.includes(key));
@@ -25,6 +26,17 @@ export const classifyGmailProxyRequest = (
 
   if (method === 'GET' && url.pathname === '/profile' && !url.search) {
     return { method: 'GET', operation: 'gmail_read', limit: 120 };
+  }
+
+  if (method === 'GET' && url.pathname === '/history'
+    && hasOnlyParams(url, ['startHistoryId', 'maxResults', 'pageToken'])) {
+    const count = Number(url.searchParams.get('maxResults'));
+    const cursor = url.searchParams.get('startHistoryId') || '';
+    const page = url.searchParams.get('pageToken');
+    if (/^\d{1,30}$/.test(cursor) && Number.isInteger(count) && count >= 1 && count <= 500
+      && (!page || pageTokenPattern.test(page))) {
+      return { method: 'GET', operation: 'gmail_read', limit: 120 };
+    }
   }
 
   const threadMatch = url.pathname.match(/^\/threads\/([^/]+)$/);

@@ -1,6 +1,8 @@
 import type { Project } from '@/types';
 import { sendGmailThreadReply } from '@/api/google/gmail/client';
-import { getGmailThread } from '@/api/google/gmail/threads';
+import { getGmailThread, invalidateRecentGmailThreads } from '@/api/google/gmail/threads';
+import { getAuthSession } from '@/api/supabase/auth';
+import { ReadCache } from '@/lib/readCache';
 import {
   deleteProjectGmailThreadRecord,
   getProjectGmailMessages,
@@ -10,24 +12,33 @@ import {
 import { assertProjectGmailThreadAccess } from '@/features/gmail/gmailThreadAccess';
 import type { GmailReplyContent, GmailThreadAttachment, GmailThreadMessage, GmailThreadSnapshot } from '@/api/google/gmail/types';
 
+const correspondence = new ReadCache<GmailThreadMessage[]>();
+
 export const cacheProjectGmailThread = async (projectId: string, thread: GmailThreadSnapshot): Promise<void> => {
-  await saveProjectGmailThreadRecord(projectId, thread);
+  try { await saveProjectGmailThreadRecord(projectId, thread); }
+  finally { correspondence.clear(); }
 };
 
 export const linkProjectGmailThread = cacheProjectGmailThread;
 
 export const unlinkProjectGmailThread = async (projectId: string): Promise<void> => {
-  await deleteProjectGmailThreadRecord(projectId);
+  try { await deleteProjectGmailThreadRecord(projectId); }
+  finally { correspondence.clear(); }
 };
 
 export const loadProjectGmailMessages = async (projectId: string): Promise<GmailThreadMessage[]> => {
-  return getProjectGmailMessages(projectId);
+  const { data } = await getAuthSession();
+  const ownerId = data.session?.user.id;
+  return ownerId ? correspondence.read(`${ownerId}:${projectId}`, () => getProjectGmailMessages(projectId)) : getProjectGmailMessages(projectId);
 };
 
-export const syncProjectGmailThread = async (project: Project): Promise<GmailThreadSnapshot> => {
+export const syncProjectGmailThread = async (project: Project, options: {
+  onThread?: (thread: GmailThreadSnapshot) => void;
+} = {}): Promise<GmailThreadSnapshot> => {
   if (!project.gmailThreadId) throw new Error('This project does not have a Main Gmail Thread.');
   await assertProjectGmailThreadAccess(project);
   const snapshot = await getGmailThread(project.gmailThreadId, project.gmailAccountEmail || undefined);
+  options.onThread?.(snapshot);
   await cacheProjectGmailThread(project.id, snapshot);
   return snapshot;
 };
@@ -56,6 +67,7 @@ export const sendProjectGmailReply = async (
     inReplyTo: latestMessage.messageIdHeader,
     references
   });
+  invalidateRecentGmailThreads();
   const refreshed = await getGmailThread(latestThread.id, latestThread.accountEmail);
   await cacheProjectGmailThread(project.id, refreshed);
   window.dispatchEvent(new CustomEvent('hexforge:gmail-synced', { detail: { projectId: project.id } }));
@@ -69,5 +81,6 @@ export const updateAttachmentDownloadStatus = async (args: {
   savedFilename?: string | null;
   error?: string | null;
 }): Promise<void> => {
-  await updateGmailAttachmentRecord(args);
+  try { await updateGmailAttachmentRecord(args); }
+  finally { correspondence.clear(); }
 };

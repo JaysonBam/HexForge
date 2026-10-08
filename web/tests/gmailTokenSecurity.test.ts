@@ -12,6 +12,7 @@ const read = (relativePath: string) =>
 
 test('Gmail proxy permits only the operations used by HexForge', () => {
   assert.equal(classifyGmailProxyRequest('/profile', 'GET')?.operation, 'gmail_read');
+  assert.equal(classifyGmailProxyRequest('/history?startHistoryId=123&maxResults=500&pageToken=next_1', 'GET')?.operation, 'gmail_read');
   assert.equal(classifyGmailProxyRequest('/threads/thread_1?format=full', 'GET')?.operation, 'gmail_read');
   assert.equal(
     classifyGmailProxyRequest('/messages?maxResults=100&q=is%3Aunread&pageToken=next_1', 'GET')?.operation,
@@ -34,10 +35,20 @@ test('Gmail proxy rejects arbitrary hosts, paths, methods, parameters, and overs
   assert.equal(classifyGmailProxyRequest('https://attacker.example/token', 'GET'), null);
   assert.equal(classifyGmailProxyRequest('/settings/forwardingAddresses', 'GET'), null);
   assert.equal(classifyGmailProxyRequest('/profile', 'POST'), null);
+  assert.equal(classifyGmailProxyRequest('/history?startHistoryId=123&maxResults=501', 'GET'), null);
+  assert.equal(classifyGmailProxyRequest('/history?startHistoryId=invalid&maxResults=500', 'GET'), null);
+  assert.equal(classifyGmailProxyRequest('/history?startHistoryId=123&maxResults=500&access_token=secret', 'GET'), null);
   assert.equal(classifyGmailProxyRequest('/threads?maxResults=50&q=3d%20print', 'GET'), null);
   assert.equal(classifyGmailProxyRequest('/messages?maxResults=100&q=x&access_token=secret', 'GET'), null);
   assert.equal(classifyGmailProxyRequest(`/messages?maxResults=100&q=${'x'.repeat(1501)}`, 'GET'), null);
   assert.equal(classifyGmailProxyRequest('/messages/a/attachments/../../profile', 'GET'), null);
+});
+
+test('Gmail history pagination accepts opaque base64 tokens without widening the allowed parameters', () => {
+  const path = `/history?${new URLSearchParams({ startHistoryId: '123', maxResults: '500', pageToken: 'opaque+/token==' })}`;
+  assert.equal(classifyGmailProxyRequest(path, 'GET')?.operation, 'gmail_read');
+  assert.equal(classifyGmailProxyRequest(`${path}&access_token=secret`, 'GET'), null);
+  assert.equal(classifyGmailProxyRequest(`/history?startHistoryId=123&maxResults=500&pageToken=${'x'.repeat(1025)}`, 'GET'), null);
 });
 
 test('Gmail thread picker uses the deployed proxy-compatible list route', () => {

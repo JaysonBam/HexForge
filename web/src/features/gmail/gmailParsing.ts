@@ -49,7 +49,7 @@ export const extractLabelledName = (values: string[]): string => {
 
 export const extractProjectSuggestions = (
   thread: GmailThreadSnapshot,
-  existingProjects: Project[]
+  existingProjects: Pick<Project, 'email' | 'studentNumber' | 'studentName' | 'course' | 'lecturer'>[]
 ): GmailProjectSuggestions => {
   const accountEmail = thread.accountEmail.toLowerCase();
   const externalMessages = thread.messages.filter((message) =>

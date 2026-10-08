@@ -1,4 +1,3 @@
-import JSZip from 'jszip';
 import type { Part, PrintRun, Project } from '@/types';
 import { filamentSourceLabel, getPartFilamentSource } from '@/domain/filamentSource.ts';
 
@@ -245,6 +244,7 @@ const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 </styleSheet>`;
 
 export const buildCollectionReportXlsx = async (rows: CollectionReportRow[]) => {
+  const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
   const createdAt = new Date().toISOString();
 

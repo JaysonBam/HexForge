@@ -1,7 +1,6 @@
 import { Outlet, Link, matchPath, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import {
-  getAuthUser,
   signOut,
   subscribeToAuthChanges
 } from '@/api/supabase/auth';
@@ -145,9 +144,7 @@ export const Layout = () => {
   useEffect(() => {
     let isMounted = true;
 
-    const loadCurrentUser = async () => {
-      const { data } = await getAuthUser();
-      const user = data.user;
+    const loadCurrentUser = async (user: import('@supabase/supabase-js').User) => {
       if (!user) {
         if (!isMounted) {
           return;
@@ -195,8 +192,6 @@ export const Layout = () => {
       );
     };
 
-    loadCurrentUser();
-
     const subscription = subscribeToAuthChanges((_event, session) => {
       if (!session) {
         setProfileAvatarUrl(null);
@@ -205,7 +200,9 @@ export const Layout = () => {
         return;
       }
 
-      void loadCurrentUser();
+      // Header identity is display data. The authenticated session already has
+      // it; avoid two getUser requests that lock and delay all database reads.
+      void loadCurrentUser(session.user);
     });
 
     const handlePointerDown = (event: MouseEvent) => {

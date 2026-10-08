@@ -1,3 +1,15 @@
+/** Decode attachment bytes without allocating one callback per byte. */
+export const decodeBase64UrlBytes = (value: string): Uint8Array => {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+  const native = Uint8Array as unknown as { fromBase64?: (input: string) => Uint8Array };
+  if (native.fromBase64) return native.fromBase64(padded);
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+};
+
 /** Remove the quoted history Gmail includes in reply bodies before displaying or caching it. */
 export const stripQuotedReplyContent = (body: string): string => {
   const normalized = body.replace(/\r/g, '').trim();

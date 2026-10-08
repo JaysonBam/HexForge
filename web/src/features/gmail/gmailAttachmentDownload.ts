@@ -29,8 +29,8 @@ export const prepareGmailAttachmentDownload = async (
     resolution: resolution as Exclude<ProjectResolution, MatchedResolution>,
     attachments: []
   };
-  const messages = await loadProjectGmailMessages(project.id);
-  const attachments = (selectedAttachments || messages.flatMap((message) => message.attachments))
+  const candidates = selectedAttachments ?? (await loadProjectGmailMessages(project.id)).flatMap(message => message.attachments);
+  const attachments = candidates
     .filter((attachment) => isGmailAttachmentDownloadEligible(attachment, Boolean(selectedAttachments)));
   return { resolution, attachments };
 };
@@ -42,29 +42,42 @@ export const downloadPreparedGmailAttachments = async (
 ): Promise<{ saved: number; skipped: number; renamed: number; failed: number; warnings: string[] }> => {
   await assertProjectGmailThreadAccess(project);
   const result = { saved: 0, skipped: 0, renamed: 0, failed: 0, warnings: [] as string[] };
-  for (const attachment of prepared.attachments) {
+  // Fetch ahead with a small bounded window. Local writes remain in original
+  // order so duplicate filenames retain the helper's collision behaviour.
+  const reads = new Map<number, Promise<{ bytes: Uint8Array } | { error: unknown }>>();
+  const startRead = (index: number) => {
+    const attachment = prepared.attachments[index];
+    if (attachment && !reads.has(index)) reads.set(index, downloadGmailAttachment(attachment)
+      .then(bytes => ({ bytes }), error => ({ error })));
+  };
+  for (let index = 0; index < Math.min(3, prepared.attachments.length); index++) startRead(index);
+  const statuses: Promise<void>[] = [];
+  const recordFailure = async (attachment: GmailThreadAttachment, error: unknown) => {
+    result.failed += 1;
+    const message = error instanceof Error ? error.message : `Could not download ${attachment.filename}.`;
+    result.warnings.push(`${attachment.filename}: ${message}`);
+    await updateAttachmentDownloadStatus({ projectId: project.id, attachment, status: 'failed', error: message }).catch(() => undefined);
+  };
+  for (let index = 0; index < prepared.attachments.length; index++) {
+    const attachment = prepared.attachments[index];
     try {
-      const bytes = await downloadGmailAttachment(attachment);
-      const saved = await client.saveProjectAttachment(prepared.resolution.projectKey, attachment.filename, bytes);
+      const read = await reads.get(index)!;
+      reads.delete(index);
+      startRead(index + 3);
+      if ('error' in read) throw read.error;
+      const saved = await client.saveProjectAttachment(prepared.resolution.projectKey, attachment.filename, read.bytes);
       result[saved.status] += 1;
       if (saved.status === 'renamed') result.warnings.push(`${attachment.filename} already existed with different content; saved as ${saved.filename}.`);
-      await updateAttachmentDownloadStatus({
+      statuses.push(updateAttachmentDownloadStatus({
         projectId: project.id,
         attachment,
         status: saved.status === 'saved' ? 'downloaded' : saved.status,
         savedFilename: saved.filename
-      });
+      }).catch(error => recordFailure(attachment, error)));
     } catch (error) {
-      result.failed += 1;
-      const message = error instanceof Error ? error.message : `Could not download ${attachment.filename}.`;
-      result.warnings.push(`${attachment.filename}: ${message}`);
-      await updateAttachmentDownloadStatus({
-        projectId: project.id,
-        attachment,
-        status: 'failed',
-        error: message
-      }).catch(() => undefined);
+      statuses.push(recordFailure(attachment, error));
     }
   }
+  await Promise.all(statuses);
   return result;
 };

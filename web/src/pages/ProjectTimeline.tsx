@@ -303,6 +303,7 @@ export const ProjectTimeline = () => {
         </div>
       )}
       <ProjectCorrespondencePanel
+        key={project.id}
         project={project}
         open={correspondenceOpen}
         onClose={() => setCorrespondenceOpen(false)}

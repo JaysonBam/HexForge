@@ -29,12 +29,12 @@ const buildInitialEmail = (project?: Project) => project?.email || getStudentEma
 
 export const CheckpointNew = ({ project }: { project?: Project }) => {
   const navigate = useNavigate();
-  const { addProject, updateProject, projects } = useProjects();
+  const { addProject, updateProject, projectSummaries } = useProjects();
   const { modules } = useSettings();
   const { confirm, notify, prompt, showMessage } = useFeedback();
   const { state: helperState, client: helperClient } = useLocalHelper();
   const { canUseGmail } = useProjectGmailThreadAccess(project || { gmailThreadId: null, gmailAccountEmail: null });
-  const automaticPriority = useMemo(() => getNextProjectPriority(projects), [projects]);
+  const automaticPriority = useMemo(() => getNextProjectPriority(projectSummaries), [projectSummaries]);
   const priorityManuallyAdjustedRef = useRef(false);
 
   const [formData, setFormData] = useState({
@@ -91,7 +91,7 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
       return;
     }
 
-    const suggestions = extractProjectSuggestions(item.snapshot, projects);
+    const suggestions = extractProjectSuggestions(item.snapshot, projectSummaries);
     const matchedModule = modules.find((module) =>
       module.code.replace(/\s+/g, '').toUpperCase() === suggestions.moduleCode.replace(/\s+/g, '').toUpperCase());
     setSelectedGmailThread(item);
