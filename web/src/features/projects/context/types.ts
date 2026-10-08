@@ -1,4 +1,5 @@
 import type { Part, Project } from '@/types';
+import type { ProjectSummary } from '@/api/supabase/projects';
 
 export type TransitionResult = {
   ok: boolean;
@@ -30,6 +31,7 @@ export type PartTransitionAction =
 
 export interface ProjectContextType {
   projects: Project[];
+  projectSummaries: ProjectSummary[];
   projectsLoading: boolean;
   projectsLoadError: string | null;
   syncStatus: { saving: boolean; error: string | null };

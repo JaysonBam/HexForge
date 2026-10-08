@@ -1,5 +1,7 @@
-import { gmailApiFetch } from '@/api/google/gmail/client';
-import { stripQuotedReplyContent } from './decoding';
+import { gmailApiFetch, GmailApiStatusError } from '@/api/google/gmail/client';
+import { readSnapshot, writeSnapshot } from '@/lib/persistentReads';
+import { getAuthSession } from '@/api/supabase/auth';
+import { decodeBase64UrlBytes, stripQuotedReplyContent } from './decoding';
 import type { GmailThreadAttachment, GmailThreadListItem, GmailThreadMessage, GmailThreadSnapshot } from './types';
 import { buildRecentPrintEmailQuery, getGmailMessageDirection, isSupportedGmailAttachment } from './search';
 
@@ -27,12 +29,7 @@ const PRINT_TERMS = ['3d', '3d print', '3d printing', 'print', 'printing', 'prin
 const headerValue = (message: GmailMessage, name: string) => message.payload?.headers
   ?.find((header) => header.name?.toLowerCase() === name.toLowerCase())?.value?.trim() || '';
 
-const decodeBase64Url = (value: string): string => {
-  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
-  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
-  const binary = atob(padded);
-  return new TextDecoder().decode(Uint8Array.from(binary, (character) => character.charCodeAt(0)));
-};
+const decodeBase64Url = (value: string): string => new TextDecoder().decode(decodeBase64UrlBytes(value));
 
 const htmlToPlainText = (html: string): string => {
   if (typeof DOMParser === 'undefined') return stripQuotedReplyContent(html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
@@ -84,21 +81,21 @@ const messageDate = (message: GmailMessage): string => {
   return Number.isNaN(parsed.getTime()) ? new Date(0).toISOString() : parsed.toISOString();
 };
 
-const fetchJson = async <T>(path: string): Promise<T> => {
-  const response = await gmailApiFetch(path);
-  if (!response.ok) throw new Error(`Gmail API returned ${response.status}: ${await response.text()}`);
+const fetchJson = async <T>(path: string, signal?: AbortSignal): Promise<T> => {
+  const response = await gmailApiFetch(path, { signal });
+  if (!response.ok) throw new GmailApiStatusError(response.status, await response.text());
   return response.json() as Promise<T>;
 };
 
-export const getGmailAccountEmail = async (): Promise<string> => {
-  const profile = await fetchJson<{ emailAddress?: string }>('/profile');
+export const getGmailAccountEmail = async (signal?: AbortSignal): Promise<string> => {
+  const profile = await fetchJson<{ emailAddress?: string }>('/profile', signal);
   return profile.emailAddress?.trim().toLowerCase() || '';
 };
 
-export const getGmailThread = async (threadId: string, knownAccountEmail?: string): Promise<GmailThreadSnapshot> => {
+export const getGmailThread = async (threadId: string, knownAccountEmail?: string, signal?: AbortSignal): Promise<GmailThreadSnapshot> => {
   const [payload, accountEmail] = await Promise.all([
-    fetchJson<GmailThreadResponse>(`/threads/${encodeURIComponent(threadId)}?format=full`),
-    knownAccountEmail ? Promise.resolve(knownAccountEmail) : getGmailAccountEmail()
+    fetchJson<GmailThreadResponse>(`/threads/${encodeURIComponent(threadId)}?format=full`, signal),
+    knownAccountEmail ? Promise.resolve(knownAccountEmail) : getGmailAccountEmail(signal)
   ]);
   const rawMessages = payload.messages || [];
   const messages: GmailThreadMessage[] = rawMessages.map((message): GmailThreadMessage => {
@@ -139,19 +136,107 @@ export const getGmailThread = async (threadId: string, knownAccountEmail?: strin
   };
 };
 
-export const listRecent3dPrintThreads = async (): Promise<GmailThreadListItem[]> => {
+type RecentThreads = {
+  accountEmail: string;
+  historyId: string;
+  fullSyncedAt: number;
+  items: GmailThreadListItem[];
+};
+type GmailHistory = {
+  historyId?: string;
+  nextPageToken?: string;
+  history?: Array<{
+    messages?: Array<{ threadId?: string }>;
+    messagesAdded?: Array<{ message?: { threadId?: string } }>;
+    messagesDeleted?: Array<{ message?: { threadId?: string } }>;
+    labelsAdded?: Array<{ message?: { threadId?: string } }>;
+    labelsRemoved?: Array<{ message?: { threadId?: string } }>;
+  }>;
+};
+const fullSyncIntervalMs = 3 * 60 * 60 * 1000;
+const pendingLists = new Map<string, Promise<GmailThreadListItem[]>>();
+let cacheGeneration = 0;
+// Every open checks Gmail. Replies make any already-running result ineligible for persistence.
+export const invalidateRecentGmailThreads = () => { cacheGeneration++; pendingLists.clear(); };
+
+export const listRecent3dPrintThreads = async (options: {
+  onProgress?: (items: GmailThreadListItem[]) => void;
+  signal?: AbortSignal;
+  forceRefresh?: boolean;
+} = {}): Promise<GmailThreadListItem[]> => {
+  options.signal?.throwIfAborted();
+  const { data } = await getAuthSession();
+  const ownerId = data.session?.user.id;
+  if (!ownerId) return loadRecent3dPrintThreads(undefined, options);
+  let pending = pendingLists.get(ownerId);
+  if (!pending) {
+    pending = loadRecent3dPrintThreads(ownerId, {
+      onProgress: next => { if (!options.signal?.aborted) options.onProgress?.(next); }
+    });
+    pendingLists.set(ownerId, pending);
+    void pending.finally(() => { if (pendingLists.get(ownerId) === pending) pendingLists.delete(ownerId); }).catch(() => {});
+  }
+  const items = await pending;
+  options.signal?.throwIfAborted();
+  options.onProgress?.(items);
+  return items;
+};
+
+const loadRecent3dPrintThreads = async (ownerId: string | undefined, options: {
+  onProgress?: (items: GmailThreadListItem[]) => void;
+  signal?: AbortSignal;
+}): Promise<GmailThreadListItem[]> => {
   const groupedTerms = PRINT_TERMS.map((term) => /\s/.test(term) ? `"${term}"` : term).join(' ');
   const query = `${buildRecentPrintEmailQuery('3d').replace(/\s+3d$/, '')} {${groupedTerms}}`;
-  const result = await fetchJson<{ messages?: Array<{ threadId?: string }> }>(
-    `/messages?maxResults=100&q=${encodeURIComponent(query)}`
-  );
+  const generation = cacheGeneration;
+  const key = `recent-gmail-v2:${ownerId}`;
+  const [result, profile, saved] = await Promise.all([
+    fetchJson<{ messages?: Array<{ threadId?: string }> }>(`/messages?maxResults=100&q=${encodeURIComponent(query)}`, options.signal),
+    fetchJson<{ emailAddress?: string; historyId?: string }>('/profile', options.signal),
+    ownerId ? readSnapshot<RecentThreads>(key) : Promise.resolve(undefined)
+  ]);
+  const accountEmail = profile.emailAddress?.trim().toLowerCase() || '';
   const threadIds = [...new Set((result.messages || []).map((message) => message.threadId).filter((id): id is string => Boolean(id)))].slice(0, 50);
-  const accountEmail = await getGmailAccountEmail();
-  const snapshots = await Promise.all(threadIds.map((threadId) => getGmailThread(threadId, accountEmail)));
-  return snapshots.map((snapshot) => {
+  let reusable = saved?.accountEmail === accountEmail && Array.isArray(saved.items)
+    && Boolean(saved.historyId && profile.historyId)
+    && Date.now() - saved.fullSyncedAt < fullSyncIntervalMs;
+  const changed = new Set<string>();
+  let historyId = profile.historyId || '';
+  if (reusable && saved && saved.historyId !== historyId) {
+    try {
+      let pageToken: string | undefined;
+      do {
+        const params = new URLSearchParams({ startHistoryId: saved.historyId, maxResults: '500' });
+        if (pageToken) params.set('pageToken', pageToken);
+        const history = await fetchJson<GmailHistory>(`/history?${params}`, options.signal);
+        history.history?.forEach(record => [
+          ...(record.messages || []),
+          ...[...(record.messagesAdded || []), ...(record.messagesDeleted || []),
+            ...(record.labelsAdded || []), ...(record.labelsRemoved || [])]
+            .flatMap(change => change.message ? [change.message] : [])
+        ].forEach(message => {
+          if (message.threadId) changed.add(message.threadId);
+        }));
+        historyId = history.historyId || historyId;
+        pageToken = history.nextPageToken;
+      } while (pageToken);
+    } catch (error) {
+      if (!(error instanceof GmailApiStatusError) || error.status !== 404) throw error;
+      reusable = false; // Expired Gmail change cursor: verify all current threads again.
+    }
+  }
+  const previous = new Map((reusable ? saved!.items : []).map(item => [item.threadId, item]));
+  const loaded: GmailThreadListItem[] = [];
+  let newestReady = false;
+  const sorted = () => [...loaded].sort((left, right) => right.messageDate.localeCompare(left.messageDate));
+  await Promise.all(threadIds.map(async (threadId) => {
+    options.signal?.throwIfAborted();
+    const cached = previous.get(threadId);
+    if (cached && !changed.has(threadId)) { loaded.push(cached); return; }
+    const snapshot = await getGmailThread(threadId, accountEmail, options.signal);
     const latest = snapshot.messages.at(-1);
     const representative = [...snapshot.messages].reverse().find((message) => message.direction === 'incoming') || latest;
-    return {
+    const item = {
       threadId: snapshot.id,
       messageId: representative?.id || '',
       senderName: representative?.senderName || '',
@@ -163,8 +248,23 @@ export const listRecent3dPrintThreads = async (): Promise<GmailThreadListItem[]>
         .filter((attachment) => isSupportedGmailAttachment(attachment.filename))
         .map((attachment) => attachment.filename))],
       snapshot
-    };
-  }).sort((left, right) => right.messageDate.localeCompare(left.messageDate));
+    } satisfies GmailThreadListItem;
+    loaded.push(item);
+    if (threadId === threadIds[0]) newestReady = true;
+    // With a reusable saved list, wait for changed/new rows so old mail never flashes first.
+    // Gmail lists matching messages newest first; don't let a faster older request win.
+    if (!reusable && newestReady) options.onProgress?.(sorted());
+  }));
+  const items = sorted();
+  if (ownerId && generation === cacheGeneration
+    && (!reusable || historyId !== saved!.historyId || items.length !== saved!.items.length
+      || items.some(item => previous.get(item.threadId) !== item))) {
+    await writeSnapshot<RecentThreads>(key, {
+      accountEmail, historyId, items,
+      fullSyncedAt: reusable ? saved!.fullSyncedAt : Date.now()
+    });
+  }
+  return items;
 };
 
 export const downloadGmailAttachment = async (attachment: GmailThreadAttachment): Promise<Uint8Array> => {
@@ -179,7 +279,5 @@ export const downloadGmailAttachment = async (attachment: GmailThreadAttachment)
     payload = part?.body || {};
   }
   if (!payload.data) throw new Error(`Gmail returned no data for ${attachment.filename}.`);
-  const normalized = payload.data.replace(/-/g, '+').replace(/_/g, '/');
-  const binary = atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '='));
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  return decodeBase64UrlBytes(payload.data);
 };

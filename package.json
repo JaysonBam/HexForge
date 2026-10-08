@@ -22,8 +22,9 @@
     "smoke:helper": "npm run smoke -w windows-helper",
     "lint": "npm run lint:web",
     "typecheck": "npm run typecheck:web && npm run typecheck:helper",
-    "test": "npm run test:web && npm run test:helper",
-    "build": "npm run build:web && npm run build:helper"
+    "test": "npm run test:web && npm run test:performance && npm run test:helper",
+    "build": "npm run build:web && npm run build:helper",
+    "test:performance": "node web/tests/performance/regression.mjs"
   },
   "devDependencies": {
     "supabase": "^2.84.5"

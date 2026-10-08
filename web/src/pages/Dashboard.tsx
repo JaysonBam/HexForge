@@ -40,7 +40,7 @@ const laneEmptyCopy: Record<DashboardLaneKey, { title: string; description: stri
   }
 };
 
-const emailReminderRefreshIntervalMs = 5 * 60 * 1000;
+const emailReminderRefreshIntervalMs = 10 * 60 * 1000;
 
 const projectMatchesSearch = (values: Array<string | undefined>, search: string) => {
   const normalizedSearch = search.trim().toLowerCase();
@@ -61,9 +61,9 @@ type EmailReminderState = {
 let cachedEmailReminderState: EmailReminderState | null = null;
 let cachedEmailReminderCheckedAtMs = 0;
 
-const fetchEmailReminderState = async (): Promise<EmailReminderState> => {
+const fetchEmailReminderState = async (onProgress?: (summary: GmailUnreadPrintEmailSummary) => void): Promise<EmailReminderState> => {
   try {
-    const summary = await getUnread3dPrintEmailSummary();
+    const summary = await getUnread3dPrintEmailSummary({ onProgress });
     return {
       status: 'ready',
       summary,
@@ -94,7 +94,7 @@ const getInitialEmailReminderState = (): EmailReminderState => (
 
 export const Dashboard = () => {
   const navigate = useNavigate();
-  const { projects, projectsLoading, projectsLoadError } = useProjects();
+  const { projectSummaries: projects, projectsLoading, projectsLoadError } = useProjects();
   const [search, setSearch] = useState('');
   const [emailReminder, setEmailReminder] = useState<EmailReminderState>(getInitialEmailReminderState);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
@@ -123,7 +123,9 @@ export const Dashboard = () => {
     }));
 
     try {
-      const nextReminder = await fetchEmailReminderState();
+      const nextReminder = await fetchEmailReminderState(summary => setEmailReminder({
+        status: 'ready', summary, message: null, isRefreshing: true
+      }));
       setCachedEmailReminder({
         ...nextReminder,
         summary: nextReminder.summary ?? cachedEmailReminderState?.summary ?? null,
@@ -136,6 +138,7 @@ export const Dashboard = () => {
   }, [setCachedEmailReminder]);
 
   useEffect(() => {
+    if (projectsLoading) return;
     const refreshIfStale = () => {
       const shouldRefresh =
         !cachedEmailReminderState ||
@@ -155,7 +158,7 @@ export const Dashboard = () => {
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [loadEmailReminder]);
+  }, [loadEmailReminder, projectsLoading]);
 
   const visibleProjects = useMemo(() => (
     projects.filter((project) => projectMatchesSearch([
@@ -349,6 +352,8 @@ const EmailReminderCard = ({
   const refreshedAt = formatEmailReminderTime(reminder.summary?.checkedAt);
   const emailSummaryText = isLoading
     ? 'Checking print emails'
+    : reminder.summary?.complete === false
+      ? `Checking print emails — ${count ?? 0} loaded so far`
     : reminder.status === 'ready' || reminder.summary
       ? `You have ${count ?? 0} unread print ${count === 1 ? 'email' : 'emails'}`
       : reminder.message || 'Could not check Gmail.';
@@ -531,7 +536,7 @@ const CompactMetric = ({
   </div>
 );
 
-const ProjectRow = ({ project, onOpen }: { project: ReturnType<typeof useProjects>['projects'][number]; onOpen: () => void }) => {
+const ProjectRow = ({ project, onOpen }: { project: ReturnType<typeof useProjects>['projectSummaries'][number]; onOpen: () => void }) => {
   const counts = getPartCounts(project);
 
   return (

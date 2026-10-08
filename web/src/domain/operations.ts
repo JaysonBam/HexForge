@@ -73,7 +73,7 @@ const activeStates = new Set<ProjectState>([
   'PARTIALLY_COLLECTED'
 ]);
 
-export const isActiveProject = (project: Project) => activeStates.has(project.state);
+export const isActiveProject = (project: Pick<Project, 'state'>) => activeStates.has(project.state);
 
 export const isPaymentBlocked = (project: Project) =>
   project.needsPayment &&
@@ -85,7 +85,8 @@ export const isCollectionBlocked = (project: Project) =>
   project.needsPayment &&
   !(project.receiptNumber && project.receiptNumber.trim());
 
-export const getPartCounts = (project: Project) => {
+type ProjectCountsInput = { parts: Pick<Part, 'printStatus'>[] };
+export const getPartCounts = (project: ProjectCountsInput) => {
   const total = project.parts.length;
   const verified = project.parts.filter(isPartVerifiedForReview).length;
   const ready = project.parts.filter((part) => part.printStatus === 'READY' || part.printStatus === 'VERIFIED').length;
@@ -120,7 +121,7 @@ export const getProjectBlockers = (project: Project) => {
   return blockers;
 };
 
-export const getProjectLane = (project: Project): DashboardLaneKey | null => {
+export const getProjectLane = (project: Pick<Project, 'state'> & ProjectCountsInput): DashboardLaneKey | null => {
   const counts = getPartCounts(project);
 
   if (project.state === 'CLOSED' || project.state === 'CANCELLED') return null;
@@ -130,8 +131,8 @@ export const getProjectLane = (project: Project): DashboardLaneKey | null => {
   return 'toBeConfirmed';
 };
 
-export const buildDashboardLanes = (projects: Project[]) => {
-  const lanes: Record<DashboardLaneKey, Project[]> = {
+export const buildDashboardLanes = <T extends Pick<Project, 'state' | 'priorityNumber' | 'createdAt'> & ProjectCountsInput>(projects: T[]) => {
+  const lanes: Record<DashboardLaneKey, T[]> = {
     toBeConfirmed: [],
     readyToPrint: [],
     printing: []

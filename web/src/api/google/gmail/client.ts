@@ -1,4 +1,5 @@
-import { signInWithGoogleOAuth } from '@/api/supabase/auth';
+import { getAuthSession, signInWithGoogleOAuth } from '@/api/supabase/auth';
+import { readSnapshot, writeSnapshot } from '@/lib/persistentReads';
 import { beginGmailConnection, invokeGmailProxy } from '@/api/supabase/edgeFunctions';
 import { buildUnreadPrintEmailQuery } from './search';
 
@@ -34,6 +35,7 @@ export type GmailUnreadPrintEmailSummary = {
   checkedAt: string;
   flaggedSubjects: string[];
   flaggedEmails: GmailUnreadPrintEmail[];
+  complete?: boolean;
 };
 
 export type GmailUnreadPrintEmail = {
@@ -94,7 +96,7 @@ export class GmailAuthError extends Error {
   }
 }
 
-class GmailApiStatusError extends Error {
+export class GmailApiStatusError extends Error {
   status: number;
   googleError: string;
 
@@ -340,7 +342,7 @@ const getFlaggedPrintEmail = async (messageId: string): Promise<GmailUnreadPrint
   };
 };
 
-const getFlaggedPrintEmails = async (messageIds: Set<string>) => {
+const getFlaggedPrintEmails = async (messageIds: Set<string>, onProgress?: (emails: GmailUnreadPrintEmail[]) => void, saved: GmailUnreadPrintEmail[] = []) => {
   const ids = Array.from(messageIds);
   const emails = new Array<GmailUnreadPrintEmail>(ids.length);
   let nextIndex = 0;
@@ -349,14 +351,19 @@ const getFlaggedPrintEmails = async (messageIds: Set<string>) => {
     while (nextIndex < ids.length) {
       const index = nextIndex;
       nextIndex += 1;
-      emails[index] = await getFlaggedPrintEmail(ids[index]);
+      emails[index] = saved.find(email => email.id === ids[index]) ?? await getFlaggedPrintEmail(ids[index]);
+      onProgress?.(selectFlaggedPrintEmails(emails.filter(Boolean)));
     }
   };
 
   const workerCount = Math.min(gmailMetadataConcurrency, ids.length);
   await Promise.all(Array.from({ length: workerCount }, () => worker()));
 
-  const sorted = emails.sort((first, second) => {
+  return selectFlaggedPrintEmails(emails);
+};
+
+const selectFlaggedPrintEmails = (emails: GmailUnreadPrintEmail[]) => {
+  const sorted = [...emails].sort((first, second) => {
     const firstTime = first.receivedAt ? new Date(first.receivedAt).getTime() : 0;
     const secondTime = second.receivedAt ? new Date(second.receivedAt).getTime() : 0;
     return secondTime - firstTime || first.subject.localeCompare(second.subject);
@@ -379,17 +386,38 @@ const logFlaggedPrintEmails = (emails: GmailUnreadPrintEmail[]) => {
   console.groupEnd();
 };
 
-const buildUnreadPrintEmailSummary = async (): Promise<GmailUnreadPrintEmailSummary> => {
-  const messageIds = await listUnreadPrintEmailIds();
-  const flaggedEmails = await getFlaggedPrintEmails(messageIds);
+type SavedUnreadMetadata = { accountEmail: string; fullSyncedAt: number; emails: GmailUnreadPrintEmail[] };
+const buildUnreadPrintEmailSummary = async (onProgress?: (summary: GmailUnreadPrintEmailSummary) => void): Promise<GmailUnreadPrintEmailSummary> => {
+  const { data } = await getAuthSession();
+  const key = `unread-gmail-v1:${data.session?.user.id}`;
+  const [messageIds, response, saved] = await Promise.all([
+    listUnreadPrintEmailIds(),
+    gmailApiFetch('/profile'),
+    data.session ? readSnapshot<SavedUnreadMetadata>(key) : Promise.resolve(undefined)
+  ]);
+  if (!response.ok) throw new GmailApiStatusError(response.status, await readGoogleError(response));
+  const profile = await response.json() as { emailAddress?: string };
+  const accountEmail = profile.emailAddress?.trim().toLowerCase() || '';
+  const reusable = saved?.accountEmail === accountEmail && Date.now() - saved.fullSyncedAt < 3 * 60 * 60 * 1000;
+  // Received-message subject/date are immutable; unread membership is always queried live.
+  // Only the newest ten distinct threads are displayed, as before.
+  const displayedIds = new Set([...messageIds].slice(0, 10));
+  const flaggedEmails = await getFlaggedPrintEmails(displayedIds, emails => onProgress?.({
+    count: emails.length, checkedAt: new Date().toISOString(), flaggedSubjects: emails.map(email => email.subject), flaggedEmails: emails, complete: false
+  }), reusable ? saved.emails : []);
   const flaggedSubjects = flaggedEmails.map((email) => email.subject);
   logFlaggedPrintEmails(flaggedEmails);
+  if (data.session && (!reusable || flaggedEmails.some(email => !saved.emails.some(previous => previous.id === email.id))
+    || flaggedEmails.length !== saved.emails.length)) await writeSnapshot<SavedUnreadMetadata>(key, {
+    accountEmail, fullSyncedAt: reusable ? saved.fullSyncedAt : Date.now(), emails: flaggedEmails
+  });
 
   return {
     count: flaggedEmails.length,
     checkedAt: new Date().toISOString(),
     flaggedSubjects,
-    flaggedEmails
+    flaggedEmails,
+    complete: true
   };
 };
 
@@ -478,9 +506,11 @@ export const sendGmailThreadReply = async (request: GmailReplyRequest) => {
   return response.json() as Promise<{ id: string; threadId: string; labelIds?: string[] }>;
 };
 
-export const getUnread3dPrintEmailSummary = async (): Promise<GmailUnreadPrintEmailSummary> => {
+export const getUnread3dPrintEmailSummary = async (options: {
+  onProgress?: (summary: GmailUnreadPrintEmailSummary) => void;
+} = {}): Promise<GmailUnreadPrintEmailSummary> => {
   try {
-    return await buildUnreadPrintEmailSummary();
+    return await buildUnreadPrintEmailSummary(options.onProgress);
   } catch (error) {
     if (error instanceof GmailApiStatusError && error.status === 401) {
       throw new GmailAuthError('Connect Gmail to check unread print emails.');

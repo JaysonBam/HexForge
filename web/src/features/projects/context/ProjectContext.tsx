@@ -1,9 +1,15 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useLocation, matchPath } from 'react-router-dom';
 import type { Part, Project } from '@/types';
 import {
   createProjectRecord,
   deleteProjectRecord,
   getProjects,
+  getProjectById,
+  getProjectSummaries,
+  getActiveProjectCache,
+  type ActiveProjectSnapshot,
+  type ProjectSummary,
   transitionProjectRecord,
   updateProjectRecord
 } from '@/api/supabase/projects';
@@ -28,6 +34,8 @@ import {
 } from '@/features/projects/context/optimisticTransitions';
 import type { ProjectContextType } from '@/features/projects/context/types';
 import { getNextProjectPriority } from '@/domain/projectPriority';
+import { getAuthSession } from '@/api/supabase/auth';
+import { readSnapshot, writeSnapshot } from '@/lib/persistentReads';
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 const EDIT_SAVE_DEBOUNCE_MS = 600;
@@ -53,39 +61,141 @@ export const useProjects = () => {
 };
 
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { pathname } = useLocation();
+  const routeId = matchPath('/project/:id', pathname)?.params.id;
+  const projectId = routeId && routeId !== 'new' ? routeId : undefined;
+  const loadKey = projectId ? `project:${projectId}` : pathname;
   const [projects, setProjects] = useState<Project[]>([]);
+  const [projectSummaries, setProjectSummaries] = useState<ProjectSummary[]>([]);
+  const dashboardSummariesRef = useRef<ProjectSummary[] | null>(null);
+  const loadedProjectsRef = useRef(projects);
+  const [loadedKey, setLoadedKey] = useState('');
+  const loadGenerationRef = useRef(0);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [projectsLoadError, setProjectsLoadError] = useState<string | null>(null);
   const [pendingWrites, setPendingWrites] = useState(0);
   const [syncError, setSyncError] = useState<string | null>(null);
   const queuedProjectUpdatesRef = useRef<Map<string, QueuedProjectUpdate>>(new Map());
   const queuedPartUpdatesRef = useRef<Map<string, QueuedPartUpdate>>(new Map());
+  const activeSnapshotsRef = useRef<Record<string, ActiveProjectSnapshot> | null>(null);
+  const activeCheckAtRef = useRef(0);
+  const activeCheckRef = useRef<Promise<void> | null>(null);
+  const activeChecksEnabledRef = useRef(false);
+  const writeGenerationRef = useRef(0);
+  const writesInFlightRef = useRef(0);
+  const currentPathRef = useRef(pathname);
+  const mountedRef = useRef(true);
+  useEffect(() => { currentPathRef.current = pathname; }, [pathname]);
+  useEffect(() => { loadedProjectsRef.current = projects; }, [projects]);
 
-  const refreshProjects = useCallback(async () => {
+  const preloadActiveProjects = useCallback((force = false): Promise<void> => {
+    if (activeCheckRef.current) return activeCheckRef.current;
+    if (!force && Date.now() - activeCheckAtRef.current < 5 * 60 * 1000) return Promise.resolve();
+    const generation = writeGenerationRef.current;
+    const check = (async () => {
+      const { data } = await getAuthSession();
+      const ownerId = data.session?.user.id;
+      if (!ownerId) return;
+      const key = `active-projects-v1:${ownerId}`;
+      const saved = activeSnapshotsRef.current ?? await readSnapshot<Record<string, ActiveProjectSnapshot>>(key) ?? {};
+      const verified = await getActiveProjectCache(saved);
+      const openId = matchPath('/project/:id', currentPathRef.current)?.params.id;
+      const removedOpenProject = openId && saved[openId] && !verified[openId]
+        ? await getProjectById(openId) : null;
+      if (!mountedRef.current || generation !== writeGenerationRef.current
+        || writesInFlightRef.current || queuedProjectUpdatesRef.current.size || queuedPartUpdatesRef.current.size) return;
+      activeSnapshotsRef.current = verified;
+      activeCheckAtRef.current = Date.now();
+      const active = Object.values(verified).map(entry => entry.project);
+      setProjects(current => [
+        ...current.filter(project => !(project.id in verified) && (!removedOpenProject || project.id !== openId)),
+        ...active, ...(removedOpenProject?.projects ?? [])
+      ]);
+      const summaries = active.map(project => ({ ...project, parts: project.parts.map(part => ({ printStatus: part.printStatus })) }));
+      dashboardSummariesRef.current = summaries;
+      if (currentPathRef.current === '/') setProjectSummaries(summaries);
+      await writeSnapshot(key, verified);
+    })().catch(error => {
+      // A failed background check leaves on-demand project reads available.
+      console.warn('Active projects could not be preloaded:', error);
+    });
+    activeCheckRef.current = check;
+    void check.finally(() => { if (activeCheckRef.current === check) activeCheckRef.current = null; });
+    return check;
+  }, []);
+
+  const refreshProjects = useCallback(async (force = true) => {
+    const generation = ++loadGenerationRef.current;
+    const cachedDashboard = pathname === '/' ? dashboardSummariesRef.current : null;
+    const cachedProject = projectId && loadedProjectsRef.current.some(project => project.id === projectId);
+    setProjectsLoading(!cachedDashboard && !cachedProject);
+    if (cachedProject) setLoadedKey(loadKey);
+    if (cachedDashboard) {
+      setProjectSummaries(cachedDashboard.map(summary =>
+        loadedProjectsRef.current.find(project => project.id === summary.id) ?? summary));
+      setLoadedKey(loadKey);
+    }
     try {
       setProjectsLoadError(null);
-
-      const result = await getProjects();
-      if (result.quoteSnapshotError) {
-        console.error('Failed to fetch quote snapshots:', result.quoteSnapshotError);
+      if (projectId && cachedProject && !force && activeSnapshotsRef.current?.[projectId]
+        && Date.now() - activeCheckAtRef.current < 5 * 60 * 1000) return;
+      if (projectId || pathname === '/projects') {
+        const result = await (projectId ? getProjectById(projectId) : getProjects());
+        if (generation !== loadGenerationRef.current) return;
+        if (result.quoteSnapshotError) console.error('Failed to fetch quote snapshots:', result.quoteSnapshotError);
+        if (result.printRunError) console.error('Failed to fetch print runs:', result.printRunError);
+        setProjects(current => projectId
+          ? [...current.filter(project => project.id !== projectId), ...result.projects]
+          : result.projects);
+        if (projectId) { activeChecksEnabledRef.current = true; void preloadActiveProjects(); }
+      } else if (pathname === '/' || pathname === '/project/new') {
+        const summaries = await getProjectSummaries(pathname === '/');
+        if (generation !== loadGenerationRef.current) return;
+        if (pathname === '/') dashboardSummariesRef.current = summaries;
+        setProjectSummaries(summaries);
+        if (pathname === '/') {
+          activeChecksEnabledRef.current = true;
+          void preloadActiveProjects();
+          void import('@/pages/ProjectTimeline');
+        }
       }
-      if (result.printRunError) {
-        console.error('Failed to fetch print runs:', result.printRunError);
-      }
-      setProjects(result.projects);
     } catch (error) {
+      if (generation !== loadGenerationRef.current) return;
       const message = error instanceof Error ? error.message : 'Unexpected project load failure.';
       console.error('Failed to refresh projects:', error);
       setProjectsLoadError(message);
     } finally {
-      setProjectsLoading(false);
+      if (generation === loadGenerationRef.current) {
+        setLoadedKey(loadKey);
+        setProjectsLoading(false);
+      }
     }
-  }, []);
+  }, [projectId, pathname, loadKey, preloadActiveProjects]);
+  const refreshProjectsRef = useRef(refreshProjects);
+  useEffect(() => { refreshProjectsRef.current = refreshProjects; }, [refreshProjects]);
+
+  const refreshProject = async (projectId: string) => {
+    setProjectsLoadError(null);
+    try {
+      const result = await getProjectById(projectId);
+      if (result.quoteSnapshotError) console.error('Failed to fetch quote snapshots:', result.quoteSnapshotError);
+      if (result.printRunError) console.error('Failed to fetch print runs:', result.printRunError);
+      const loaded = result.projects[0];
+      setProjects(current => loaded
+        ? [...current.filter(project => project.id !== projectId), loaded]
+        : current.filter(project => project.id !== projectId));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unexpected project load failure.';
+      setProjectsLoadError(message);
+    }
+  };
 
   const trackMutation = useCallback(async (
     label: string,
     mutation: () => PromiseLike<SupabaseMutationResult>
   ) => {
+    writeGenerationRef.current++;
+    writesInFlightRef.current++;
     setPendingWrites((count) => count + 1);
     setSyncError(null);
 
@@ -93,19 +203,20 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const { error } = await mutation();
       if (error) {
         setSyncError(`${label}: ${error.message || 'Supabase rejected the change.'}`);
-        await refreshProjects();
+        await refreshProjectsRef.current();
         return false;
       }
       return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unexpected write failure.';
       setSyncError(`${label}: ${message}`);
-      await refreshProjects();
+      await refreshProjectsRef.current();
       return false;
     } finally {
+      writesInFlightRef.current--;
       setPendingWrites((count) => Math.max(0, count - 1));
     }
-  }, [refreshProjects]);
+  }, []);
 
   const flushQueuedProjectUpdate = useCallback((id: string) => {
     const queued = queuedProjectUpdatesRef.current.get(id);
@@ -128,6 +239,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [trackMutation]);
 
   const queueProjectUpdate = useCallback((id: string, updates: Partial<Project>) => {
+    writeGenerationRef.current++;
     const existing = queuedProjectUpdatesRef.current.get(id);
     if (existing) window.clearTimeout(existing.timerId);
 
@@ -142,6 +254,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [flushQueuedProjectUpdate]);
 
   const queuePartUpdate = useCallback((projectId: string, partId: string, updates: Partial<Part>) => {
+    writeGenerationRef.current++;
     const existing = queuedPartUpdatesRef.current.get(partId);
     if (existing) window.clearTimeout(existing.timerId);
 
@@ -191,8 +304,28 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, []);
 
   useEffect(() => {
-    refreshProjects();
+    void refreshProjects(false);
+    return () => { loadGenerationRef.current += 1; };
   }, [refreshProjects]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    const checkIfDue = () => {
+      if (activeChecksEnabledRef.current && document.visibilityState !== 'hidden'
+        && Date.now() - activeCheckAtRef.current >= 5 * 60 * 1000) void preloadActiveProjects();
+    };
+    const timer = window.setInterval(() => {
+      if (activeChecksEnabledRef.current && document.visibilityState !== 'hidden') void preloadActiveProjects(true);
+    }, 5 * 60 * 1000);
+    window.addEventListener('focus', checkIfDue);
+    document.addEventListener('visibilitychange', checkIfDue);
+    return () => {
+      mountedRef.current = false;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', checkIfDue);
+      document.removeEventListener('visibilitychange', checkIfDue);
+    };
+  }, [preloadActiveProjects]);
 
   useEffect(() => {
     const queuedProjectUpdates = queuedProjectUpdatesRef.current;
@@ -218,7 +351,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
   }, []);
 
-  const getProject = (id: string) => projects.find(p => p.id === id);
+  // A verified working project is already usable on the first route render.
+  // Waiting for the route-loading effect would mount a skeleton and then the editor.
+  const readyWorkingProject = Boolean(projectId && activeSnapshotsRef.current?.[projectId]
+    && Date.now() - activeCheckAtRef.current < 5 * 60 * 1000
+    && projects.some(project => project.id === projectId));
+  const getProject = (id: string) => loadedKey === loadKey || (readyWorkingProject && id === projectId)
+    ? projects.find(project => project.id === id) : undefined;
 
   const generateProjectId = () => {
     let newId = '';
@@ -231,7 +370,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const addProject = async (data: Partial<Project>) => {
     const newId = generateProjectId();
 
-    const assignedPriority = data.priorityNumber ?? getNextProjectPriority(projects);
+    const assignedPriority = data.priorityNumber ?? getNextProjectPriority(projectSummaries);
 
     const newProject: Project = {
       id: newId,
@@ -303,6 +442,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     setProjects(prev => prev.filter(p => p.id !== id));
+    if (dashboardSummariesRef.current) dashboardSummariesRef.current = dashboardSummariesRef.current.filter(project => project.id !== id);
     return trackMutation('Delete project', () => deleteProjectRecord(id));
   };
 
@@ -443,6 +583,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     const previousProjects = projects;
+    writeGenerationRef.current++;
+    writesInFlightRef.current++;
     const optimisticProjects = applyOptimisticProjectTransition(previousProjects, { projectId, action, printLabel });
     if (optimisticProjects !== previousProjects) {
       setProjects(optimisticProjects);
@@ -478,7 +620,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         };
       }
 
-      await refreshProjects();
+      await refreshProject(projectId);
       return {
         ok: true,
         errors: [],
@@ -490,6 +632,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setProjects(previousProjects);
       return { ok: false, errors: [message] };
     } finally {
+      writesInFlightRef.current--;
       setPendingWrites((count) => Math.max(0, count - 1));
     }
   };
@@ -509,6 +652,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     const previousProjects = projects;
+    writeGenerationRef.current++;
+    writesInFlightRef.current++;
     const optimisticProjects = applyOptimisticPartTransition(previousProjects, {
       projectId,
       partId,
@@ -551,7 +696,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         };
       }
 
-      await refreshProjects();
+      await refreshProject(projectId);
       return {
         ok: true,
         errors: [],
@@ -563,6 +708,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setProjects(previousProjects);
       return { ok: false, errors: [message] };
     } finally {
+      writesInFlightRef.current--;
       setPendingWrites((count) => Math.max(0, count - 1));
     }
   };
@@ -570,7 +716,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   return (
     <ProjectContext.Provider value={{
       projects,
-      projectsLoading,
+      projectSummaries,
+      projectsLoading: !readyWorkingProject && (projectsLoading || loadedKey !== loadKey),
       projectsLoadError,
       syncStatus: { saving: pendingWrites > 0, error: syncError },
       clearSyncError: () => setSyncError(null),

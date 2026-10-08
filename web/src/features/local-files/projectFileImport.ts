@@ -1,7 +1,4 @@
-import JSZip from 'jszip';
 import type { Part } from '@/types';
-import { parseBambu } from '@/lib/slicer-parsers/parsers/BambuParser';
-import { parseUltimaker } from '@/lib/slicer-parsers/parsers/UltimakerParser';
 
 type ParsedMaterial = {
   type?: string;
@@ -44,14 +41,15 @@ export const analyzeProjectFiles = async (args: {
     }
 
     try {
+      const [{ default: JSZip }, parse] = await Promise.all([
+        import('jszip'),
+        isBambu || isStandard3mf
+          ? import('@/lib/slicer-parsers/parsers/BambuParser').then(module => module.parseBambu)
+          : import('@/lib/slicer-parsers/parsers/UltimakerParser').then(module => module.parseUltimaker)
+      ]);
       const zipContent = await new JSZip().loadAsync(uploadedFile);
-      let parsedParts: ParsedSlicerPart[] = [];
-      if (isBambu || isStandard3mf) {
-        const bareFilename = uploadedFile.name.replace(/(\.gcode\.3mf|\.3mf)$/i, '');
-        parsedParts = await parseBambu(zipContent, partCounter, bareFilename) as ParsedSlicerPart[];
-      } else {
-        parsedParts = await parseUltimaker(zipContent, partCounter) as ParsedSlicerPart[];
-      }
+      const bareFilename = uploadedFile.name.replace(/(\.gcode\.3mf|\.3mf)$/i, '');
+      const parsedParts = await parse(zipContent, partCounter, bareFilename) as ParsedSlicerPart[];
       if (!parsedParts.length) {
         errors.push(`File ${uploadedFile.name} was parsed but no printable parts were found.`);
         continue;

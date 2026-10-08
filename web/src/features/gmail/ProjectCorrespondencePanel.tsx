@@ -12,6 +12,7 @@ import { loadProjectGmailMessages, syncProjectGmailThread } from '@/features/gma
 import type { GmailThreadMessage } from '@/api/google/gmail/types';
 import { openGmailThread } from '@/api/google/gmail/urls';
 import { GMAIL_THREAD_ACCOUNT_MISMATCH, useProjectGmailThreadAccess } from '@/features/gmail/gmailThreadAccess';
+import { mergeGmailMessages } from '@/features/gmail/mergeGmailMessages';
 
 const formatDateTime = (value: string) => {
   const date = new Date(value);
@@ -40,6 +41,8 @@ export const ProjectCorrespondencePanel = ({
   const [checkingLocalFiles, setCheckingLocalFiles] = useState(false);
   const [warning, setWarning] = useState<string | null>(null);
   const autoSyncedThread = useRef<string | null>(null);
+  const cacheRevision = useRef(0);
+  const refreshInFlight = useRef(false);
 
   const loadCached = useCallback(async () => {
     if (!project.gmailThreadId) {
@@ -47,8 +50,10 @@ export const ProjectCorrespondencePanel = ({
       return;
     }
     setLoadingCache(true);
+    const revision = ++cacheRevision.current;
     try {
-      setMessages(await loadProjectGmailMessages(project.id));
+      const cached = await loadProjectGmailMessages(project.id);
+      if (revision === cacheRevision.current) setMessages(cached);
     } catch (error) {
       setWarning(error instanceof Error ? error.message : 'Saved Gmail messages could not be loaded.');
     } finally {
@@ -73,25 +78,29 @@ export const ProjectCorrespondencePanel = ({
   }, [helperClient, helperState, open, project]);
 
   const refresh = useCallback(async (manual = false) => {
-    if (!project.gmailThreadId || refreshing || !canUseGmail) return;
+    if (!project.gmailThreadId || refreshInFlight.current || !canUseGmail) return;
+    refreshInFlight.current = true;
     setRefreshing(true);
     setWarning(null);
     try {
-      const thread = await syncProjectGmailThread(project);
+      const thread = await syncProjectGmailThread(project, { onThread: snapshot => {
+        cacheRevision.current++;
+        setMessages(current => mergeGmailMessages(snapshot.messages, current));
+      } });
       onProjectSynced({
         gmailAccountEmail: thread.accountEmail,
         gmailThreadSubject: thread.subject,
         gmailMainContactEmail: thread.mainContactEmail,
         gmailLastSyncedAt: thread.syncedAt
       });
-      await loadCached();
       if (manual) notify({ title: 'Correspondence refreshed', message: `${thread.messages.length} messages in the Main Gmail Thread.`, tone: 'success' });
     } catch (error) {
       setWarning(`Gmail could not be refreshed. Showing saved messages. ${error instanceof Error ? error.message : ''}`.trim());
     } finally {
+      refreshInFlight.current = false;
       setRefreshing(false);
     }
-  }, [canUseGmail, loadCached, notify, onProjectSynced, project, refreshing]);
+  }, [canUseGmail, notify, onProjectSynced, project]);
 
   useEffect(() => {
     if (!open) return;
@@ -105,11 +114,13 @@ export const ProjectCorrespondencePanel = ({
   }, [loadAvailableLocalFiles]);
 
   useEffect(() => {
-    if (!project.gmailThreadId || !canUseGmail || autoSyncedThread.current === project.gmailThreadId) return;
-    autoSyncedThread.current = project.gmailThreadId;
-    const timer = window.setTimeout(() => void refresh(false), 0);
+    if (!open || !project.gmailThreadId || !canUseGmail || autoSyncedThread.current === project.gmailThreadId) return;
+    const timer = window.setTimeout(() => {
+      autoSyncedThread.current = project.gmailThreadId!;
+      void refresh(false);
+    }, 0);
     return () => window.clearTimeout(timer);
-  }, [canUseGmail, project.gmailThreadId, refresh]);
+  }, [canUseGmail, open, project.gmailThreadId, refresh]);
 
   useEffect(() => {
     const handleSync = (event: Event) => {

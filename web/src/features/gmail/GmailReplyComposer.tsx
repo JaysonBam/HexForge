@@ -1,13 +1,14 @@
-import { useRef, useState } from 'react';
+import { lazy, Suspense, useRef, useState } from 'react';
 import { Loader2, Send, X } from 'lucide-react';
 import type { Project } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { useFeedback } from '@/app/providers/FeedbackProvider';
-import { RichEmailEditor } from '@/features/settings/components/RichEmailEditor';
 import gmailIcon from '@/assets/icons/gmail.svg';
 import { GmailAuthError, requestGmailDraftAccess, type GmailAttachment } from '@/api/google/gmail/client';
 import { sendProjectGmailReply } from '@/features/gmail/gmailProjectService';
 import { GMAIL_THREAD_ACCOUNT_MISMATCH, useProjectGmailThreadAccess } from '@/features/gmail/gmailThreadAccess';
+
+const RichEmailEditor = lazy(() => import('@/features/settings/components/RichEmailEditor').then(module => ({ default: module.RichEmailEditor })));
 
 export const GmailReplyComposer = ({
   project,
@@ -91,6 +92,7 @@ export const GmailReplyComposer = ({
               </div>
               <div>
                 <p className="mb-2 text-sm font-bold text-slate-800">Reply</p>
+                <Suspense fallback={<p role="status" className="p-4 text-sm font-semibold text-slate-600">Loading reply editor…</p>}>
                 <RichEmailEditor
                   value={htmlBody}
                   onChange={(nextHtml) => {
@@ -101,6 +103,7 @@ export const GmailReplyComposer = ({
                   allowImages={false}
                   allowTokens={false}
                 />
+                </Suspense>
               </div>
               <p className="text-xs font-semibold text-slate-600">The thread is refreshed once before sending. This reply stays in Gmail and is cached in project correspondence.</p>
             </div>

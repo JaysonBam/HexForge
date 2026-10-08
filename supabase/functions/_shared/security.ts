@@ -1,3 +1,5 @@
+import { configuredWebOrigins } from './webOrigins.ts';
+
 export type AuthenticatedUser = {
   id: string;
   email: string;
@@ -154,10 +156,10 @@ export const invokeServiceRpc = (name: string, body: Record<string, unknown>) =>
   });
 
 const configuredOrigins = () =>
-  (Deno.env.get('HEXFORGE_WEB_ORIGINS') || Deno.env.get('HEXFORGE_WEB_ORIGIN') || '')
-    .split(',')
-    .map((origin) => origin.trim().replace(/\/$/, ''))
-    .filter(Boolean);
+  configuredWebOrigins(
+    Deno.env.get('HEXFORGE_WEB_ORIGINS') || Deno.env.get('HEXFORGE_WEB_ORIGIN') || '',
+    Deno.env.get('HEXFORGE_LOCAL_WEB_ORIGINS') || ''
+  );
 
 export const isAllowedOrigin = (origin: string | null) =>
   Boolean(origin && configuredOrigins().includes(origin.replace(/\/$/, '')));
