@@ -2,8 +2,7 @@ import type { Project } from '@/types';
 import { normalizeModuleCode } from '@/domain/moduleCode';
 import type { GmailProjectSuggestions, GmailThreadSnapshot } from '@/api/google/gmail/types';
 export {
-  buildRecentPrintEmailQuery,
-  buildUnreadPrintEmailQuery,
+  buildCurrentYearPrintEmailQuery,
   getGmailMessageDirection,
   isSupportedGmailAttachment
 } from '@/api/google/gmail/search';

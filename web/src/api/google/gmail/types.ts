@@ -31,6 +31,10 @@ export type GmailThreadMessage = {
 export type GmailThreadSnapshot = {
   id: string;
   accountEmail: string;
+  // Absent only in snapshots saved before unread tracking was introduced.
+  hasUnread?: boolean;
+  // Absent in older browser snapshots; verified once before reuse.
+  hasSpam?: boolean;
   subject: string;
   mainContactEmail: string;
   messages: GmailThreadMessage[];

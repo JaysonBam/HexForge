@@ -1,9 +1,9 @@
 import { gmailApiFetch, GmailApiStatusError } from '@/api/google/gmail/client';
-import { readSnapshot, writeSnapshot } from '@/lib/persistentReads';
+import { readSnapshot, writeSnapshot, removeReadSnapshots } from '@/lib/persistentReads';
 import { getAuthSession } from '@/api/supabase/auth';
 import { decodeBase64UrlBytes, stripQuotedReplyContent } from './decoding';
 import type { GmailThreadAttachment, GmailThreadListItem, GmailThreadMessage, GmailThreadSnapshot } from './types';
-import { buildRecentPrintEmailQuery, getGmailMessageDirection, isSupportedGmailAttachment } from './search';
+import { buildCurrentYearPrintEmailQuery, gmailCalendarYear, getGmailMessageDirection, isSupportedGmailAttachment } from './search';
 
 type GmailHeader = { name?: string; value?: string };
 type GmailPart = {
@@ -82,7 +82,17 @@ const messageDate = (message: GmailMessage): string => {
 };
 
 const fetchJson = async <T>(path: string, signal?: AbortSignal): Promise<T> => {
-  const response = await gmailApiFetch(path, { signal });
+  let response = await gmailApiFetch(path, { signal });
+  for (let attempt = 0; response.status === 429 && attempt < 3; attempt++) {
+    const retryAfter = response.headers.get('Retry-After');
+    const seconds = retryAfter === null ? NaN : Number(retryAfter);
+    const delay = Number.isFinite(seconds) ? Math.max(0, seconds * 1000)
+      : retryAfter && Number.isFinite(Date.parse(retryAfter)) ? Math.max(0, Date.parse(retryAfter) - Date.now())
+      : 1000 * 2 ** attempt;
+    await new Promise(resolve => setTimeout(resolve, delay));
+    signal?.throwIfAborted();
+    response = await gmailApiFetch(path, { signal });
+  }
   if (!response.ok) throw new GmailApiStatusError(response.status, await response.text());
   return response.json() as Promise<T>;
 };
@@ -129,6 +139,8 @@ export const getGmailThread = async (threadId: string, knownAccountEmail?: strin
   return {
     id: payload.id || threadId,
     accountEmail,
+    hasUnread: rawMessages.some(message => message.labelIds?.includes('UNREAD')),
+    hasSpam: rawMessages.some(message => message.labelIds?.includes('SPAM')),
     subject: messages.at(-1)?.subject || messages[0]?.subject || '(no subject)',
     mainContactEmail: externalSender?.senderEmail || externalRecipient || '',
     messages,
@@ -138,6 +150,7 @@ export const getGmailThread = async (threadId: string, knownAccountEmail?: strin
 
 type RecentThreads = {
   accountEmail: string;
+  year: number;
   historyId: string;
   fullSyncedAt: number;
   items: GmailThreadListItem[];
@@ -161,9 +174,10 @@ export const invalidateRecentGmailThreads = () => { cacheGeneration++; pendingLi
 
 const listMatchingThreadIds = async (query: string, signal?: AbortSignal): Promise<string[]> => {
   const ids = new Set<string>();
+  const pages = new Set<string>();
   let pageToken: string | undefined;
   do {
-    const params = new URLSearchParams({ maxResults: String(50 - ids.size), q: query });
+    const params = new URLSearchParams({ maxResults: String(50 - ids.size), q: query, includeSpamTrash: 'true' });
     if (pageToken) params.set('pageToken', pageToken);
     const result = await fetchJson<{ threads?: Array<{ id?: string }>; nextPageToken?: string }>(
       `/threads?${params}`, signal
@@ -173,12 +187,15 @@ const listMatchingThreadIds = async (query: string, signal?: AbortSignal): Promi
       if (ids.size === 50) break;
     }
     pageToken = result.nextPageToken;
+    if (pageToken && pages.has(pageToken)) throw new Error('Gmail returned a repeated page token. Please refresh.');
+    if (pageToken) pages.add(pageToken);
   } while (ids.size < 50 && pageToken);
   return [...ids];
 };
 
 export const listRecent3dPrintThreads = async (options: {
   onProgress?: (items: GmailThreadListItem[]) => void;
+  onMembership?: (threadIds: string[], accountEmail: string) => void;
   signal?: AbortSignal;
   forceRefresh?: boolean;
 } = {}): Promise<GmailThreadListItem[]> => {
@@ -189,6 +206,7 @@ export const listRecent3dPrintThreads = async (options: {
   let pending = pendingLists.get(ownerId);
   if (!pending) {
     pending = loadRecent3dPrintThreads(ownerId, {
+      onMembership: options.onMembership,
       onProgress: next => { if (!options.signal?.aborted) options.onProgress?.(next); }
     });
     pendingLists.set(ownerId, pending);
@@ -202,19 +220,23 @@ export const listRecent3dPrintThreads = async (options: {
 
 const loadRecent3dPrintThreads = async (ownerId: string | undefined, options: {
   onProgress?: (items: GmailThreadListItem[]) => void;
+  onMembership?: (threadIds: string[], accountEmail: string) => void;
   signal?: AbortSignal;
 }): Promise<GmailThreadListItem[]> => {
   const groupedTerms = PRINT_TERMS.map((term) => /\s/.test(term) ? `"${term}"` : term).join(' ');
-  const query = `${buildRecentPrintEmailQuery('3d').replace(/\s+3d$/, '')} {${groupedTerms}}`;
+  const year = gmailCalendarYear();
+  const query = `${buildCurrentYearPrintEmailQuery('3d', year).replace(/\s+3d$/, '')} {${groupedTerms}}`;
   const generation = cacheGeneration;
-  const key = `recent-gmail-v2:${ownerId}`;
+  const key = `gmail-threads:${ownerId}`;
+  await removeReadSnapshots(['unread-gmail-v1:', 'recent-gmail-v2:']);
   const [threadIds, profile, saved] = await Promise.all([
     listMatchingThreadIds(query, options.signal),
     fetchJson<{ emailAddress?: string; historyId?: string }>('/profile', options.signal),
     ownerId ? readSnapshot<RecentThreads>(key) : Promise.resolve(undefined)
   ]);
   const accountEmail = profile.emailAddress?.trim().toLowerCase() || '';
-  let reusable = saved?.accountEmail === accountEmail && Array.isArray(saved.items)
+  options.onMembership?.(threadIds, accountEmail);
+  let reusable = saved?.year === year && saved?.accountEmail === accountEmail && Array.isArray(saved.items)
     && Boolean(saved.historyId && profile.historyId)
     && Date.now() - saved.fullSyncedAt < fullSyncIntervalMs;
   const changed = new Set<string>();
@@ -245,11 +267,14 @@ const loadRecent3dPrintThreads = async (ownerId: string | undefined, options: {
   const previous = new Map((reusable ? saved!.items : []).map(item => [item.threadId, item]));
   const loaded: GmailThreadListItem[] = [];
   let newestReady = false;
+  let failed = false;
   const sorted = () => [...loaded].sort((left, right) => right.messageDate.localeCompare(left.messageDate));
-  await Promise.all(threadIds.map(async (threadId) => {
+  let nextIndex = 0;
+  const loadThread = async (threadId: string) => {
     options.signal?.throwIfAborted();
     const cached = previous.get(threadId);
-    if (cached && !changed.has(threadId)) { loaded.push(cached); return; }
+    if (cached && typeof cached.snapshot.hasUnread === 'boolean' && typeof cached.snapshot.hasSpam === 'boolean'
+      && !changed.has(threadId)) { loaded.push(cached); return; }
     const snapshot = await getGmailThread(threadId, accountEmail, options.signal);
     const latest = snapshot.messages.at(-1);
     const representative = [...snapshot.messages].reverse().find((message) => message.direction === 'incoming') || latest;
@@ -270,14 +295,19 @@ const loadRecent3dPrintThreads = async (ownerId: string | undefined, options: {
     if (threadId === threadIds[0]) newestReady = true;
     // With a reusable saved list, wait for changed/new rows so old mail never flashes first.
     // Gmail lists matching messages newest first; don't let a faster older request win.
-    if (!reusable && newestReady) options.onProgress?.(sorted());
+    if (!failed && !reusable && newestReady) options.onProgress?.(sorted());
+  };
+  await Promise.all(Array.from({ length: Math.min(6, threadIds.length) }, async () => {
+    try {
+      while (!failed && nextIndex < threadIds.length) await loadThread(threadIds[nextIndex++]);
+    } catch (error) { failed = true; throw error; }
   }));
   const items = sorted();
   if (ownerId && generation === cacheGeneration
     && (!reusable || historyId !== saved!.historyId || items.length !== saved!.items.length
       || items.some(item => previous.get(item.threadId) !== item))) {
     await writeSnapshot<RecentThreads>(key, {
-      accountEmail, historyId, items,
+      accountEmail, year, historyId, items,
       fullSyncedAt: reusable ? saved!.fullSyncedAt : Date.now()
     });
   }

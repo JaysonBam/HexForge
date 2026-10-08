@@ -47,6 +47,19 @@ test('Gmail proxy rejects arbitrary hosts, paths, methods, parameters, and overs
   assert.equal(classifyGmailProxyRequest('/messages/a/attachments/../../profile', 'GET'), null);
 });
 
+test('Spam inclusion accepts one boolean only on thread listing and retains old request support', () => {
+  const request = '/threads?maxResults=50&q=print%20-in%3Atrash';
+  for (const option of ['', '&includeSpamTrash=true', '&includeSpamTrash=false']) {
+    assert.equal(classifyGmailProxyRequest(request + option, 'GET')?.operation, 'gmail_read');
+  }
+  for (const option of ['&includeSpamTrash=', '&includeSpamTrash=1', '&includeSpamTrash=anything',
+    '&includeSpamTrash=true&includeSpamTrash=false', '&includeSpamTrash=true&access_token=secret']) {
+    assert.equal(classifyGmailProxyRequest(request + option, 'GET'), null);
+  }
+  assert.equal(classifyGmailProxyRequest('/messages?maxResults=50&q=print&includeSpamTrash=true', 'GET'), null);
+  assert.equal(classifyGmailProxyRequest('/threads/id?format=full&includeSpamTrash=true', 'GET'), null);
+});
+
 test('Gmail history pagination accepts opaque base64 tokens without widening the allowed parameters', () => {
   const path = `/history?${new URLSearchParams({ startHistoryId: '123', maxResults: '500', pageToken: 'opaque+/token==' })}`;
   assert.equal(classifyGmailProxyRequest(path, 'GET')?.operation, 'gmail_read');
@@ -54,11 +67,12 @@ test('Gmail history pagination accepts opaque base64 tokens without widening the
   assert.equal(classifyGmailProxyRequest(`/history?startHistoryId=123&maxResults=500&pageToken=${'x'.repeat(1025)}`, 'GET'), null);
 });
 
-test('Gmail list pagination accepts opaque tokens and keeps the same restricted parameters', () => {
+test('Gmail list pagination accepts opaque tokens and validates endpoint-specific parameters', () => {
   for (const endpoint of ['messages', 'threads']) {
     const path = `/${endpoint}?${new URLSearchParams({ maxResults: '50', q: 'newer_than:30d print', pageToken: 'opaque+/token==' })}`;
     assert.equal(classifyGmailProxyRequest(path, 'GET')?.operation, 'gmail_read');
-    assert.equal(classifyGmailProxyRequest(`${path}&includeSpamTrash=true`, 'GET'), null);
+    assert.equal(classifyGmailProxyRequest(`${path}&includeSpamTrash=true`, 'GET')?.operation ?? null,
+      endpoint === 'threads' ? 'gmail_read' : null);
     assert.equal(classifyGmailProxyRequest(`/${endpoint}?maxResults=50&q=print&pageToken=${'x'.repeat(1025)}`, 'GET'), null);
   }
 });

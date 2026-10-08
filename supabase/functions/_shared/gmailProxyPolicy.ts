@@ -53,17 +53,20 @@ export const classifyGmailProxyRequest = (
   if (
     method === 'GET'
     && (url.pathname === '/messages' || url.pathname === '/threads')
-    && hasOnlyParams(url, ['maxResults', 'q', 'pageToken'])
+    && hasOnlyParams(url, ['maxResults', 'q', 'pageToken', ...(url.pathname === '/threads' ? ['includeSpamTrash'] : [])])
   ) {
     const maxResults = Number(url.searchParams.get('maxResults'));
     const query = url.searchParams.get('q') || '';
     const pageToken = url.searchParams.get('pageToken');
+    const includeSpamTrash = url.searchParams.getAll('includeSpamTrash');
     if (
       Number.isInteger(maxResults)
       && maxResults >= 1
       && maxResults <= 100
       && query.length >= 1
       && query.length <= 1500
+      && includeSpamTrash.length <= 1
+      && includeSpamTrash.every(value => value === 'true' || value === 'false')
       && (!pageToken || pageTokenPattern.test(pageToken))
     ) {
       return { method: 'GET', operation: 'gmail_read', limit: 120 };

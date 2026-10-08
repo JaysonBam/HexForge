@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/Card';
 import { PrintLocationBadge } from '@/components/ui/PrintLocationBadge';
@@ -9,14 +9,11 @@ import {
   getPartCounts,
   type DashboardLaneKey
 } from '@/domain/operations';
-import {
-  GmailAuthError,
-  getUnread3dPrintEmailSummary,
-  requestGmailReadAccess,
-  type GmailUnreadPrintEmail,
-  type GmailUnreadPrintEmailSummary
-} from '@/api/google/gmail/client';
-import { AlertTriangle, ExternalLink, RefreshCw, Search, Settings, X } from 'lucide-react';
+import { requestGmailReadAccess } from '@/api/google/gmail/client';
+import { GmailThreadPicker } from '@/features/gmail/GmailThreadPicker';
+import { useGmailInbox } from '@/features/gmail/useGmailInbox';
+import { gmailInboxActionCount, refreshGmailInbox } from '@/features/gmail/gmailInboxStore';
+import { AlertTriangle, ExternalLink, RefreshCw, Search, Settings } from 'lucide-react';
 import gmailIcon from '@/assets/icons/gmail.svg';
 
 const laneOrder: DashboardLaneKey[] = [
@@ -40,8 +37,6 @@ const laneEmptyCopy: Record<DashboardLaneKey, { title: string; description: stri
   }
 };
 
-const emailReminderRefreshIntervalMs = 10 * 60 * 1000;
-
 const projectMatchesSearch = (values: Array<string | undefined>, search: string) => {
   const normalizedSearch = search.trim().toLowerCase();
   if (!normalizedSearch) return true;
@@ -49,117 +44,11 @@ const projectMatchesSearch = (values: Array<string | undefined>, search: string)
   return values.some((value) => value?.toLowerCase().includes(normalizedSearch));
 };
 
-type EmailReminderStatus = 'loading' | 'ready' | 'auth' | 'error';
-
-type EmailReminderState = {
-  status: EmailReminderStatus;
-  summary: GmailUnreadPrintEmailSummary | null;
-  message: string | null;
-  isRefreshing: boolean;
-};
-
-let cachedEmailReminderState: EmailReminderState | null = null;
-let cachedEmailReminderCheckedAtMs = 0;
-
-const fetchEmailReminderState = async (onProgress?: (summary: GmailUnreadPrintEmailSummary) => void): Promise<EmailReminderState> => {
-  try {
-    const summary = await getUnread3dPrintEmailSummary({ onProgress });
-    return {
-      status: 'ready',
-      summary,
-      message: null,
-      isRefreshing: false
-    };
-  } catch (error) {
-    console.error('Unread print email reminder failed', error);
-    return {
-      status: error instanceof GmailAuthError ? 'auth' : 'error',
-      summary: null,
-      message: error instanceof GmailAuthError
-        ? 'Gmail read access is needed.'
-        : 'Could not check Gmail.',
-      isRefreshing: false
-    };
-  }
-};
-
-const getInitialEmailReminderState = (): EmailReminderState => (
-  cachedEmailReminderState ?? {
-    status: 'loading',
-    summary: null,
-    message: null,
-    isRefreshing: true
-  }
-);
-
 export const Dashboard = () => {
   const navigate = useNavigate();
   const { projectSummaries: projects, projectsLoading, projectsLoadError } = useProjects();
   const [search, setSearch] = useState('');
-  const [emailReminder, setEmailReminder] = useState<EmailReminderState>(getInitialEmailReminderState);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
-  const emailReminderRefreshInFlightRef = useRef(false);
-
-  const setCachedEmailReminder = useCallback((nextReminder: EmailReminderState) => {
-    cachedEmailReminderState = nextReminder;
-    if (nextReminder.summary?.checkedAt) {
-      cachedEmailReminderCheckedAtMs = new Date(nextReminder.summary.checkedAt).getTime();
-    }
-    setEmailReminder(nextReminder);
-  }, []);
-
-  const loadEmailReminder = useCallback(async () => {
-    if (emailReminderRefreshInFlightRef.current) {
-      return;
-    }
-
-    emailReminderRefreshInFlightRef.current = true;
-
-    setEmailReminder((previous) => ({
-      status: previous.summary ? previous.status : 'loading',
-      summary: previous.summary,
-      message: previous.summary ? previous.message : null,
-      isRefreshing: true
-    }));
-
-    try {
-      const nextReminder = await fetchEmailReminderState(summary => setEmailReminder({
-        status: 'ready', summary, message: null, isRefreshing: true
-      }));
-      setCachedEmailReminder({
-        ...nextReminder,
-        summary: nextReminder.summary ?? cachedEmailReminderState?.summary ?? null,
-        message: nextReminder.summary ? null : nextReminder.message,
-        isRefreshing: false
-      });
-    } finally {
-      emailReminderRefreshInFlightRef.current = false;
-    }
-  }, [setCachedEmailReminder]);
-
-  useEffect(() => {
-    if (projectsLoading) return;
-    const refreshIfStale = () => {
-      const shouldRefresh =
-        !cachedEmailReminderState ||
-        Date.now() - cachedEmailReminderCheckedAtMs >= emailReminderRefreshIntervalMs;
-
-      if (shouldRefresh) {
-        void loadEmailReminder();
-      }
-    };
-
-    refreshIfStale();
-
-    const intervalId = window.setInterval(() => {
-      void loadEmailReminder();
-    }, emailReminderRefreshIntervalMs);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, [loadEmailReminder, projectsLoading]);
-
   const visibleProjects = useMemo(() => (
     projects.filter((project) => projectMatchesSearch([
       project.id,
@@ -204,9 +93,8 @@ export const Dashboard = () => {
           </div>
 
           <EmailReminderCard
-            reminder={emailReminder}
             onOpen={() => setIsEmailModalOpen(true)}
-            onRefresh={loadEmailReminder}
+            onRefresh={() => void refreshGmailInbox()}
             onReconnect={requestGmailReadAccess}
           />
         </div>
@@ -257,13 +145,10 @@ export const Dashboard = () => {
         </div>
       )}
 
-      {isEmailModalOpen && (
-        <EmailReminderModal
-          reminder={emailReminder}
-          onClose={() => setIsEmailModalOpen(false)}
-          onRefresh={loadEmailReminder}
-        />
-      )}
+      <GmailThreadPicker open={isEmailModalOpen} actionMode
+        onClose={() => setIsEmailModalOpen(false)}
+        onSelect={item => navigate('/project/new', { state: { gmailThreadId: item.threadId } })}
+        onOpenProject={id => navigate(`/project/${id}`)} />
     </div>
   );
 };
@@ -315,49 +200,27 @@ const formatEmailReminderTime = (checkedAt?: string) => {
   });
 };
 
-const formatFlaggedEmailDate = (email: GmailUnreadPrintEmail) => {
-  if (!email.receivedAt) {
-    return email.dateHeader || 'Unknown date';
-  }
-
-  const date = new Date(email.receivedAt);
-  if (Number.isNaN(date.getTime())) {
-    return email.dateHeader || 'Unknown date';
-  }
-
-  return date.toLocaleString([], {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-};
-
 const EmailReminderCard = ({
-  reminder,
   onOpen,
   onRefresh,
   onReconnect
 }: {
-  reminder: EmailReminderState;
   onOpen: () => void;
   onRefresh: () => void;
   onReconnect: () => void;
 }) => {
-  const count = reminder.summary?.count ?? null;
-  const isLoading = reminder.status === 'loading' && !reminder.summary;
+  // Email body progress must not rerender every project on the swim lanes.
+  const reminder = useGmailInbox();
+  const count = reminder.verified ? gmailInboxActionCount(reminder) : null;
   const isRefreshing = reminder.isRefreshing;
   const isAuthBlocked = reminder.status === 'auth';
   const isError = reminder.status === 'error';
-  const refreshedAt = formatEmailReminderTime(reminder.summary?.checkedAt);
-  const emailSummaryText = isLoading
-    ? 'Checking print emails'
-    : reminder.summary?.complete === false
-      ? `Checking print emails — ${count ?? 0} loaded so far`
-    : reminder.status === 'ready' || reminder.summary
-      ? `You have ${count ?? 0} unread print ${count === 1 ? 'email' : 'emails'}`
-      : reminder.message || 'Could not check Gmail.';
-  const emailActionLabel = isAuthBlocked ? 'Grant access' : isError ? 'Retry' : 'Open Gmail';
+  const refreshedAt = formatEmailReminderTime(reminder.checkedAt || undefined);
+  const emailSummaryText = count === null && !isAuthBlocked && !isError
+    ? 'Checking emails needing action'
+    : isAuthBlocked || isError ? reminder.error || 'Could not check Gmail.'
+    : `${count} ${count === 1 ? 'email needs' : 'emails need'} action`;
+  const emailActionLabel = isAuthBlocked ? 'Grant access' : isError ? 'Retry' : 'View emails';
 
   return (
     <div
@@ -400,9 +263,9 @@ const EmailReminderCard = ({
             type="button"
             onClick={onOpen}
             className="inline-flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-md border border-sky-500/30 bg-white px-2.5 py-1.5 text-xs font-bold text-sky-700 transition hover:bg-sky-50 sm:flex-none"
-            aria-label="View unread print email threads"
+            aria-label="View emails needing action"
           >
-            Open Gmail
+            View emails
             <ExternalLink size={14} />
           </button>
         )}
@@ -411,111 +274,10 @@ const EmailReminderCard = ({
             onClick={onRefresh}
             disabled={isRefreshing}
             className="rounded-full p-1 text-slate-500 transition hover:bg-white hover:text-sky-700 disabled:cursor-wait disabled:opacity-60"
-            aria-label="Refresh unread Gmail reminder"
+            aria-label="Refresh emails needing action"
           >
             <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
           </button>
-      </div>
-    </div>
-  );
-};
-
-const EmailReminderModal = ({
-  reminder,
-  onClose,
-  onRefresh
-}: {
-  reminder: EmailReminderState;
-  onClose: () => void;
-  onRefresh: () => void;
-}) => {
-  const emails = reminder.summary?.flaggedEmails ?? [];
-  const isLoading = reminder.status === 'loading' && !reminder.summary;
-  const isRefreshing = reminder.isRefreshing;
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-[2px]"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="email-reminder-modal-title"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
-      }}
-    >
-      <div className="forge-modal flex max-h-[85vh] w-full max-w-2xl flex-col">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-300 px-4 py-3">
-          <div>
-            <h2 id="email-reminder-modal-title" className="text-lg font-black text-slate-950">
-              Unread Print Emails
-            </h2>
-            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-              Last refreshed {formatEmailReminderTime(reminder.summary?.checkedAt)}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={isRefreshing}
-              className="inline-flex items-center gap-2 rounded-md border border-[color:var(--forge-gold-border)] bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-sky-50 disabled:cursor-wait disabled:opacity-60"
-            >
-              <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
-              Refresh
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-md p-2 text-slate-500 transition hover:bg-sky-50 hover:text-slate-950"
-              aria-label="Close recent print email threads"
-            >
-              <X size={18} />
-            </button>
-          </div>
-        </div>
-
-        <div className="overflow-y-auto px-4 py-3">
-          {isLoading ? (
-            <div className="forge-empty px-3 py-5 text-center text-sm font-semibold">
-              Checking Gmail...
-            </div>
-          ) : reminder.status !== 'ready' && !reminder.summary ? (
-            <div className="rounded-md border border-rose-300 bg-rose-50 px-3 py-5 text-center text-sm font-bold text-rose-800">
-              {reminder.message || 'Could not check Gmail.'}
-            </div>
-          ) : emails.length === 0 ? (
-            <div className="forge-empty px-3 py-5 text-center text-sm font-semibold">
-              No unread print-related email threads found in the last three months.
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {emails.map((email) => (
-                <div key={email.id} className="forge-panel grid gap-3 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-                  <div className="min-w-0">
-                    <h3 className="truncate text-sm font-black text-slate-950" title={email.subject}>
-                      {email.subject}
-                    </h3>
-                    <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                      {formatFlaggedEmailDate(email)}
-                    </p>
-                  </div>
-                  <a
-                    href={email.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center justify-center gap-2 rounded-md border border-sky-500/40 bg-slate-950 px-3 py-2 text-xs font-bold text-white transition hover:bg-slate-800"
-                  >
-                    <ExternalLink size={14} />
-                    Open in Gmail
-                  </a>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );

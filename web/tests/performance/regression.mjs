@@ -12,6 +12,119 @@ const api = await import(pathToFileURL(await bundleApi('regression')).href);
 api.supabase.auth.getSession = async () => ({ data: { session: { access_token: 'fixture-only', user: owner } }, error: null });
 function reset() { fixture = createFixture({ delay: 5, threadCount: 12, tailDelay: 20 }); owner = { id: `owner-${Math.random()}`, email: 'printing@example.com' }; }
 
+await test('linked-thread filter reads only current project links, including completed projects', async () => {
+  reset();
+  fixture.projects.forEach(project => { project.gmailThreadId = null; project.gmailAccountEmail = null; });
+  Object.assign(fixture.projects[0], { state: 'CLOSED', gmailThreadId: 'thread-11', gmailAccountEmail: 'Printing@Example.com' });
+  Object.assign(fixture.projects[1], { state: 'CANCELLED', gmailThreadId: 'thread-10', gmailAccountEmail: 'printing@example.com' });
+  Object.assign(fixture.projects[2], { gmailThreadId: 'thread-9', gmailAccountEmail: 'manager@example.com' });
+  const [items, links] = await Promise.all([api.listRecent3dPrintThreads(), api.getLinkedProjectGmailThreads()]);
+  assert.deepEqual(api.visibleGmailThreads(items, api.buildLinkedGmailThreadKeys(links)).map(row => row.threadId),
+    Array.from({ length: 10 }, (_, index) => `thread-${9 - index}`));
+  const read = fixture.requests.find(request => request.name === 'projects');
+  const query = new URL(read.url).searchParams;
+  assert.equal(query.get('select'), 'id,priorityNumber,gmailThreadId,gmailAccountEmail');
+  assert.equal(links.find(link=>link.id==='TEST1').priorityNumber,1);
+  assert.equal(query.get('gmailThreadId'), 'not.is.null');
+  assert.equal(query.has('state'), false);
+  assert.equal(fixture.requests.filter(request => request.name === 'projects').length, 1);
+  assert.ok(!fixture.requests.some(request => request.name === 'project_gmail_messages'));
+});
+
+await test('link checks observe fresh local/remote links, unlinking and deletion without evicting Gmail bodies', async () => {
+  reset();
+  const items = await api.listRecent3dPrintThreads();
+  let links = await api.getLinkedProjectGmailThreads();
+  assert.equal(api.visibleGmailThreads(items, api.buildLinkedGmailThreadKeys(links)).length, 11);
+  fixture.projects.forEach(project => { project.gmailThreadId = null; });
+  Object.assign(fixture.projects[0], { gmailThreadId: 'thread-11', gmailAccountEmail: 'printing@example.com' });
+  links = await api.getLinkedProjectGmailThreads();
+  assert.equal(api.visibleGmailThreads(items, api.buildLinkedGmailThreadKeys(links))[0].threadId, 'thread-10');
+  fixture.projects.shift();
+  links = await api.getLinkedProjectGmailThreads();
+  assert.equal(api.visibleGmailThreads(items, api.buildLinkedGmailThreadKeys(links)).length, 12);
+  const from = fixture.requests.length;
+  assert.deepEqual(await api.listRecent3dPrintThreads(), items);
+  assert.equal(fixture.requests.length - from, 2);
+  assert.ok(fixture.requests.slice(from).every(request => !request.name.startsWith('/threads/')));
+  const after = fixture.requests.length;
+  const keys = api.buildLinkedGmailThreadKeys(links);
+  for (let i = 0; i < 10; i += 1) {
+    api.visibleGmailThreads(items, keys);
+    assert.equal(api.visibleGmailThreads(items, keys, false), items);
+  }
+  assert.equal(fixture.requests.length, after);
+});
+
+await test('linked-thread check includes project links beyond the Supabase page limit', async () => {
+  reset();
+  fixture.projects.length = 0;
+  fixture.projects.push(...Array.from({ length: 1005 }, (_, index) => ({
+    id: `PROJECT-${String(index).padStart(4, '0')}`, gmailThreadId: `thread-${index}`, gmailAccountEmail: 'printing@example.com'
+  })));
+  const links = await api.getLinkedProjectGmailThreads();
+  assert.equal(links.length, 1005);
+  assert.equal(api.buildLinkedGmailThreadKeys(links).size, 1005);
+  assert.equal(fixture.requests.length, 2);
+});
+
+await test('failed project-link checks reject rather than silently classifying everything as unlinked', async () => {
+  reset();
+  fixture.failures.set('projects', 'links unavailable');
+  await assert.rejects(api.getLinkedProjectGmailThreads(), /links unavailable/);
+  fixture.failures.clear();
+  assert.equal((await api.getLinkedProjectGmailThreads()).length, 80);
+});
+
+await test('hidden-list writes persist without refetching emails, are reversible, and refuse linked threads', async () => {
+  reset();
+  const items = await api.listRecent3dPrintThreads();
+  const linked = api.buildLinkedGmailThreadKeys(await api.getLinkedProjectGmailThreads());
+  const gmailCalls = () => fixture.requests.filter(request => request.name.startsWith('/')).length;
+  const from = gmailCalls();
+  await api.setGmailThreadHidden('Printing@Example.com', 'thread-11', true);
+  await api.setGmailThreadHidden('printing@example.com', 'thread-11', true);
+  let hidden = api.buildLinkedGmailThreadKeys(await api.getHiddenGmailThreads());
+  assert.equal(hidden.size, 1);
+  assert.equal(api.visibleGmailThreads(items, linked, true, hidden, true)[0].threadId, 'thread-10');
+  assert.equal(fixture.hiddenThreads[0].hidden_by_email, 'printing@example.com');
+  assert.deepEqual(Object.keys(fixture.requests.find(request => request.method === 'POST' && request.name === 'gmail_hidden_threads').body).sort(), ['gmail_account_email', 'gmail_thread_id']);
+  await assert.rejects(api.setGmailThreadHidden('printing@example.com', 'thread-0', true), /Linked emails cannot be hidden/);
+  assert.equal(fixture.hiddenThreads.length, 1);
+  await api.setGmailThreadHidden('printing@example.com', 'thread-11', false);
+  hidden = api.buildLinkedGmailThreadKeys(await api.getHiddenGmailThreads());
+  assert.equal(hidden.size, 0);
+  assert.equal(gmailCalls(), from);
+});
+
+await test('hidden-list refresh sees remote changes and project linking clears the hidden entry', async () => {
+  reset();
+  const items = await api.listRecent3dPrintThreads();
+  fixture.hiddenThreads.push({ gmail_account_email: 'printing@example.com', gmail_thread_id: 'thread-11' });
+  const first = await api.getHiddenGmailThreads();
+  assert.equal(first.length, 1);
+  const query = new URL(fixture.requests.at(-1).url).searchParams;
+  assert.equal(query.get('select'), 'gmailThreadId:gmail_thread_id,gmailAccountEmail:gmail_account_email');
+  await api.projectReads.updateProjectRecord('TEST1', { gmailThreadId: 'thread-11', gmailAccountEmail: 'printing@example.com' });
+  const hidden = api.buildLinkedGmailThreadKeys(await api.getHiddenGmailThreads());
+  const linked = api.buildLinkedGmailThreadKeys(await api.getLinkedProjectGmailThreads());
+  assert.equal(hidden.size, 0);
+  assert.equal(api.visibleGmailThreads(items, linked, false, hidden, true)[0].threadId, 'thread-11');
+});
+
+await test('hidden-list reads paginate and failed reads or writes leave email data intact', async () => {
+  reset();
+  fixture.hiddenThreads.push(...Array.from({ length: 1005 }, (_, index) => ({
+    gmail_account_email: 'printing@example.com', gmail_thread_id: `hidden-${index}`
+  })));
+  assert.equal((await api.getHiddenGmailThreads()).length, 1005);
+  assert.equal(fixture.requests.length, 2);
+  fixture.failures.set('gmail_hidden_threads', 'hide list unavailable');
+  await assert.rejects(api.getHiddenGmailThreads(), /hide list unavailable/);
+  await assert.rejects(api.setGmailThreadHidden('printing@example.com', 'thread-11', true), /hide list unavailable/);
+  assert.equal(fixture.hiddenThreads.length, 1005);
+});
+
 await test('attachment decoding preserves every binary byte and unpadded base64url', async () => {
   reset();
   const bytes = Buffer.from(Array.from({ length: 513 }, (_, index) => index % 256));
@@ -85,7 +198,7 @@ await test('picker publishes complete usable snapshots early and returns the unc
   assert.deepEqual(items.map(i => i.threadId), Array.from({length:12}, (_,i) => `thread-${11-i}`));
 });
 
-await test('picker selects fifty distinct conversations directly instead of capping individual messages', async () => {
+await test('the shared list stops at fifty current-year threads without reading the rest of the year', async () => {
   reset();
   fixture.mailbox.threadIds = Array.from({ length: 70 }, (_, i) => `thread-${69 - i}`);
   const items = await api.listRecent3dPrintThreads();
@@ -98,15 +211,55 @@ await test('picker selects fifty distinct conversations directly instead of capp
   assert.equal(api.classifyGmailProxyRequest(listing[0].name, 'GET')?.operation, 'gmail_read');
   const params = new URL(listing[0].name, 'https://fixture.invalid').searchParams;
   assert.equal(params.get('maxResults'), '50');
-  assert.equal(params.get('q'), 'newer_than:30d {3d "3d print" "3d printing" print printing printer stl 3mf slicer filament}');
+  assert.equal(params.get('includeSpamTrash'), 'true');
+  assert.equal(params.get('q'), api.buildCurrentYearPrintEmailQuery('3d').replace(/\s+3d$/, '') + ' {3d "3d print" "3d printing" print printing printer stl 3mf slicer filament}');
   assert.ok(!fixture.requests.some(request => request.name.startsWith('/messages?')));
 });
 
-await test('thread listing follows short pages, deduplicates IDs and stops once fifty are available', async () => {
+await test('the shared list includes Spam but excludes Trash using the same read and cache path', async () => {
+  reset(); api.resetGmailInbox();
+  fixture.mailbox.spamThreadIds.add('thread-11');
+  fixture.mailbox.trashThreadIds.add('thread-10');
+  fixture.mailbox.spamThreadIds.add('thread-0'); fixture.mailbox.unreadThreadIds.add('thread-0');
+  await api.refreshGmailInbox();
+  let state=api.getGmailInboxState();
+  assert.equal(state.items[0].threadId,'thread-11');
+  assert.equal(state.items.length,11); assert.ok(!state.threadIds.includes('thread-10'));
+  assert.equal(state.items.find(item=>item.threadId==='thread-11').snapshot.hasSpam,true);
+  assert.equal(state.items.find(item=>item.threadId==='thread-9').snapshot.hasSpam,false);
+  assert.equal(api.gmailInboxActionCount(state),11); // Linked unread mail in Spam counts too.
+  const listing=fixture.requests.find(r=>r.name.startsWith('/threads?'));
+  assert.equal(api.classifyGmailProxyRequest(listing.name,'GET')?.operation,'gmail_read');
+  const from=fixture.requests.length; await api.refreshGmailInbox();
+  state=api.getGmailInboxState(); assert.equal(state.items.length,11);
+  assert.equal(fixture.requests.length-from,4); // No separate Spam poll or cache.
+  assert.ok(!fixture.requests.slice(from).some(r=>r.name.startsWith('/threads/')));
+});
+
+await test('moving cached mail to Spam keeps it visible, while Trash removes it on the next shared check', async () => {
+  reset(); api.resetGmailInbox(); await api.refreshGmailInbox();
+  fixture.mailbox.spamThreadIds.add('thread-11'); fixture.mailbox.trashThreadIds.add('thread-10');
+  fixture.mailbox.historyId='2'; fixture.mailbox.changes=[{id:'2',labelsAdded:[
+    {message:{threadId:'thread-11'},labelIds:['SPAM']}, {message:{threadId:'thread-10'},labelIds:['TRASH']}
+  ]}];
+  const from=fixture.requests.length; await api.refreshGmailInbox();
+  const state=api.getGmailInboxState();
+  assert.ok(state.threadIds.includes('thread-11')); assert.ok(!state.threadIds.includes('thread-10'));
+  assert.equal(api.gmailInboxActionCount(state),10);
+  assert.deepEqual(fixture.requests.slice(from).filter(r=>r.name.startsWith('/threads/')).map(r=>r.name),['/threads/thread-11?format=full']);
+  assert.equal(state.items.find(item=>item.threadId==='thread-11').snapshot.hasSpam,true);
+  fixture.mailbox.spamThreadIds.delete('thread-11'); fixture.mailbox.historyId='3';
+  fixture.mailbox.changes.push({id:'3',labelsRemoved:[{message:{threadId:'thread-11'},labelIds:['SPAM']}]});
+  const beforeRemoval=fixture.requests.length; await api.refreshGmailInbox();
+  assert.equal(api.getGmailInboxState().items.find(item=>item.threadId==='thread-11').snapshot.hasSpam,false);
+  assert.equal(fixture.requests.slice(beforeRemoval).filter(r=>r.name.startsWith('/threads/')).length,1);
+});
+
+await test('thread listing follows short pages and stops as soon as fifty distinct threads are found', async () => {
   reset();
   fixture.mailbox.threadPages = [
     { threads: Array.from({ length: 23 }, (_, i) => ({ id: `thread-${59 - i}` })), nextPageToken: '1' },
-    { threads: [{ id: 'thread-37' }, ...Array.from({ length: 30 }, (_, i) => ({ id: `thread-${36 - i}` }))], nextPageToken: '2' }
+    { threads: [{ id: 'thread-37' }, ...Array.from({ length: 37 }, (_, i) => ({ id: `thread-${36 - i}` }))], nextPageToken: '2' }
   ];
   const items = await api.listRecent3dPrintThreads();
   assert.equal(items.length, 50);
@@ -225,38 +378,15 @@ await test('active project validation preserves complete data and transfers only
   assert.ok(changed.TEST1.project.parts.some(p=>p.specialInstruction==='Changed by another workstation'));
 });
 
-await test('unread reminder publishes partial data and retains the exact sorted final top ten', async () => {
-  reset(); const progress = [];
-  const summary = await api.getUnread3dPrintEmailSummary({ onProgress: value => progress.push(value) });
-  assert.equal(progress[0].count, 1); assert.equal(progress[0].complete, false);
-  assert.equal(summary.complete, true); assert.equal(summary.count, 10);
-  assert.deepEqual(summary.flaggedEmails.map(e => e.id), Array.from({ length:10 }, (_,i) => `message-${11-i}`));
-});
-
-await test('unread membership is verified live while unchanged message metadata is reused', async () => {
-  reset(); const initial = await api.getUnread3dPrintEmailSummary();
-  let from=fixture.requests.length;
-  assert.deepEqual((await api.getUnread3dPrintEmailSummary()).flaggedEmails,initial.flaggedEmails);
-  assert.equal(fixture.requests.length-from,2);
-  fixture.mailbox.threadIds=fixture.mailbox.threadIds.filter(id=>id!=='thread-11');
-  from=fixture.requests.length;
-  const current=await api.getUnread3dPrintEmailSummary();
-  assert.ok(current.flaggedEmails.every(email=>email.id!=='message-11'));
-  assert.equal(current.count,10); assert.equal(fixture.requests.length-from,3);
-});
-
-await test('three-hour reconciliation refreshes both thread content and unread metadata', async () => {
-  reset(); await api.listRecent3dPrintThreads(); await api.getUnread3dPrintEmailSummary();
+await test('three-hour reconciliation refreshes thread content from the single persistent cache', async () => {
+  reset(); await api.listRecent3dPrintThreads();
   const originalNow=Date.now; const future=originalNow()+3*60*60*1000+1;
   Date.now=()=>future;
   try {
     const progress=[];
-    let from=fixture.requests.length; await api.listRecent3dPrintThreads({onProgress:rows=>progress.push(rows)});
+    const from=fixture.requests.length; await api.listRecent3dPrintThreads({onProgress:rows=>progress.push(rows)});
     assert.equal(fixture.requests.length-from,14);
     assert.equal(progress[0][0].threadId,'thread-11');
-    assert.ok(progress[0].every(row=>fixture.requests.slice(from).some(request=>request.name===`/threads/${row.threadId}?format=full` && request.end>0)));
-    from=fixture.requests.length; await api.getUnread3dPrintEmailSummary();
-    assert.equal(fixture.requests.length-from,12);
   } finally { Date.now=originalNow; }
 });
 
@@ -335,4 +465,229 @@ await test('invalid attachment ownership makes no provider or helper request', a
   reset(); owner.email = 'wrong@example.com';
   await assert.rejects(api.downloadPreparedGmailAttachments(fixture.studentProject, fixture.helper, { resolution:{status:'matched', projectKey:'fixture'}, attachments:fixture.attachments }), /not linked to your Gmail account/);
   assert.equal(fixture.requests.length, 0);
+});
+
+await test('dashboard and import share one check and wait for verified linked unread status', async () => {
+  reset(); api.resetGmailInbox();
+  fixture.hiddenThreads.push({gmail_account_email:'printing@example.com',gmail_thread_id:'thread-10'});
+  const states=[]; const unsubscribe=api.subscribeGmailInbox(()=>states.push(api.getGmailInboxState()));
+  await Promise.all([api.refreshGmailInbox(),api.refreshGmailInbox()]); unsubscribe();
+  const state=api.getGmailInboxState();
+  assert.equal(state.complete,true); assert.equal(state.items.length,12);
+  assert.equal(api.gmailInboxActionCount(state),10);
+  const counted=states.find(state=>state.verified);
+  assert.equal(counted.items.length,0); assert.equal(api.gmailInboxActionCount(counted),null);
+  assert.equal(fixture.requests.length,16);
+  assert.equal(fixture.requests.filter(r=>r.name.startsWith('/threads?')).length,1);
+  assert.ok(!fixture.requests.some(r=>r.name.startsWith('/messages?')));
+});
+
+await test('unlinked action counts still publish before bodies finish', async () => {
+  reset(); api.resetGmailInbox(); fixture.projects.forEach(project => {project.gmailThreadId=null;});
+  fixture.hiddenThreads.push({gmail_account_email:'printing@example.com',gmail_thread_id:'thread-10'});
+  const states=[]; const unsubscribe=api.subscribeGmailInbox(()=>states.push(api.getGmailInboxState()));
+  await api.refreshGmailInbox(); unsubscribe();
+  const counted=states.find(state=>state.verified);
+  assert.equal(counted.items.length,0); assert.equal(api.gmailInboxActionCount(counted),11);
+});
+
+await test('any unread message in a linked thread needs action, even with a newer sent message', async () => {
+  reset(); api.resetGmailInbox();
+  fixture.mailbox.threadResponses.set('thread-0',{id:'thread-0',messages:[
+    {id:'older-unread',threadId:'thread-0',internalDate:'1791356400000',labelIds:['UNREAD'],payload:{headers:[{name:'From',value:'student@example.com'}]}},
+    {id:'newer-read',threadId:'thread-0',internalDate:'1791356401000',labelIds:['SENT'],payload:{headers:[{name:'From',value:'printing@example.com'}]}}
+  ]});
+  fixture.mailbox.unreadThreadIds.add('thread-10');
+  fixture.hiddenThreads.push({gmail_account_email:'printing@example.com',gmail_thread_id:'thread-10'});
+  await api.refreshGmailInbox();
+  const state=api.getGmailInboxState();
+  assert.equal(state.items.find(item=>item.threadId==='thread-0').snapshot.hasUnread,true);
+  assert.equal(api.gmailInboxActionCount(state),11);
+  assert.equal(fixture.requests.length,16); // Same provider calls as the read-only case.
+});
+
+await test('cached linked unread status follows label changes and only refetches the changed thread', async () => {
+  reset(); api.resetGmailInbox(); await api.refreshGmailInbox();
+  assert.equal(api.gmailInboxActionCount(api.getGmailInboxState()),11);
+  fixture.mailbox.unreadThreadIds.add('thread-0'); fixture.mailbox.historyId='2';
+  fixture.mailbox.changes=[{id:'2',labelsAdded:[{message:{threadId:'thread-0'},labelIds:['UNREAD']}]}];
+  let from=fixture.requests.length;
+  await api.refreshGmailInbox();
+  assert.equal(api.gmailInboxActionCount(api.getGmailInboxState()),12);
+  assert.equal(fixture.requests.slice(from).filter(r=>r.name.startsWith('/threads/')).length,1);
+  from=fixture.requests.length; await api.refreshGmailInbox();
+  assert.equal(api.gmailInboxActionCount(api.getGmailInboxState()),12);
+  assert.equal(fixture.requests.length-from,4); // List/profile/links/hides; no additional unread query.
+  fixture.mailbox.unreadThreadIds.delete('thread-0'); fixture.mailbox.historyId='3';
+  fixture.mailbox.changes.push({id:'3',labelsRemoved:[{message:{threadId:'thread-0'},labelIds:['UNREAD']}]});
+  from=fixture.requests.length; await api.refreshGmailInbox();
+  assert.equal(api.gmailInboxActionCount(api.getGmailInboxState()),11);
+  assert.equal(fixture.requests.slice(from).filter(r=>r.name.startsWith('/threads/')).length,1);
+});
+
+await test('linking a hidden unread thread clears the hide and keeps it actionable without another Gmail read', async () => {
+  reset(); api.resetGmailInbox(); fixture.mailbox.unreadThreadIds.add('thread-11');
+  await api.refreshGmailInbox();
+  const from=fixture.requests.length;
+  await api.setGmailThreadHidden('printing@example.com','thread-11',true);
+  assert.equal(api.gmailInboxActionCount(api.getGmailInboxState()),10);
+  await api.projectReads.updateProjectRecord('TEST1',{gmailThreadId:'thread-11',gmailAccountEmail:'printing@example.com'});
+  const state=api.getGmailInboxState();
+  assert.equal(state.hiddenKeys.has(JSON.stringify(['printing@example.com','thread-11'])),false);
+  assert.equal(api.gmailInboxActionCount(state),11);
+  assert.ok(!fixture.requests.slice(from).some(r=>r.name.startsWith('/')));
+});
+
+await test('old browser snapshots verify missing unread flags once rather than treating them as read', async () => {
+  reset(); api.resetGmailInbox(); await api.refreshGmailInbox();
+  const key='gmail-threads:'+owner.id;
+  const saved=await api.readSnapshot(key);
+  saved.items.forEach(item=>{delete item.snapshot.hasUnread;});
+  await api.writeSnapshot(key,saved);
+  fixture.mailbox.unreadThreadIds.add('thread-0');
+  let from=fixture.requests.length; await api.refreshGmailInbox();
+  assert.equal(api.gmailInboxActionCount(api.getGmailInboxState()),12);
+  assert.equal(fixture.requests.slice(from).filter(r=>r.name.startsWith('/threads/')).length,12);
+  from=fixture.requests.length; await api.refreshGmailInbox();
+  assert.equal(fixture.requests.length-from,4);
+});
+
+await test('old browser snapshots verify missing Spam flags once, then reuse the same cache', async () => {
+  reset(); api.resetGmailInbox(); await api.refreshGmailInbox();
+  const key='gmail-threads:'+owner.id;
+  const saved=await api.readSnapshot(key);
+  saved.items.forEach(item=>{delete item.snapshot.hasSpam;});
+  await api.writeSnapshot(key,saved);
+  fixture.mailbox.spamThreadIds.add('thread-0');
+  let from=fixture.requests.length; await api.refreshGmailInbox();
+  assert.equal(api.getGmailInboxState().items.find(item=>item.threadId==='thread-0').snapshot.hasSpam,true);
+  assert.equal(fixture.requests.slice(from).filter(r=>r.name.startsWith('/threads/')).length,12);
+  from=fixture.requests.length; await api.refreshGmailInbox();
+  assert.equal(fixture.requests.length-from,4);
+  assert.ok(!fixture.requests.slice(from).some(r=>r.name.startsWith('/threads/')));
+});
+
+await test('project button priorities follow successful local saves and fresh remote reads without Gmail body requests', async () => {
+  reset(); api.resetGmailInbox(); await api.refreshGmailInbox();
+  assert.equal(api.getGmailInboxState().linked.find(link=>link.id==='TEST1').priorityNumber,1);
+  let from=fixture.requests.length;
+  await api.projectReads.updateProjectRecord('TEST1',{priorityNumber:123});
+  assert.equal(api.getGmailInboxState().linked.find(link=>link.id==='TEST1').priorityNumber,123);
+  assert.ok(!fixture.requests.slice(from).some(r=>r.name.startsWith('/')));
+  await api.projectReads.updateProjectRecord('TEST1',{gmailThreadId:'thread-1'});
+  assert.equal(api.getGmailInboxState().linked.find(link=>link.id==='TEST1').priorityNumber,123);
+  fixture.projects[0].priorityNumber=456;
+  from=fixture.requests.length; await api.refreshGmailInbox();
+  assert.equal(api.getGmailInboxState().linked.find(link=>link.id==='TEST1').priorityNumber,456);
+  assert.ok(!fixture.requests.slice(from).some(r=>r.name.startsWith('/threads/')));
+});
+
+await test('the ten-minute refresh reuses bodies and observes remote hides, links and deletions', async () => {
+  reset(); api.resetGmailInbox(); await api.refreshGmailInbox();
+  let from=fixture.requests.length;
+  await api.refreshGmailInbox(true); assert.equal(fixture.requests.length,from);
+  const originalNow=Date.now; Date.now=()=>originalNow()+10*60*1000+1;
+  try {
+    fixture.projects[0].gmailThreadId='thread-11';
+    fixture.hiddenThreads.push({gmail_account_email:'printing@example.com',gmail_thread_id:'thread-10'});
+    fixture.mailbox.threadIds=fixture.mailbox.threadIds.filter(id=>id!=='thread-9');
+    await api.refreshGmailInbox(true);
+    const state=api.getGmailInboxState();
+    assert.equal(api.gmailInboxActionCount(state),8);
+    assert.equal(state.items.length,11);
+    assert.equal(state.linked.find(link=>link.id==='TEST1').gmailThreadId,'thread-11');
+    assert.equal(fixture.requests.length-from,4);
+    assert.ok(!fixture.requests.slice(from).some(r=>r.name.startsWith('/threads/')));
+  } finally {Date.now=originalNow;}
+});
+
+await test('successful local hide/link/unlink writes update the shared count without a Gmail read', async () => {
+  reset(); api.resetGmailInbox(); await api.refreshGmailInbox();
+  const from=fixture.requests.length;
+  await api.setGmailThreadHidden('printing@example.com','thread-11',true);
+  assert.equal(api.gmailInboxActionCount(api.getGmailInboxState()),10);
+  const thread=api.getGmailInboxState().items.find(item=>item.threadId==='thread-11').snapshot;
+  await api.projectReads.updateProjectRecord('TEST1',{gmailThreadId:thread.id,gmailAccountEmail:thread.accountEmail});
+  let state=api.getGmailInboxState();
+  assert.ok(state.linked.some(link=>link.id==='TEST1'&&link.gmailThreadId==='thread-11'));
+  assert.equal(state.hiddenKeys.has(JSON.stringify(['printing@example.com','thread-11'])),false);
+  // TEST1 changed its old thread, but 79 other projects still link that thread.
+  assert.equal(api.gmailInboxActionCount(state),10);
+  await api.projectReads.updateProjectRecord('TEST1',{gmailThreadId:null,gmailAccountEmail:null});
+  assert.equal(api.gmailInboxActionCount(api.getGmailInboxState()),11);
+  fixture.failures.set('gmail_hidden_threads','save failed');
+  await assert.rejects(api.setGmailThreadHidden('printing@example.com','thread-11',true),/save failed/);
+  assert.equal(api.gmailInboxActionCount(api.getGmailInboxState()),11);
+  assert.ok(!fixture.requests.slice(from).some(r=>r.name.startsWith('/')));
+});
+
+await test('a save racing revalidation cannot restore outdated hidden or linked membership', async () => {
+  reset(); api.resetGmailInbox(); await api.refreshGmailInbox();
+  const pending=api.refreshGmailInbox();
+  await fixture.wait(8);
+  await api.projectReads.updateProjectRecord('TEST1',{gmailThreadId:'thread-11',gmailAccountEmail:'printing@example.com'});
+  await pending;
+  assert.ok(api.getGmailInboxState().linked.some(link=>link.id==='TEST1'&&link.gmailThreadId==='thread-11'));
+  assert.equal(api.gmailInboxActionCount(api.getGmailInboxState()),10);
+});
+
+await test('verification errors show no saved emails and do not claim an accurate action count', async () => {
+  reset(); api.resetGmailInbox(); await api.refreshGmailInbox();
+  fixture.failures.set('gmail_hidden_threads','hidden list unavailable');
+  await api.refreshGmailInbox();
+  let state=api.getGmailInboxState();
+  assert.equal(state.verified,false); assert.equal(state.status,'error'); assert.deepEqual(state.items,[]);
+  fixture.failures.clear(); fixture.failures.set('/profile',{status:401,message:'access needed'});
+  await api.refreshGmailInbox();
+  state=api.getGmailInboxState(); assert.equal(state.status,'auth'); assert.equal(state.verified,false);
+});
+
+await test('account changes and sign-out discard shared mailbox state', async () => {
+  reset(); api.resetGmailInbox(); await api.refreshGmailInbox();
+  owner={id:'other-inbox-owner',email:'printing@example.com'};
+  fixture.mailbox.threadIds=['thread-4'];
+  await api.refreshGmailInbox(true);
+  assert.deepEqual(api.getGmailInboxState().threadIds,['thread-4']);
+  owner=null; await api.refreshGmailInbox();
+  assert.equal(api.getGmailInboxState().status,'auth'); assert.deepEqual(api.getGmailInboxState().items,[]);
+});
+
+await test('January replaces the single browser snapshot and excludes previous-year hide entries', async () => {
+  reset(); api.resetGmailInbox(); await api.refreshGmailInbox();
+  fixture.hiddenThreads.push({gmail_account_email:'printing@example.com',gmail_thread_id:'thread-11',hidden_at:'2026-12-01T00:00:00Z'});
+  const originalNow=Date.now; Date.now=()=>Date.parse('2027-01-01T00:00:00+02:00');
+  try {
+    fixture.mailbox.threadIds=['thread-11'];
+    await api.refreshGmailInbox(true);
+    const state=api.getGmailInboxState();
+    assert.equal(state.year,2027); assert.equal(state.hiddenKeys.size,0); assert.equal(api.gmailInboxActionCount(state),1);
+    const saved=await api.readSnapshot('gmail-threads:'+owner.id);
+    assert.equal(saved.year,2027); assert.equal(saved.items.length,1);
+    await api.setGmailThreadHidden('printing@example.com','thread-11',true);
+    assert.equal(fixture.hiddenThreads.length,1);
+    assert.equal(api.gmailInboxActionCount(api.getGmailInboxState()),0);
+  } finally {Date.now=originalNow;api.resetGmailInbox();}
+});
+
+await test('retired unread/import caches are removed without clearing project snapshots', async () => {
+  reset();
+  await api.writeSnapshot('unread-gmail-v1:old',{emails:['old']});
+  await api.writeSnapshot('recent-gmail-v2:old',{items:['old']});
+  await api.writeSnapshot('active-projects:other',{projects:['keep']});
+  await api.listRecent3dPrintThreads();
+  assert.equal(await api.readSnapshot('unread-gmail-v1:old'),undefined);
+  assert.equal(await api.readSnapshot('recent-gmail-v2:old'),undefined);
+  assert.deepEqual(await api.readSnapshot('active-projects:other'),{projects:['keep']});
+});
+
+await test('Create project uses the same import extraction and module defaults without fetching Gmail', async () => {
+  reset(); api.resetGmailInbox(); await api.refreshGmailInbox();
+  const item=api.getGmailInboxState().items[0];
+  item.snapshot.messages[0].body='Name: Ada Lovelace\nStudent number: 12345678\nModule: ABC 123';
+  const from=fixture.requests.length;
+  const form=api.gmailProjectFormValues(item,[],[{id:'module',code:'ABC123',lecturer:'Fixture Lecturer',modulePayment:true,defaultFilamentSource:'STUDENT'}]);
+  assert.equal(form.studentName,'Ada Lovelace');assert.equal(form.studentNumber,'12345678');
+  assert.equal(form.email,'student@example.com');assert.equal(form.course,'ABC 123');
+  assert.equal(form.lecturer,'Fixture Lecturer');assert.equal(form.needsPayment,false);
+  assert.equal(fixture.requests.length,from);
 });

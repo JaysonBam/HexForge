@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { subscribeToAuthChanges } from '@/api/supabase/auth';
 import { clearGoogleProviderTokens } from '@/api/google/gmail/client';
+import { resetGmailInbox } from '@/features/gmail/gmailInboxStore';
 import { clearReadSnapshots } from '@/lib/persistentReads';
 
 export function AuthGuard({ children }: { children: ReactNode }) {
@@ -14,6 +15,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
       setAuthenticated(Boolean(session));
       setLoading(false);
       if (!session) {
+        resetGmailInbox();
         clearGoogleProviderTokens();
         void clearReadSnapshots();
       }

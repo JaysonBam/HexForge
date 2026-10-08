@@ -24,6 +24,7 @@ import {
   type LucideIcon
 } from 'lucide-react';
 import { getWorkspaceTabForState, type WorkspaceTab } from '@/domain/operations';
+import { useGmailInboxRefresh } from '@/features/gmail/useGmailInbox';
 import { LocalHelperIndicator } from '@/features/local-files/LocalHelperIndicator';
 
 type NavigationItem = {
@@ -82,6 +83,7 @@ const getGoogleIdentityDataString = (
 };
 
 export const Layout = () => {
+  useGmailInboxRefresh();
   const { syncStatus, clearSyncError, getProject, projectsLoading } = useProjects();
   const { staffList } = useSettings();
   const { activeStaffName, setActiveStaffName, clearActiveStaffName } = useStaffSession();

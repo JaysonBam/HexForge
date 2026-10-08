@@ -5,6 +5,61 @@ import type {
   GmailThreadSnapshot
 } from '@/api/google/gmail/types';
 import { supabase } from './client';
+import { notifyGmailInboxChange } from '@/lib/gmailInboxEvents';
+import { gmailYearStart } from '@/api/google/gmail/search';
+
+export type LinkedProjectGmailThread = {
+  id?: string;
+  priorityNumber?: number | null;
+  gmailThreadId: string | null;
+  gmailAccountEmail: string | null;
+};
+
+// Read current links on every picker opening, including completed projects.
+// Email bodies stay cached; only project links and their labels need revalidation.
+export const getLinkedProjectGmailThreads = async (signal?: AbortSignal): Promise<LinkedProjectGmailThread[]> => {
+  const links: LinkedProjectGmailThread[] = [];
+  const pageSize = 1000;
+  for (let offset = 0; ; offset += pageSize) {
+    const query = supabase.from('projects')
+      .select('id,priorityNumber,gmailThreadId,gmailAccountEmail')
+      .not('gmailThreadId', 'is', null)
+      .order('id')
+      .range(offset, offset + pageSize - 1);
+    const { data, error } = await (signal ? query.abortSignal(signal) : query);
+    if (error) throw new Error(error.message || 'Project Gmail links could not be checked.');
+    links.push(...(data || []));
+    if (!data || data.length < pageSize) return links;
+  }
+};
+
+export const getHiddenGmailThreads = async (signal?: AbortSignal): Promise<LinkedProjectGmailThread[]> => {
+  const rows: LinkedProjectGmailThread[] = [];
+  const pageSize = 1000;
+  for (let offset = 0; ; offset += pageSize) {
+    const query = supabase.from('gmail_hidden_threads')
+      .select('gmailThreadId:gmail_thread_id,gmailAccountEmail:gmail_account_email')
+      .gte('hidden_at', new Date(gmailYearStart()).toISOString())
+      .order('gmail_thread_id')
+      .range(offset, offset + pageSize - 1);
+    const { data, error } = await (signal ? query.abortSignal(signal) : query);
+    if (error) throw new Error(error.message || 'Hidden emails could not be checked.');
+    rows.push(...(data || []));
+    if (!data || data.length < pageSize) return rows;
+  }
+};
+
+export const setGmailThreadHidden = async (accountEmail: string, threadId: string, hidden: boolean) => {
+  const account = accountEmail.trim().toLowerCase();
+  const query = hidden
+    ? supabase.from('gmail_hidden_threads').upsert({ gmail_account_email: account, gmail_thread_id: threadId }, {
+      onConflict: 'gmail_account_email,gmail_thread_id'
+    })
+    : supabase.from('gmail_hidden_threads').delete().eq('gmail_account_email', account).eq('gmail_thread_id', threadId);
+  const { error } = await query;
+  if (error) throw new Error(error.message || 'The hidden email list could not be updated.');
+  notifyGmailInboxChange({ type: 'hidden', accountEmail: account, threadId, hidden });
+};
 
 const messageRow = (projectId: string, message: GmailThreadMessage) => ({
   project_id: projectId,
@@ -45,6 +100,7 @@ export const saveProjectGmailThreadRecord = async (
     gmailLastSyncedAt: thread.syncedAt
   }).eq('id', projectId);
   if (projectError) throw new Error(projectError.message || 'The Main Gmail Thread could not be saved.');
+  notifyGmailInboxChange({ type: 'project', projectId, threadId: thread.id, accountEmail: thread.accountEmail });
 
   if (thread.messages.length) {
     const { error: messageError } = await supabase.from('project_gmail_messages')
@@ -86,6 +142,7 @@ export const deleteProjectGmailThreadRecord = async (projectId: string) => {
     gmailLastSyncedAt: null
   }).eq('id', projectId);
   if (projectError) throw new Error(projectError.message);
+  notifyGmailInboxChange({ type: 'project', projectId, threadId: null });
 };
 
 export const getProjectGmailMessages = async (
