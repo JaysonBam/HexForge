@@ -24,6 +24,7 @@ import {
 import type { ProjectWorkspaceNavigationContext } from '@/app/layout/Layout';
 import { LocalFilesCard } from '@/features/local-files/LocalFilesCard';
 import { ProjectCorrespondencePanel } from '@/features/gmail/ProjectCorrespondencePanel';
+import { getGmailInboxState } from '@/features/gmail/gmailInboxStore';
 import {
   ArrowLeft,
   Archive,
@@ -163,9 +164,11 @@ export const ProjectTimeline = () => {
   }
 
   if (id === 'new') {
+    const threadId = (location.state as { gmailThreadId?: string } | null)?.gmailThreadId;
+    const initialGmailThread = getGmailInboxState().items.find(item => item.threadId === threadId);
     return (
       <div className="w-full">
-        <CheckpointNew />
+        <CheckpointNew key={threadId || 'new'} initialGmailThread={initialGmailThread} />
       </div>
     );
   }

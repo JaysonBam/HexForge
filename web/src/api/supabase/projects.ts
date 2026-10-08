@@ -1,3 +1,4 @@
+import { notifyGmailInboxChange } from '@/lib/gmailInboxEvents';
 import { normalizePartVerification } from '@/domain/partVerification';
 import type { Part, PrintRun, Project, QuoteSnapshot } from '@/types';
 import { supabase } from './client';
@@ -197,19 +198,25 @@ export const getProjectSummaries = async (dashboardOnly = true): Promise<Project
   return (data as unknown as ProjectSummary[]).map(project => ({ ...project, parts: project.parts ?? [] }));
 };
 
-export const createProjectRecord = (project: Omit<Project, 'parts'> & { parts?: never }) => supabase
-  .from('projects')
-  .insert([project]);
+export const createProjectRecord = async (project: Omit<Project, 'parts'> & { parts?: never }) => {
+  const result = await supabase.from('projects').insert([project]);
+  if (!result.error && project.gmailThreadId) notifyGmailInboxChange({ type: 'project', projectId: project.id,
+    threadId: project.gmailThreadId, accountEmail: project.gmailAccountEmail, priorityNumber: project.priorityNumber });
+  return result;
+};
 
-export const updateProjectRecord = (projectId: string, updates: Partial<Project>) => supabase
-  .from('projects')
-  .update(updates)
-  .eq('id', projectId);
+export const updateProjectRecord = async (projectId: string, updates: Partial<Project>) => {
+  const result = await supabase.from('projects').update(updates).eq('id', projectId);
+  if (!result.error && ('gmailThreadId' in updates || 'gmailAccountEmail' in updates || 'priorityNumber' in updates)) notifyGmailInboxChange({ type: 'project', projectId,
+    threadId: updates.gmailThreadId, accountEmail: updates.gmailAccountEmail, priorityNumber: updates.priorityNumber });
+  return result;
+};
 
-export const deleteProjectRecord = (projectId: string) => supabase
-  .from('projects')
-  .delete()
-  .eq('id', projectId);
+export const deleteProjectRecord = async (projectId: string) => {
+  const result = await supabase.from('projects').delete().eq('id', projectId);
+  if (!result.error) notifyGmailInboxChange({ type: 'project', projectId, deleted: true });
+  return result;
+};
 
 export const transitionProjectRecord = (args: {
   projectId: string;

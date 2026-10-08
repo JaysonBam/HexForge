@@ -2,8 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { LocalProjectFile } from '@hexforge/windows-helper/contracts';
 import {
-  buildRecentPrintEmailQuery,
-  buildUnreadPrintEmailQuery,
+  buildCurrentYearPrintEmailQuery,
   extractProjectSuggestions,
   findModuleCode,
   findStudentNumbers,
@@ -41,14 +40,12 @@ const baseThread = (body: string, overrides: Partial<GmailThreadSnapshot> = {}):
   }],
   ...overrides
 });
-test('recent print Gmail query includes read and unread messages', () => {
-  const query = buildRecentPrintEmailQuery('3d print');
-  assert.equal(query, 'newer_than:30d "3d print"');
-  assert.doesNotMatch(query, /is:unread/i);
-});
-test('dashboard Gmail query finds unread messages in print threads from the last three months', () => {
-  const query = buildUnreadPrintEmailQuery('3d print');
-  assert.equal(query, 'newer_than:90d is:unread -from:linkedin.com "3d print"');
+test('the shared Gmail query includes read mail and covers the South African calendar year', () => {
+  const query = buildCurrentYearPrintEmailQuery('3d print', 2026);
+  const start = Date.parse('2026-01-01T00:00:00+02:00') / 1000;
+  const end = Date.parse('2027-01-01T00:00:00+02:00') / 1000;
+  assert.equal(query, `after:${start} before:${end} -in:trash "3d print"`);
+  assert.doesNotMatch(query, /is:unread|newer_than/i);
 });
 
 test('project Gmail links use the working primary-account thread route', () => {

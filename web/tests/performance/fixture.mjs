@@ -12,13 +12,17 @@ export function createFixture({ delay = 120, threadCount = 30, tailDelay = 480, 
   const messageRows = [{ project_id: 'TEST1', gmail_message_id: 'message-0', gmail_thread_id: 'thread-0', sender_name: 'Fixture Student', sender_email: 'student@example.com', recipient_emails: ['printing@example.com'], subject: 'Fixture print request', body_text: 'Please print the fixture.', message_date: '2026-10-07T08:00:00Z', direction: 'incoming', has_attachments: true, message_id_header: '<fixture@example.com>' }];
   const attachmentRows = attachments.map(a => ({ project_id: 'TEST1', gmail_message_id: a.messageId, gmail_attachment_id: a.attachmentId, mime_part_id: a.partId, filename: a.filename, mime_type: a.mimeType, size_bytes: a.size, download_status: 'pending' }));
   const failures = new Map();
+  const hiddenThreads = [];
   const mailbox = {
     historyId: '1',
     threadIds: Array.from({ length: threadCount }, (_, i) => `thread-${threadCount - 1 - i}`),
     changes: [],
     historyPages: null,
     threadPages: null,
-    threadResponses: new Map()
+    threadResponses: new Map(),
+    unreadThreadIds: new Set(),
+    spamThreadIds: new Set(),
+    trashThreadIds: new Set()
   };
   let activeGmail = 0;
   const gmailQueue = [];
@@ -30,7 +34,7 @@ export function createFixture({ delay = 120, threadCount = 30, tailDelay = 480, 
     const table = path.split('/').at(-1);
     const gmailPath = url.searchParams.get('path');
     const name = gmailPath || table;
-    const record = { name, method, body: init.body ? JSON.parse(init.body) : null, start: performance.now(), end: 0, bytes: 0 };
+    const record = { name, method, url: url.toString(), body: init.body ? JSON.parse(init.body) : null, start: performance.now(), end: 0, bytes: 0 };
     requests.push(record);
     const isThread = gmailPath?.startsWith('/threads/');
     if (isThread) {
@@ -57,14 +61,27 @@ export function createFixture({ delay = 120, threadCount = 30, tailDelay = 480, 
     else if (gmailPath?.startsWith('/messages?')) payload = { messages: mailbox.threadIds.map(id => ({ id: id.replace('thread', 'message'), threadId: id })) };
     else if (gmailPath?.startsWith('/threads?')) {
       const params = new URL(gmailPath, 'https://fixture.invalid').searchParams;
+      const matchingIds = mailbox.threadIds.filter(id =>
+        (params.get('includeSpamTrash') === 'true' || (!mailbox.spamThreadIds.has(id) && !mailbox.trashThreadIds.has(id)))
+        && (!(params.get('q') || '').includes('-in:trash') || !mailbox.trashThreadIds.has(id)));
       payload = mailbox.threadPages
         ? mailbox.threadPages[Number(params.get('pageToken') || 0)]
-        : { threads: mailbox.threadIds.slice(0, Number(params.get('maxResults'))).map(id => ({ id })) };
+        : (() => {
+          const offset = Number(params.get('pageToken') || 0);
+          const end = offset + Number(params.get('maxResults'));
+          return { threads: matchingIds.slice(offset, end).map(id => ({ id })),
+            ...(end < matchingIds.length ? { nextPageToken: String(end) } : {}) };
+        })();
     }
     else if (isThread) {
       const id = gmailPath.split('/')[2].split('?')[0];
       payload = { id, messages: [{ id: id.replace('thread', 'message'), threadId: id, internalDate: String(1791356400000 + Number(id.split('-')[1]) * 1000), payload: { headers: [{ name: 'From', value: 'Fixture Student <student@example.com>' }, { name: 'To', value: 'printing@example.com' }, { name: 'Subject', value: 'Fixture print request' }, { name: 'Message-ID', value: '<fixture@example.com>' }], parts: [{ partId: '0', mimeType: 'text/plain', body: { data: Buffer.from('Please print the fixture.').toString('base64url') } }, ...attachments.map(a => ({ partId: a.partId, filename: a.filename, mimeType: a.mimeType, body: { attachmentId: a.attachmentId, size: a.size } }))] } }] };
       if (mailbox.threadResponses.has(id)) payload = mailbox.threadResponses.get(id);
+      else payload.messages[0].labelIds = [
+        ...(mailbox.unreadThreadIds.has(id) ? ['UNREAD'] : []),
+        ...(mailbox.spamThreadIds.has(id) ? ['SPAM'] : []),
+        ...(mailbox.trashThreadIds.has(id) ? ['TRASH'] : [])
+      ];
     } else if (gmailPath?.includes('/attachments/')) payload = { data: attachmentBytes.toString('base64url'), size: attachmentBytes.length };
     else if (gmailPath?.startsWith('/messages/message-')) {
       const id = gmailPath.split('/')[2].split('?')[0];
@@ -78,10 +95,41 @@ export function createFixture({ delay = 120, threadCount = 30, tailDelay = 480, 
       });
     }
     else if (table === 'transition_project_state') payload = { ok: true, errors: [], warnings: [] };
+    else if (table === 'gmail_hidden_threads' && method === 'POST') {
+      const row = record.body;
+      const linked = projects.some(project => project.gmailThreadId === row.gmail_thread_id
+        && project.gmailAccountEmail?.trim().toLowerCase() === row.gmail_account_email);
+      if (linked) { status = 400; payload = { message: 'Linked emails cannot be hidden.' }; }
+      else {
+        const existing = hiddenThreads.find(existing => existing.gmail_account_email === row.gmail_account_email && existing.gmail_thread_id === row.gmail_thread_id);
+        const saved = { ...row, hidden_by_email: 'printing@example.com', hidden_at: new Date(Date.now()).toISOString() };
+        if (existing) Object.assign(existing, saved); else hiddenThreads.push(saved);
+        status = 204;
+      }
+    }
+    else if (table === 'gmail_hidden_threads' && method === 'DELETE') {
+      const account = url.searchParams.get('gmail_account_email')?.slice(3);
+      const threadId = url.searchParams.get('gmail_thread_id')?.slice(3);
+      for (let i = hiddenThreads.length - 1; i >= 0; i -= 1)
+        if (hiddenThreads[i].gmail_account_email === account && hiddenThreads[i].gmail_thread_id === threadId
+          && (!url.searchParams.has('hidden_at') || (hiddenThreads[i].hidden_at && hiddenThreads[i].hidden_at < url.searchParams.get('hidden_at').slice(3)))) hiddenThreads.splice(i, 1);
+      status = 204;
+    }
+    else if (table === 'projects' && method === 'PATCH') {
+      const project = projects.find(row => row.id === url.searchParams.get('id')?.slice(3));
+      if (project) {
+        Object.assign(project, record.body);
+        for (let i = hiddenThreads.length - 1; i >= 0; i -= 1)
+          if (hiddenThreads[i].gmail_thread_id === project.gmailThreadId && hiddenThreads[i].gmail_account_email === project.gmailAccountEmail?.toLowerCase()) hiddenThreads.splice(i, 1);
+      }
+      status = 204;
+    }
     else if (method !== 'GET') { payload = null; status = 204; }
     else {
-      payload = ({ projects, parts, project_cost_snapshots: snapshots, print_runs: runs, project_gmail_messages: messageRows, project_gmail_attachments: attachmentRows, audit_events: [{ id: 1, project_id: 'TEST1', action_type: 'REOPEN_REVIEW' }] })[table] ?? [];
+      payload = ({ projects, parts, gmail_hidden_threads: hiddenThreads, project_cost_snapshots: snapshots, print_runs: runs, project_gmail_messages: messageRows, project_gmail_attachments: attachmentRows, audit_events: [{ id: 1, project_id: 'TEST1', action_type: 'REOPEN_REVIEW' }] })[table] ?? [];
       for (const [column, filter] of url.searchParams) {
+        if (filter.startsWith('gte.')) payload = payload.filter(row => String(row[column] ?? new Date().toISOString()) >= filter.slice(4));
+        if (filter === 'not.is.null') payload = payload.filter(row => row[column] != null);
         if (filter.startsWith('eq.')) payload = payload.filter(row => String(row[column]) === filter.slice(3));
         if (filter.startsWith('in.')) {
           const included = filter.slice(3).replace(/[()]/g, '').split(',');
@@ -97,7 +145,7 @@ export function createFixture({ delay = 120, threadCount = 30, tailDelay = 480, 
         const withParts = select.includes('parts!parts_projectId_fkey(printStatus)');
         const columns = select.replace(/parts!parts_projectId_fkey\(printStatus\)/, '').split(',').filter(Boolean);
         payload = payload.map(row => ({
-          ...Object.fromEntries(columns.map(column => [column, row[column]])),
+          ...Object.fromEntries(columns.map(column => { const [alias, source = alias] = column.split(':'); return [alias, row[source]]; })),
           ...(withParts ? { parts: parts.filter(part => part.projectId === row.id).map(part => ({ printStatus: part.printStatus })) } : {})
         }));
       }
@@ -105,6 +153,9 @@ export function createFixture({ delay = 120, threadCount = 30, tailDelay = 480, 
         const [column, direction] = url.searchParams.get('order').split('.');
         payload = [...payload].sort((a, b) => (a[column] < b[column] ? -1 : a[column] > b[column] ? 1 : 0) * (direction === 'desc' ? -1 : 1));
       }
+      const offset = Number(url.searchParams.get('offset') || 0);
+      const limit = Number(url.searchParams.get('limit') || payload.length);
+      payload = payload.slice(offset, offset + limit);
     }
     const body = status === 204 ? null : JSON.stringify(payload);
     record.end = performance.now(); record.bytes = body?.length || 0;
@@ -115,5 +166,5 @@ export function createFixture({ delay = 120, threadCount = 30, tailDelay = 480, 
     createProjectFolder: async () => { throw new Error('Fixture folder already exists'); },
     saveProjectAttachment: async (_key, filename) => { await wait(delay); return { status: 'saved', filename }; }
   };
-  return { fetch, helper, requests, failures, mailbox, studentProject, attachments, projects, parts, snapshots, runs, wait };
+  return { fetch, helper, requests, failures, hiddenThreads, mailbox, studentProject, attachments, projects, parts, snapshots, runs, wait };
 }

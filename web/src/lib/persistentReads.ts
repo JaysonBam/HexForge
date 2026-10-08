@@ -48,3 +48,24 @@ export async function clearReadSnapshots(): Promise<void> {
     } catch { resolve(); }
   });
 }
+
+// Remove retired Gmail caches without touching project snapshots or queued writes.
+export async function removeReadSnapshots(prefixes: string[]): Promise<void> {
+  const matches = (key: unknown) => typeof key === 'string' && prefixes.some(prefix => key.startsWith(prefix));
+  for (const key of memory.keys()) if (matches(key)) memory.delete(key);
+  const db = await openDatabase();
+  if (!db) return;
+  await new Promise<void>(resolve => {
+    try {
+      const transaction = db.transaction('reads', 'readwrite');
+      const request = transaction.objectStore('reads').openCursor();
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) return;
+        if (matches(cursor.key)) cursor.delete();
+        cursor.continue();
+      };
+      transaction.oncomplete = transaction.onerror = transaction.onabort = () => resolve();
+    } catch { resolve(); }
+  });
+}

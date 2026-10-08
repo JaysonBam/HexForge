@@ -24,10 +24,11 @@ import { GMAIL_THREAD_ACCOUNT_MISMATCH, useProjectGmailThreadAccess } from '@/fe
 import { useLocalHelper } from '@/features/local-files/LocalHelperContext';
 import { ExternalLink, Mail, Paperclip, Unlink } from 'lucide-react';
 import { getNextProjectPriority } from '@/domain/projectPriority';
+import { gmailProjectFormValues } from '@/features/gmail/gmailProjectForm';
 
 const buildInitialEmail = (project?: Project) => project?.email || getStudentEmail(project?.studentNumber || '');
 
-export const CheckpointNew = ({ project }: { project?: Project }) => {
+export const CheckpointNew = ({ project, initialGmailThread }: { project?: Project; initialGmailThread?: GmailThreadListItem }) => {
   const navigate = useNavigate();
   const { addProject, updateProject, projectSummaries } = useProjects();
   const { modules } = useSettings();
@@ -37,7 +38,7 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
   const automaticPriority = useMemo(() => getNextProjectPriority(projectSummaries), [projectSummaries]);
   const priorityManuallyAdjustedRef = useRef(false);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(() => ({
     studentName: project?.studentName || '',
     studentNumber: project?.studentNumber || '',
     email: buildInitialEmail(project),
@@ -46,17 +47,27 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
     lecturer: project?.lecturer || '',
     needsPayment: project?.needsPayment ?? true,
     moduleOrLecturerPays: project?.moduleOrLecturerPays ?? false,
-    defaultFilamentSource: normalizeFilamentSource(project?.defaultFilamentSource)
-  });
+    defaultFilamentSource: normalizeFilamentSource(project?.defaultFilamentSource),
+    ...(!project && initialGmailThread ? gmailProjectFormValues(initialGmailThread, projectSummaries, modules) : {})
+  }));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [gmailPickerOpen, setGmailPickerOpen] = useState(false);
-  const [selectedGmailThread, setSelectedGmailThread] = useState<GmailThreadListItem | null>(null);
+  const [selectedGmailThread, setSelectedGmailThread] = useState<GmailThreadListItem | null>(initialGmailThread || null);
   const [gmailLinking, setGmailLinking] = useState(false);
   const [saving, setSaving] = useState(false);
+  const initialThreadReviewed = useRef(false);
+
+  useEffect(() => {
+    if (!initialGmailThread || initialThreadReviewed.current) return;
+    initialThreadReviewed.current = true;
+    const { studentNumberCandidates } = extractProjectSuggestions(initialGmailThread.snapshot, projectSummaries);
+    if (studentNumberCandidates.length > 1) notify({ title: 'Student number needs review',
+      message: `Found multiple eight-digit numbers: ${studentNumberCandidates.join(', ')}. No number was selected.`, tone: 'warning' });
+  }, [initialGmailThread, projectSummaries, notify]);
 
   useEffect(() => {
     if (project || priorityManuallyAdjustedRef.current) return;
-    setFormData((previous) => ({ ...previous, priorityNumber: automaticPriority }));
+    setFormData(previous => previous.priorityNumber === automaticPriority ? previous : { ...previous, priorityNumber: automaticPriority });
   }, [automaticPriority, project]);
 
   const applySelectedThread = async (item: GmailThreadListItem) => {
@@ -92,22 +103,8 @@ export const CheckpointNew = ({ project }: { project?: Project }) => {
     }
 
     const suggestions = extractProjectSuggestions(item.snapshot, projectSummaries);
-    const matchedModule = modules.find((module) =>
-      module.code.replace(/\s+/g, '').toUpperCase() === suggestions.moduleCode.replace(/\s+/g, '').toUpperCase());
     setSelectedGmailThread(item);
-    setFormData((previous) => ({
-      ...previous,
-      studentName: suggestions.studentName || previous.studentName,
-      studentNumber: suggestions.studentNumber,
-      email: suggestions.email || previous.email,
-      ...(suggestions.moduleCode ? { course: suggestions.moduleCode } : {}),
-      ...(matchedModule ? {
-        lecturer: matchedModule.lecturer,
-        needsPayment: !matchedModule.modulePayment,
-        moduleOrLecturerPays: !!matchedModule.modulePayment,
-        defaultFilamentSource: normalizeFilamentSource(matchedModule.defaultFilamentSource)
-      } : {})
-    }));
+    setFormData(previous => ({ ...previous, ...gmailProjectFormValues(item, projectSummaries, modules) }));
     setErrors({});
     if (suggestions.studentNumberCandidates.length > 1) {
       notify({
