@@ -52,7 +52,7 @@ export const classifyGmailProxyRequest = (
 
   if (
     method === 'GET'
-    && url.pathname === '/messages'
+    && (url.pathname === '/messages' || url.pathname === '/threads')
     && hasOnlyParams(url, ['maxResults', 'q', 'pageToken'])
   ) {
     const maxResults = Number(url.searchParams.get('maxResults'));
@@ -64,7 +64,7 @@ export const classifyGmailProxyRequest = (
       && maxResults <= 100
       && query.length >= 1
       && query.length <= 1500
-      && (!pageToken || idPattern.test(pageToken))
+      && (!pageToken || pageTokenPattern.test(pageToken))
     ) {
       return { method: 'GET', operation: 'gmail_read', limit: 120 };
     }

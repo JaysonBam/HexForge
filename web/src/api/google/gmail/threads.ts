@@ -159,6 +159,24 @@ let cacheGeneration = 0;
 // Every open checks Gmail. Replies make any already-running result ineligible for persistence.
 export const invalidateRecentGmailThreads = () => { cacheGeneration++; pendingLists.clear(); };
 
+const listMatchingThreadIds = async (query: string, signal?: AbortSignal): Promise<string[]> => {
+  const ids = new Set<string>();
+  let pageToken: string | undefined;
+  do {
+    const params = new URLSearchParams({ maxResults: String(50 - ids.size), q: query });
+    if (pageToken) params.set('pageToken', pageToken);
+    const result = await fetchJson<{ threads?: Array<{ id?: string }>; nextPageToken?: string }>(
+      `/threads?${params}`, signal
+    );
+    for (const thread of result.threads || []) {
+      if (thread.id) ids.add(thread.id);
+      if (ids.size === 50) break;
+    }
+    pageToken = result.nextPageToken;
+  } while (ids.size < 50 && pageToken);
+  return [...ids];
+};
+
 export const listRecent3dPrintThreads = async (options: {
   onProgress?: (items: GmailThreadListItem[]) => void;
   signal?: AbortSignal;
@@ -190,13 +208,12 @@ const loadRecent3dPrintThreads = async (ownerId: string | undefined, options: {
   const query = `${buildRecentPrintEmailQuery('3d').replace(/\s+3d$/, '')} {${groupedTerms}}`;
   const generation = cacheGeneration;
   const key = `recent-gmail-v2:${ownerId}`;
-  const [result, profile, saved] = await Promise.all([
-    fetchJson<{ messages?: Array<{ threadId?: string }> }>(`/messages?maxResults=100&q=${encodeURIComponent(query)}`, options.signal),
+  const [threadIds, profile, saved] = await Promise.all([
+    listMatchingThreadIds(query, options.signal),
     fetchJson<{ emailAddress?: string; historyId?: string }>('/profile', options.signal),
     ownerId ? readSnapshot<RecentThreads>(key) : Promise.resolve(undefined)
   ]);
   const accountEmail = profile.emailAddress?.trim().toLowerCase() || '';
-  const threadIds = [...new Set((result.messages || []).map((message) => message.threadId).filter((id): id is string => Boolean(id)))].slice(0, 50);
   let reusable = saved?.accountEmail === accountEmail && Array.isArray(saved.items)
     && Boolean(saved.historyId && profile.historyId)
     && Date.now() - saved.fullSyncedAt < fullSyncIntervalMs;

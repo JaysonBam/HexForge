@@ -85,6 +85,55 @@ await test('picker publishes complete usable snapshots early and returns the unc
   assert.deepEqual(items.map(i => i.threadId), Array.from({length:12}, (_,i) => `thread-${11-i}`));
 });
 
+await test('picker selects fifty distinct conversations directly instead of capping individual messages', async () => {
+  reset();
+  fixture.mailbox.threadIds = Array.from({ length: 70 }, (_, i) => `thread-${69 - i}`);
+  const items = await api.listRecent3dPrintThreads();
+  assert.equal(items.length, 50);
+  assert.equal(new Set(items.map(item => item.threadId)).size, 50);
+  assert.equal(items[0].threadId, 'thread-69');
+  assert.equal(items.at(-1).threadId, 'thread-20');
+  const listing = fixture.requests.filter(request => request.name.startsWith('/threads?'));
+  assert.equal(listing.length, 1);
+  assert.equal(api.classifyGmailProxyRequest(listing[0].name, 'GET')?.operation, 'gmail_read');
+  const params = new URL(listing[0].name, 'https://fixture.invalid').searchParams;
+  assert.equal(params.get('maxResults'), '50');
+  assert.equal(params.get('q'), 'newer_than:30d {3d "3d print" "3d printing" print printing printer stl 3mf slicer filament}');
+  assert.ok(!fixture.requests.some(request => request.name.startsWith('/messages?')));
+});
+
+await test('thread listing follows short pages, deduplicates IDs and stops once fifty are available', async () => {
+  reset();
+  fixture.mailbox.threadPages = [
+    { threads: Array.from({ length: 23 }, (_, i) => ({ id: `thread-${59 - i}` })), nextPageToken: '1' },
+    { threads: [{ id: 'thread-37' }, ...Array.from({ length: 30 }, (_, i) => ({ id: `thread-${36 - i}` }))], nextPageToken: '2' }
+  ];
+  const items = await api.listRecent3dPrintThreads();
+  assert.equal(items.length, 50);
+  assert.equal(items[0].threadId, 'thread-59');
+  assert.equal(items.at(-1).threadId, 'thread-10');
+  const listing = fixture.requests.filter(request => request.name.startsWith('/threads?'));
+  assert.equal(listing.length, 2);
+  assert.ok(listing.every(request => api.classifyGmailProxyRequest(request.name, 'GET')?.operation === 'gmail_read'));
+  const params = new URL(listing[1].name, 'https://fixture.invalid').searchParams;
+  assert.equal(params.get('pageToken'), '1');
+  assert.equal(params.get('maxResults'), '27');
+});
+
+await test('thread listing stops at the actual available count and propagates later-page failures', async () => {
+  reset();
+  fixture.mailbox.threadPages = [
+    { threads: [{ id: 'thread-2' }], nextPageToken: '1' },
+    { threads: [{ id: 'thread-1' }, { id: 'thread-0' }] }
+  ];
+  assert.equal((await api.listRecent3dPrintThreads()).length, 3);
+  const nextPage = fixture.requests.find(request => request.name.startsWith('/threads?') && request.name.includes('pageToken=1')).name;
+  fixture.failures.set(nextPage, 'list page unavailable');
+  const progress = [];
+  await assert.rejects(api.listRecent3dPrintThreads({ onProgress: rows => progress.push(rows) }), /list page unavailable/);
+  assert.equal(progress.length, 0);
+});
+
 await test('picker verifies Gmail before showing reusable rows, including explicit Refresh and account changes', async () => {
   reset(); await api.listRecent3dPrintThreads({ forceRefresh: true });
   let count = fixture.requests.length;
