@@ -7,6 +7,7 @@ import type {
 import { supabase } from './client';
 import { notifyGmailInboxChange } from '@/lib/gmailInboxEvents';
 import { gmailYearStart } from '@/api/google/gmail/search';
+import type { Project } from '@/types';
 
 export type LinkedProjectGmailThread = {
   id?: string;
@@ -15,21 +16,22 @@ export type LinkedProjectGmailThread = {
   gmailAccountEmail: string | null;
 };
 
-// Read current links on every picker opening, including completed projects.
-// Email bodies stay cached; only project links and their labels need revalidation.
-export const getLinkedProjectGmailThreads = async (signal?: AbortSignal): Promise<LinkedProjectGmailThread[]> => {
-  const links: LinkedProjectGmailThread[] = [];
-  const pageSize = 1000;
-  for (let offset = 0; ; offset += pageSize) {
+export type GmailInboxProject = LinkedProjectGmailThread & Pick<Project,
+  'id' | 'studentName' | 'studentNumber' | 'email' | 'createdAt'>;
+
+// One small metadata read serves links and suggestions; never load parts or full projects.
+export const getGmailInboxProjects = async (signal?: AbortSignal): Promise<GmailInboxProject[]> => {
+  const projects: GmailInboxProject[] = [];
+  const start = new Date(gmailYearStart() - 24 * 60 * 60 * 1000).toISOString();
+  for (let offset = 0; ; offset += 1000) {
     const query = supabase.from('projects')
-      .select('id,priorityNumber,gmailThreadId,gmailAccountEmail')
-      .not('gmailThreadId', 'is', null)
-      .order('id')
-      .range(offset, offset + pageSize - 1);
+      .select('id,priorityNumber,studentName,studentNumber,email,createdAt,gmailThreadId,gmailAccountEmail')
+      .or(`gmailThreadId.not.is.null,createdAt.gte.${start}`)
+      .order('id').range(offset, offset + 999);
     const { data, error } = await (signal ? query.abortSignal(signal) : query);
     if (error) throw new Error(error.message || 'Project Gmail links could not be checked.');
-    links.push(...(data || []));
-    if (!data || data.length < pageSize) return links;
+    projects.push(...(data || []));
+    if (!data || data.length < 1000) return projects;
   }
 };
 
@@ -90,16 +92,20 @@ const attachmentRow = (projectId: string, attachment: GmailThreadAttachment) => 
 
 export const saveProjectGmailThreadRecord = async (
   projectId: string,
-  thread: GmailThreadSnapshot
+  thread: GmailThreadSnapshot,
+  onlyIfUnlinked = false
 ) => {
-  const { error: projectError } = await supabase.from('projects').update({
+  const query = supabase.from('projects').update({
     gmailThreadId: thread.id,
     gmailAccountEmail: thread.accountEmail,
     gmailThreadSubject: thread.subject,
     gmailMainContactEmail: thread.mainContactEmail,
     gmailLastSyncedAt: thread.syncedAt
   }).eq('id', projectId);
+  // Another workstation may have linked the suggested project since the list opened.
+  const { data, error: projectError } = await (onlyIfUnlinked ? query.is('gmailThreadId', null).select('id') : query);
   if (projectError) throw new Error(projectError.message || 'The Main Gmail Thread could not be saved.');
+  if (onlyIfUnlinked && !data?.length) throw new Error('This project was removed or already has an email thread. Refresh the email list.');
   notifyGmailInboxChange({ type: 'project', projectId, threadId: thread.id, accountEmail: thread.accountEmail });
 
   if (thread.messages.length) {

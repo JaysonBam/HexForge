@@ -3,9 +3,9 @@ import { GmailAuthError } from '@/api/google/gmail/client';
 import { gmailCalendarYear } from '@/api/google/gmail/search';
 import { invalidateRecentGmailThreads, listRecent3dPrintThreads } from '@/api/google/gmail/threads';
 import type { GmailThreadListItem } from '@/api/google/gmail/types';
-import { getHiddenGmailThreads, getLinkedProjectGmailThreads, type LinkedProjectGmailThread } from '@/api/supabase/gmailRecords';
+import { getHiddenGmailThreads, getGmailInboxProjects, type GmailInboxProject, type LinkedProjectGmailThread } from '@/api/supabase/gmailRecords';
 import { onGmailInboxChange } from '@/lib/gmailInboxEvents';
-import { buildLinkedGmailThreadKeys, gmailThreadKey, gmailThreadNeedsAction } from './linkedGmailThreads';
+import { buildLinkedGmailThreadKeys, gmailThreadHasIncomingMessage, gmailThreadKey, gmailThreadNeedsAction } from './linkedGmailThreads';
 
 export const gmailInboxRefreshIntervalMs = 10 * 60 * 1000;
 export type GmailInboxState = {
@@ -22,13 +22,14 @@ export type GmailInboxState = {
   threadIds: string[];
   accountEmail: string;
   linked: LinkedProjectGmailThread[];
+  projects: GmailInboxProject[];
   hiddenKeys: Set<string>;
 };
 let nextCheckId = 0;
 const emptyState = (): GmailInboxState => ({
   year: gmailCalendarYear(), checkId: nextCheckId, status: 'loading', isRefreshing: false, complete: false, detailsVerified: false,
   verified: false, checkedAt: null, error: null, items: [], threadIds: [],
-  accountEmail: '', linked: [], hiddenKeys: new Set()
+  accountEmail: '', linked: [], projects: [], hiddenKeys: new Set()
 });
 let state = emptyState();
 let ownerKey = '';
@@ -61,10 +62,12 @@ export const gmailInboxActionCount = (inbox: GmailInboxState) => {
   for (const id of inbox.threadIds) {
     const key = gmailThreadKey(inbox.accountEmail, id);
     const isLinked = linked.has(key);
-    const hasUnread = freshItems.get(key)?.snapshot.hasUnread;
-    // Keep checking until linked unread status is verified, rather than undercounting.
-    if (isLinked && typeof hasUnread !== 'boolean') return null;
-    if (gmailThreadNeedsAction(isLinked, inbox.hiddenKeys.has(key), hasUnread === true)) count++;
+    if (!isLinked && inbox.hiddenKeys.has(key)) continue;
+    const item = freshItems.get(key);
+    // Sender details must be verified too: a sent-only thread must never inflate the badge.
+    if (!item || (isLinked && typeof item.snapshot.hasUnread !== 'boolean')) return null;
+    if (gmailThreadNeedsAction(isLinked, inbox.hiddenKeys.has(key), item.snapshot.hasUnread === true,
+      gmailThreadHasIncomingMessage(item.snapshot))) count++;
   }
   return count;
 };
@@ -81,7 +84,8 @@ onGmailInboxChange(change => {
     publish({ hiddenKeys });
     return;
   }
-  const previous = state.linked.find(link => link.id === change.projectId);
+  const previous = state.projects.find(link => link.id === change.projectId)
+    ?? state.linked.find(link => link.id === change.projectId);
   const threadId = change.deleted ? null : change.threadId === undefined ? previous?.gmailThreadId : change.threadId;
   const accountEmail = change.accountEmail === undefined ? previous?.gmailAccountEmail : change.accountEmail;
   const linked = state.linked.filter(link => link.id !== change.projectId);
@@ -91,7 +95,11 @@ onGmailInboxChange(change => {
       priorityNumber: change.priorityNumber ?? previous?.priorityNumber });
     hiddenKeys.delete(gmailThreadKey(accountEmail, threadId));
   }
-  publish({ linked, hiddenKeys });
+  const projects = change.deleted ? state.projects.filter(project => project.id !== change.projectId)
+    : state.projects.map(project => project.id === change.projectId ? { ...project,
+      gmailThreadId: threadId ?? null, gmailAccountEmail: accountEmail ?? null,
+      priorityNumber: change.priorityNumber ?? project.priorityNumber } : project);
+  publish({ linked, projects, hiddenKeys });
 });
 
 // Dashboard, import and the timer all join this one request. No separate unread cache.
@@ -110,12 +118,13 @@ export const refreshGmailInbox = async (onlyIfStale = false): Promise<void> => {
   publish({ checkId: ++nextCheckId, isRefreshing: true, verified: false, detailsVerified: false, complete: false, error: null });
   const run = async () => {
     let membership: { ids: string[]; accountEmail: string } | null = null;
-    let metadata: [LinkedProjectGmailThread[], LinkedProjectGmailThread[]] | null = null;
+    let metadata: [GmailInboxProject[], LinkedProjectGmailThread[]] | null = null;
     let metadataVersion = -1;
     const exposeMembership = () => {
       if (!valid() || !membership || !metadata || metadataVersion !== mutationVersion) return;
       const keys = new Set(membership.ids.map(id => gmailThreadKey(membership!.accountEmail, id)));
       publish({ verified: true, status: 'ready', threadIds: membership.ids, accountEmail: membership.accountEmail,
+        projects: metadata[0],
         linked: metadata[0].filter(link => link.gmailAccountEmail && link.gmailThreadId
           && keys.has(gmailThreadKey(link.gmailAccountEmail, link.gmailThreadId))),
         hiddenKeys: new Set([...buildLinkedGmailThreadKeys(metadata[1])].filter(key => keys.has(key))),
@@ -125,7 +134,7 @@ export const refreshGmailInbox = async (onlyIfStale = false): Promise<void> => {
       const readMetadata = async () => {
         do {
           metadataVersion = mutationVersion;
-          metadata = await Promise.all([getLinkedProjectGmailThreads(), getHiddenGmailThreads()]);
+          metadata = await Promise.all([getGmailInboxProjects(), getHiddenGmailThreads()]);
         } while (valid() && metadataVersion !== mutationVersion);
         exposeMembership();
       };

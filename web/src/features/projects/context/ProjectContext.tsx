@@ -36,6 +36,7 @@ import type { ProjectContextType } from '@/features/projects/context/types';
 import { getNextProjectPriority } from '@/domain/projectPriority';
 import { getAuthSession } from '@/api/supabase/auth';
 import { readSnapshot, writeSnapshot } from '@/lib/persistentReads';
+import { onGmailInboxChange } from '@/lib/gmailInboxEvents';
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 const EDIT_SAVE_DEBOUNCE_MS = 600;
@@ -87,6 +88,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const mountedRef = useRef(true);
   useEffect(() => { currentPathRef.current = pathname; }, [pathname]);
   useEffect(() => { loadedProjectsRef.current = projects; }, [projects]);
+  useEffect(() => onGmailInboxChange(change => {
+    if (change.type !== 'project' || change.threadId === undefined) return;
+    // Gmail can be linked outside the project form. Recheck before reopening its cached data.
+    writeGenerationRef.current++;
+    activeCheckAtRef.current = 0;
+    if (activeSnapshotsRef.current) delete activeSnapshotsRef.current[change.projectId];
+  }), []);
 
   const preloadActiveProjects = useCallback((force = false): Promise<void> => {
     if (activeCheckRef.current) return activeCheckRef.current;

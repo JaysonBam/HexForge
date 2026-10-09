@@ -12,20 +12,20 @@ const api = await import(pathToFileURL(await bundleApi('regression')).href);
 api.supabase.auth.getSession = async () => ({ data: { session: { access_token: 'fixture-only', user: owner } }, error: null });
 function reset() { fixture = createFixture({ delay: 5, threadCount: 12, tailDelay: 20 }); owner = { id: `owner-${Math.random()}`, email: 'printing@example.com' }; }
 
-await test('linked-thread filter reads only current project links, including completed projects', async () => {
+await test('shared project metadata keeps current links, including completed projects', async () => {
   reset();
   fixture.projects.forEach(project => { project.gmailThreadId = null; project.gmailAccountEmail = null; });
   Object.assign(fixture.projects[0], { state: 'CLOSED', gmailThreadId: 'thread-11', gmailAccountEmail: 'Printing@Example.com' });
   Object.assign(fixture.projects[1], { state: 'CANCELLED', gmailThreadId: 'thread-10', gmailAccountEmail: 'printing@example.com' });
   Object.assign(fixture.projects[2], { gmailThreadId: 'thread-9', gmailAccountEmail: 'manager@example.com' });
-  const [items, links] = await Promise.all([api.listRecent3dPrintThreads(), api.getLinkedProjectGmailThreads()]);
+  const [items, links] = await Promise.all([api.listRecent3dPrintThreads(), api.getGmailInboxProjects()]);
   assert.deepEqual(api.visibleGmailThreads(items, api.buildLinkedGmailThreadKeys(links)).map(row => row.threadId),
     Array.from({ length: 10 }, (_, index) => `thread-${9 - index}`));
   const read = fixture.requests.find(request => request.name === 'projects');
   const query = new URL(read.url).searchParams;
-  assert.equal(query.get('select'), 'id,priorityNumber,gmailThreadId,gmailAccountEmail');
+  assert.equal(query.get('select'), 'id,priorityNumber,studentName,studentNumber,email,createdAt,gmailThreadId,gmailAccountEmail');
   assert.equal(links.find(link=>link.id==='TEST1').priorityNumber,1);
-  assert.equal(query.get('gmailThreadId'), 'not.is.null');
+  assert.match(query.get('or'), /gmailThreadId.not.is.null/);
   assert.equal(query.has('state'), false);
   assert.equal(fixture.requests.filter(request => request.name === 'projects').length, 1);
   assert.ok(!fixture.requests.some(request => request.name === 'project_gmail_messages'));
@@ -34,14 +34,14 @@ await test('linked-thread filter reads only current project links, including com
 await test('link checks observe fresh local/remote links, unlinking and deletion without evicting Gmail bodies', async () => {
   reset();
   const items = await api.listRecent3dPrintThreads();
-  let links = await api.getLinkedProjectGmailThreads();
+  let links = await api.getGmailInboxProjects();
   assert.equal(api.visibleGmailThreads(items, api.buildLinkedGmailThreadKeys(links)).length, 11);
   fixture.projects.forEach(project => { project.gmailThreadId = null; });
   Object.assign(fixture.projects[0], { gmailThreadId: 'thread-11', gmailAccountEmail: 'printing@example.com' });
-  links = await api.getLinkedProjectGmailThreads();
+  links = await api.getGmailInboxProjects();
   assert.equal(api.visibleGmailThreads(items, api.buildLinkedGmailThreadKeys(links))[0].threadId, 'thread-10');
   fixture.projects.shift();
-  links = await api.getLinkedProjectGmailThreads();
+  links = await api.getGmailInboxProjects();
   assert.equal(api.visibleGmailThreads(items, api.buildLinkedGmailThreadKeys(links)).length, 12);
   const from = fixture.requests.length;
   assert.deepEqual(await api.listRecent3dPrintThreads(), items);
@@ -62,7 +62,7 @@ await test('linked-thread check includes project links beyond the Supabase page 
   fixture.projects.push(...Array.from({ length: 1005 }, (_, index) => ({
     id: `PROJECT-${String(index).padStart(4, '0')}`, gmailThreadId: `thread-${index}`, gmailAccountEmail: 'printing@example.com'
   })));
-  const links = await api.getLinkedProjectGmailThreads();
+  const links = await api.getGmailInboxProjects();
   assert.equal(links.length, 1005);
   assert.equal(api.buildLinkedGmailThreadKeys(links).size, 1005);
   assert.equal(fixture.requests.length, 2);
@@ -71,15 +71,15 @@ await test('linked-thread check includes project links beyond the Supabase page 
 await test('failed project-link checks reject rather than silently classifying everything as unlinked', async () => {
   reset();
   fixture.failures.set('projects', 'links unavailable');
-  await assert.rejects(api.getLinkedProjectGmailThreads(), /links unavailable/);
+  await assert.rejects(api.getGmailInboxProjects(), /links unavailable/);
   fixture.failures.clear();
-  assert.equal((await api.getLinkedProjectGmailThreads()).length, 80);
+  assert.equal((await api.getGmailInboxProjects()).length, 80);
 });
 
 await test('hidden-list writes persist without refetching emails, are reversible, and refuse linked threads', async () => {
   reset();
   const items = await api.listRecent3dPrintThreads();
-  const linked = api.buildLinkedGmailThreadKeys(await api.getLinkedProjectGmailThreads());
+  const linked = api.buildLinkedGmailThreadKeys(await api.getGmailInboxProjects());
   const gmailCalls = () => fixture.requests.filter(request => request.name.startsWith('/')).length;
   const from = gmailCalls();
   await api.setGmailThreadHidden('Printing@Example.com', 'thread-11', true);
@@ -107,7 +107,7 @@ await test('hidden-list refresh sees remote changes and project linking clears t
   assert.equal(query.get('select'), 'gmailThreadId:gmail_thread_id,gmailAccountEmail:gmail_account_email');
   await api.projectReads.updateProjectRecord('TEST1', { gmailThreadId: 'thread-11', gmailAccountEmail: 'printing@example.com' });
   const hidden = api.buildLinkedGmailThreadKeys(await api.getHiddenGmailThreads());
-  const linked = api.buildLinkedGmailThreadKeys(await api.getLinkedProjectGmailThreads());
+  const linked = api.buildLinkedGmailThreadKeys(await api.getGmailInboxProjects());
   assert.equal(hidden.size, 0);
   assert.equal(api.visibleGmailThreads(items, linked, false, hidden, true)[0].threadId, 'thread-11');
 });
@@ -482,13 +482,95 @@ await test('dashboard and import share one check and wait for verified linked un
   assert.ok(!fixture.requests.some(r=>r.name.startsWith('/messages?')));
 });
 
-await test('unlinked action counts still publish before bodies finish', async () => {
+await test('unlinked action counts wait for verified senders so sent-only threads cannot inflate the badge', async () => {
   reset(); api.resetGmailInbox(); fixture.projects.forEach(project => {project.gmailThreadId=null;});
   fixture.hiddenThreads.push({gmail_account_email:'printing@example.com',gmail_thread_id:'thread-10'});
   const states=[]; const unsubscribe=api.subscribeGmailInbox(()=>states.push(api.getGmailInboxState()));
   await api.refreshGmailInbox(); unsubscribe();
   const counted=states.find(state=>state.verified);
-  assert.equal(counted.items.length,0); assert.equal(api.gmailInboxActionCount(counted),11);
+  assert.equal(counted.items.length,0); assert.equal(api.gmailInboxActionCount(counted),null);
+  assert.equal(api.gmailInboxActionCount(api.getGmailInboxState()),11);
+});
+
+await test('sent-only threads are cached but excluded from action counts; a new external reply refreshes only that thread', async () => {
+  reset(); api.resetGmailInbox();
+  const sent = {id:'sent',threadId:'thread-11',internalDate:'1791356400000',labelIds:['SENT','UNREAD'],
+    payload:{headers:[{name:'From',value:'Printing <PRINTING@example.com>'},{name:'To',value:'student@example.com'}]}};
+  fixture.mailbox.threadResponses.set('thread-11',{id:'thread-11',messages:[sent]});
+  await api.refreshGmailInbox();
+  assert.equal(api.getGmailInboxState().items.length,12);
+  assert.equal(api.gmailInboxActionCount(api.getGmailInboxState()),10);
+  let from=fixture.requests.length;
+  await api.refreshGmailInbox();
+  assert.equal(fixture.requests.length-from,4);
+  assert.equal(api.gmailInboxActionCount(api.getGmailInboxState()),10);
+  fixture.mailbox.threadResponses.set('thread-11',{id:'thread-11',messages:[sent,
+    {id:'response',threadId:'thread-11',internalDate:'1791356401000',labelIds:['UNREAD'],
+      payload:{headers:[{name:'From',value:'Student <student@example.com>'}]}}
+  ]});
+  fixture.mailbox.historyId='2';
+  fixture.mailbox.changes=[{id:'2',messagesAdded:[{message:{threadId:'thread-11'}}]}];
+  from=fixture.requests.length; await api.refreshGmailInbox();
+  assert.equal(api.gmailInboxActionCount(api.getGmailInboxState()),11);
+  assert.equal(fixture.requests.slice(from).filter(r=>r.name.startsWith('/threads/')).length,1);
+});
+
+await test('one project metadata read supplies recent unlinked suggestions and all existing links without full project data', async () => {
+  reset(); api.resetGmailInbox();
+  Object.assign(fixture.projects[0],{gmailThreadId:null,gmailAccountEmail:null,createdAt:'2026-10-07T08:00:00Z'});
+  Object.assign(fixture.projects[1],{gmailThreadId:null,createdAt:'2025-12-30T21:59:00Z'});
+  Object.assign(fixture.projects[2],{gmailThreadId:null,createdAt:'2025-12-30T22:00:00Z'});
+  Object.assign(fixture.projects[3],{createdAt:'2020-01-01T08:00:00Z'});
+  await api.refreshGmailInbox();
+  const state=api.getGmailInboxState();
+  assert.ok(state.projects.some(p=>p.id==='TEST1'));
+  assert.ok(!state.projects.some(p=>p.id==='TEST2'));
+  assert.ok(state.projects.some(p=>p.id==='TEST3'));
+  assert.ok(state.linked.some(p=>p.id==='TEST4'));
+  const reads=fixture.requests.filter(r=>r.name==='projects');
+  assert.equal(reads.length,1);
+  assert.equal(new URL(reads[0].url).searchParams.get('select'),
+    'id,priorityNumber,studentName,studentNumber,email,createdAt,gmailThreadId,gmailAccountEmail');
+  assert.ok(!fixture.requests.some(r=>['parts','project_cost_snapshots','print_runs'].includes(r.name)));
+  assert.equal(api.suggestedGmailProject(state.items[0],state.projects)?.id,'TEST1');
+});
+
+await test('suggested linking uses the loaded snapshot, persists messages and attachments, clears hiding and updates the shared cache', async () => {
+  reset(); api.resetGmailInbox();
+  Object.assign(fixture.projects[0],{gmailThreadId:null,gmailAccountEmail:null});
+  fixture.hiddenThreads.push({gmail_account_email:'printing@example.com',gmail_thread_id:'thread-11'});
+  await api.refreshGmailInbox();
+  const item=api.getGmailInboxState().items.find(item=>item.threadId==='thread-11');
+  assert.equal(api.suggestedGmailProject(item,api.getGmailInboxState().projects)?.id,'TEST1');
+  const from=fixture.requests.length;
+  await api.linkProjectGmailThread('TEST1',item.snapshot,true);
+  const state=api.getGmailInboxState();
+  assert.equal(state.projects.find(p=>p.id==='TEST1').gmailThreadId,'thread-11');
+  assert.equal(state.linked.find(p=>p.id==='TEST1').priorityNumber,1);
+  assert.equal(state.hiddenKeys.has(JSON.stringify(['printing@example.com','thread-11'])),false);
+  assert.equal(api.suggestedGmailProject(item,state.projects),null);
+  const writes=fixture.requests.slice(from);
+  assert.deepEqual(writes.map(r=>r.name),['projects','project_gmail_messages','project_gmail_attachments']);
+  assert.equal(new URL(writes[0].url).searchParams.get('gmailThreadId'),'is.null');
+  assert.equal(fixture.hiddenThreads.length,0);
+  assert.equal(writes[2].body.length,4);
+});
+
+await test('a suggestion cannot overwrite a concurrently linked or deleted project, and failed writes leave the cache unchanged', async () => {
+  for (const mode of ['linked','deleted','failed']) {
+    reset(); api.resetGmailInbox();
+    Object.assign(fixture.projects[0],{gmailThreadId:null,gmailAccountEmail:null});
+    await api.refreshGmailInbox();
+    const thread=api.getGmailInboxState().items[0].snapshot;
+    if (mode==='linked') fixture.projects[0].gmailThreadId='remote-thread';
+    else if (mode==='deleted') fixture.projects.splice(0,1);
+    else fixture.failures.set('projects','write failed');
+    const from=fixture.requests.length;
+    await assert.rejects(api.linkProjectGmailThread('TEST1',thread,true),/already has an email thread|write failed/);
+    assert.equal(api.getGmailInboxState().projects.find(p=>p.id==='TEST1').gmailThreadId,null);
+    assert.equal(fixture.requests.length-from,1);
+    if (mode==='linked') assert.equal(fixture.projects[0].gmailThreadId,'remote-thread');
+  }
 });
 
 await test('any unread message in a linked thread needs action, even with a newer sent message', async () => {

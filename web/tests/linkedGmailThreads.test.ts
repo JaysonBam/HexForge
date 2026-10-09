@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { GmailThreadListItem } from '@/api/google/gmail/types.ts';
-import { buildLinkedGmailThreadKeys, gmailThreadNeedsAction, visibleGmailThreads } from '@/features/gmail/linkedGmailThreads.ts';
+import { buildLinkedGmailThreadKeys, gmailThreadHasIncomingMessage, gmailThreadNeedsAction, visibleGmailThreads } from '@/features/gmail/linkedGmailThreads.ts';
 
 const item = (threadId: string, accountEmail = 'printing@example.com'): GmailThreadListItem => ({
   threadId, messageId: `message-${threadId}`, senderName: 'Student', senderEmail: 'student@example.com',
@@ -70,13 +70,27 @@ test('hidden filtering waits for fresh membership; turning both filters off alwa
 });
 
 test('linked unread mail needs action; hidden mail stays excluded and import filters are unchanged', () => {
-  assert.equal(gmailThreadNeedsAction(true, false, true), true);
-  assert.equal(gmailThreadNeedsAction(true, true, true), true);
-  assert.equal(gmailThreadNeedsAction(true, false, false), false);
-  assert.equal(gmailThreadNeedsAction(false, false, false), true);
-  assert.equal(gmailThreadNeedsAction(false, true, true), false);
+  assert.equal(gmailThreadNeedsAction(true, false, true, true), true);
+  assert.equal(gmailThreadNeedsAction(true, true, true, true), true);
+  assert.equal(gmailThreadNeedsAction(true, false, false, true), false);
+  assert.equal(gmailThreadNeedsAction(false, false, false, true), true);
+  assert.equal(gmailThreadNeedsAction(false, true, true, true), false);
   const linkedUnread = item('linked');
   linkedUnread.snapshot.hasUnread = true;
   const linked = buildLinkedGmailThreadKeys([{ gmailThreadId: 'linked', gmailAccountEmail: 'printing@example.com' }]);
   assert.deepEqual(visibleGmailThreads([linkedUnread], linked), []);
+});
+
+test('sent-only threads stay in All emails but never need action, until an external reply arrives', () => {
+  const row = item('sent');
+  row.snapshot.messages = [{ senderEmail: ' PRINTING@example.com ', direction: 'incoming' } as never];
+  assert.equal(gmailThreadHasIncomingMessage(row.snapshot), false);
+  for (const linked of [true, false]) assert.equal(gmailThreadNeedsAction(linked, false, true, false), false);
+  assert.equal(visibleGmailThreads([row], new Set(), false, new Set(), false)[0], row);
+  row.snapshot.messages.push({ senderEmail: 'student@example.com', direction: 'incoming' } as never);
+  assert.equal(gmailThreadHasIncomingMessage(row.snapshot), true);
+  assert.equal(gmailThreadNeedsAction(false, false, false, gmailThreadHasIncomingMessage(row.snapshot)), true);
+  assert.equal(gmailThreadNeedsAction(true, false, true, gmailThreadHasIncomingMessage(row.snapshot)), true);
+  row.snapshot.messages = [{ senderEmail: 'alias@example.com', direction: 'outgoing' } as never];
+  assert.equal(gmailThreadHasIncomingMessage(row.snapshot), false);
 });
