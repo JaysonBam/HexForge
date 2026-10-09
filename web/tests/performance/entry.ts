@@ -7,6 +7,8 @@ export {
   updateAttachmentDownloadStatus,
   syncProjectGmailThread
 } from '../../src/features/gmail/gmailProjectService';
+export { linkProjectGmailThread } from '../../src/features/gmail/gmailProjectService';
+export { suggestedGmailProject } from '../../src/features/gmail/gmailProjectMatches';
 export * from '../../src/features/gmail/gmailInboxStore';
 export { gmailProjectFormValues } from '../../src/features/gmail/gmailProjectForm';
 export { buildCurrentYearPrintEmailQuery, gmailCalendarYear, gmailYearStart } from '../../src/api/google/gmail/search';
@@ -17,6 +19,6 @@ export {
   downloadPreparedGmailAttachments
 } from '../../src/features/gmail/gmailAttachmentDownload';
 export { supabase } from '../../src/api/supabase/client';
-export { getLinkedProjectGmailThreads, getHiddenGmailThreads, setGmailThreadHidden } from '../../src/api/supabase/gmailRecords';
+export { getGmailInboxProjects, getHiddenGmailThreads, setGmailThreadHidden } from '../../src/api/supabase/gmailRecords';
 export { buildLinkedGmailThreadKeys, visibleGmailThreads } from '../../src/features/gmail/linkedGmailThreads';
 export { classifyGmailProxyRequest } from '../../../supabase/functions/_shared/gmailProxyPolicy.ts';

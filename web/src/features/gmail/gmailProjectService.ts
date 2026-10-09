@@ -14,8 +14,10 @@ import type { GmailReplyContent, GmailThreadAttachment, GmailThreadMessage, Gmai
 
 const correspondence = new ReadCache<GmailThreadMessage[]>();
 
-export const cacheProjectGmailThread = async (projectId: string, thread: GmailThreadSnapshot): Promise<void> => {
-  try { await saveProjectGmailThreadRecord(projectId, thread); }
+export const cacheProjectGmailThread = async (
+  projectId: string, thread: GmailThreadSnapshot, onlyIfUnlinked = false
+): Promise<void> => {
+  try { await saveProjectGmailThreadRecord(projectId, thread, onlyIfUnlinked); }
   finally { correspondence.clear(); }
 };
 

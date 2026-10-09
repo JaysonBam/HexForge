@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ExternalLink, Loader2, Paperclip, RefreshCw, Search, X } from 'lucide-react';
+import { ChevronDown, ExternalLink, Link2, Loader2, Paperclip, RefreshCw, Search, X } from 'lucide-react';
 import gmailIcon from '@/assets/icons/gmail.svg';
 import { Button } from '@/components/ui/Button';
 import { requestGmailReadAccess } from '@/api/google/gmail/client';
@@ -7,8 +7,11 @@ import { getGmailThreadUrl } from '@/api/google/gmail/urls';
 import { useGmailInbox } from './useGmailInbox';
 import { refreshGmailInbox } from './gmailInboxStore';
 import type { GmailThreadListItem } from '@/api/google/gmail/types';
-import { setGmailThreadHidden } from '@/api/supabase/gmailRecords';
-import { buildLinkedGmailThreadKeys, gmailThreadKey, gmailThreadNeedsAction, visibleGmailThreads } from './linkedGmailThreads';
+import { setGmailThreadHidden, type GmailInboxProject } from '@/api/supabase/gmailRecords';
+import { buildLinkedGmailThreadKeys, gmailThreadHasIncomingMessage, gmailThreadKey, gmailThreadNeedsAction, visibleGmailThreads } from './linkedGmailThreads';
+import { suggestedGmailProject } from './gmailProjectMatches';
+import { linkProjectGmailThread } from './gmailProjectService';
+import { useFeedback } from '@/app/providers/FeedbackProvider';
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
   day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -45,6 +48,7 @@ const GmailThreadPickerDialog = ({ onClose, onSelect, actionMode, onOpenProject 
 }) => {
 
   const inbox = useGmailInbox();
+  const { notify } = useFeedback();
   const { error, linked, hiddenKeys, verified } = inbox;
   const items = inbox.detailsVerified ? inbox.items : noItems;
   // Never paint yesterday's list in the frame before the opening check starts.
@@ -56,8 +60,15 @@ const GmailThreadPickerDialog = ({ onClose, onSelect, actionMode, onOpenProject 
   const [hideLinked, setHideLinked] = useState(true);
   const [hideHidden, setHideHidden] = useState(true);
   const [view, setView] = useState<'action' | 'hidden' | 'linked' | 'all'>('action');
-  const [hideSaveError, setHideSaveError] = useState<string | null>(null);
-  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState<{ key: string; linking: boolean } | null>(null);
+  const busy = saving !== null;
+  const suggestions = useMemo(() => {
+    const candidates = inbox.projects.filter(project => !project.gmailThreadId);
+    return new Map(actionMode && verified ? items
+      .filter(item => !linkedKeys?.has(gmailThreadKey(item.snapshot.accountEmail, item.threadId)))
+      .map(item => [item.threadId, suggestedGmailProject(item, candidates)]) : []);
+  }, [actionMode, verified, items, inbox.projects, linkedKeys]);
 
   const availableItems = useMemo(() => {
     if (!openingVerified || !verified || !linkedKeys) return [];
@@ -67,7 +78,7 @@ const GmailThreadPickerDialog = ({ onClose, onSelect, actionMode, onOpenProject 
       const isLinked = linkedKeys.has(key);
       const isHidden = !isLinked && hiddenKeys.has(key);
       return view === 'all' || (view === 'linked' ? isLinked : view === 'hidden' ? isHidden
-        : gmailThreadNeedsAction(isLinked, isHidden, item.snapshot.hasUnread === true));
+        : gmailThreadNeedsAction(isLinked, isHidden, item.snapshot.hasUnread === true, gmailThreadHasIncomingMessage(item.snapshot)));
     });
   }, [items, linkedKeys, hiddenKeys, verified, openingVerified, hideLinked, hideHidden, actionMode, view]);
   const filteredItems = useMemo(() => {
@@ -82,18 +93,20 @@ const GmailThreadPickerDialog = ({ onClose, onSelect, actionMode, onOpenProject 
   }, [availableItems, search]);
 
   const load = () => refreshGmailInbox();
-  const changeHidden = async (item: GmailThreadListItem) => {
+  const saveAction = async (item: GmailThreadListItem, project?: GmailInboxProject) => {
     const key = gmailThreadKey(item.snapshot.accountEmail, item.threadId);
-    if (savingKey || !linkedKeys || !hiddenKeys || linkedKeys.has(key)) return;
-    const hidden = !hiddenKeys.has(key);
-    setSavingKey(key);
-    setHideSaveError(null);
+    if (busy || !verified || !linkedKeys || linkedKeys.has(key)) return;
+    setSaving({ key, linking: !!project });
+    setSaveError(null);
     try {
-      await setGmailThreadHidden(item.snapshot.accountEmail, item.threadId, hidden);
-    } catch (saveError) {
-      setHideSaveError(saveError instanceof Error ? saveError.message : 'The hidden email list could not be updated.');
+      if (project) {
+        await linkProjectGmailThread(project.id, item.snapshot, true);
+        notify({ title: 'Email linked', message: `Linked to ${project.priorityNumber == null ? 'project' : `P${project.priorityNumber}`}.`, tone: 'success' });
+      } else await setGmailThreadHidden(item.snapshot.accountEmail, item.threadId, !hiddenKeys.has(key));
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'The email action could not be saved.');
     } finally {
-      setSavingKey(null);
+      setSaving(null);
     }
   };
 
@@ -112,7 +125,7 @@ const GmailThreadPickerDialog = ({ onClose, onSelect, actionMode, onOpenProject 
               </div>
             </div>
             <div className="flex shrink-0 gap-1">
-              <Button variant="ghost" size="icon" onClick={() => void load()} disabled={loading || savingKey !== null} aria-label="Refresh recent Gmail threads">
+              <Button variant="ghost" size="icon" onClick={() => void load()} disabled={loading || busy} aria-label="Refresh recent Gmail threads">
                 <RefreshCw size={17} className={loading ? 'animate-spin' : ''} />
               </Button>
               <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close Gmail picker"><X size={18} /></Button>
@@ -149,8 +162,8 @@ const GmailThreadPickerDialog = ({ onClose, onSelect, actionMode, onOpenProject 
           </div>
         </header>
         <div className="overflow-y-auto bg-slate-100 p-4">
-          {hideSaveError && (
-            <p role="alert" className="mb-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-900">{hideSaveError}</p>
+          {saveError && (
+            <p role="alert" className="mb-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-900">{saveError}</p>
           )}
           {items.length > 0 && (
             <div className="relative mb-4">
@@ -200,6 +213,7 @@ const GmailThreadPickerDialog = ({ onClose, onSelect, actionMode, onOpenProject 
               const key = gmailThreadKey(item.snapshot.accountEmail, item.threadId);
               const linked = linkedKeys?.has(key) || false;
               const hidden = !linked && hiddenKeys?.has(key);
+              const suggestion = !linked ? suggestions.get(item.threadId) : null;
               return (
                 <div key={item.threadId} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                   {actionMode ? <ThreadDetails item={item} linked={linked} hidden={!!hidden} /> : (
@@ -218,19 +232,25 @@ const GmailThreadPickerDialog = ({ onClose, onSelect, actionMode, onOpenProject 
                           && link.gmailAccountEmail?.trim().toLowerCase() === item.snapshot.accountEmail).map(link => (
                             <Button key={link.id} size="sm" variant="outline" className="gap-1.5 border-slate-200 font-semibold shadow-none" onClick={() => { onOpenProject?.(link.id!); onClose(); }}><ExternalLink size={13} /> {link.priorityNumber == null ? 'Open project' : `Open P${link.priorityNumber}`}</Button>
                           )) : <>
-                          <Button size="sm" onClick={() => { onSelect(item); onClose(); }}>Create project</Button>
-                          <Button variant="ghost" size="sm" className="text-slate-500" disabled={savingKey !== null || !verified} onClick={() => void changeHidden(item)}>
-                            {savingKey === key ? <Loader2 size={14} className="animate-spin" /> : hidden ? 'Unhide' : 'Hide'}
+                          {suggestion && <Button size="sm" variant="outline" className="gap-1.5 border-slate-200 font-semibold shadow-none"
+                            title={`${suggestion.studentName} · Created ${formatDate(suggestion.createdAt)}`}
+                            disabled={busy || !verified} onClick={() => void saveAction(item, suggestion)}>
+                            {saving?.key === key && saving.linking ? <Loader2 size={13} className="animate-spin" /> : <Link2 size={13} />}
+                            {suggestion.priorityNumber == null ? 'Link to project' : `Link to P${suggestion.priorityNumber}`}
+                          </Button>}
+                          <Button size="sm" disabled={busy} onClick={() => { onSelect(item); onClose(); }}>Create project</Button>
+                          <Button variant="ghost" size="sm" className="text-slate-500" disabled={busy || !verified} onClick={() => void saveAction(item)}>
+                            {saving?.key === key && !saving.linking ? <Loader2 size={14} className="animate-spin" /> : hidden ? 'Unhide' : 'Hide'}
                           </Button>
                         </>}
                       </> : <>
                         <Button size="sm" onClick={() => { onSelect(item); onClose(); }}>Select thread</Button>
                         <Button variant="ghost" size="sm" className="text-xs text-slate-500"
-                          disabled={savingKey !== null || !linkedKeys || !hiddenKeys || linked}
+                          disabled={busy || !linkedKeys || !hiddenKeys || linked}
                           title={linked ? 'Linked emails cannot be hidden.' : undefined}
                           aria-label={`${hidden ? 'Unhide' : 'Hide'} email: ${item.subject}`}
-                          onClick={() => void changeHidden(item)}>
-                          {savingKey === key ? <Loader2 size={14} className="animate-spin" /> : linked ? 'Linked' : hidden ? 'Unhide' : 'Hide'}
+                          onClick={() => void saveAction(item)}>
+                          {saving?.key === key && !saving.linking ? <Loader2 size={14} className="animate-spin" /> : linked ? 'Linked' : hidden ? 'Unhide' : 'Hide'}
                         </Button>
                       </>}
                     </div>
@@ -257,7 +277,7 @@ const ThreadDetails = ({ item, linked, hidden }: { item: GmailThreadListItem; li
     <div className="flex max-w-[45%] shrink-0 flex-col items-end gap-1.5 text-right">
       <time dateTime={item.messageDate} title={item.messageDate} className="text-[11px] text-slate-500">{formatDate(item.messageDate)}</time>
       <div className="flex flex-wrap justify-end gap-1.5 text-[10px] font-semibold">
-        {!linked && !hidden && <span className="rounded px-1.5 py-0.5 text-emerald-800 bg-emerald-50">New thread</span>}
+        {!linked && !hidden && gmailThreadHasIncomingMessage(item.snapshot) && <span className="rounded px-1.5 py-0.5 text-emerald-800 bg-emerald-50">New thread</span>}
         {item.snapshot.hasUnread && <span className="rounded px-1.5 py-0.5 text-sky-800 bg-sky-50">Unread message</span>}
         {item.snapshot.hasSpam && <span className="rounded px-1.5 py-0.5 text-amber-800 bg-amber-50">Spam</span>}
       </div>

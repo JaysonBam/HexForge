@@ -9,8 +9,12 @@ export const buildLinkedGmailThreadKeys = (links: readonly LinkedProjectGmailThr
     ? [gmailThreadKey(link.gmailAccountEmail, link.gmailThreadId)]
     : []));
 
-export const gmailThreadNeedsAction = (linked: boolean, hidden: boolean, hasUnread: boolean) =>
-  linked ? hasUnread : !hidden;
+export const gmailThreadHasIncomingMessage = (thread: GmailThreadListItem['snapshot']) =>
+  thread.messages.some(message => message.direction === 'incoming' && message.senderEmail.trim()
+    && message.senderEmail.trim().toLowerCase() !== thread.accountEmail.trim().toLowerCase());
+
+export const gmailThreadNeedsAction = (linked: boolean, hidden: boolean, hasUnread: boolean, hasIncoming: boolean) =>
+  hasIncoming && (linked ? hasUnread : !hidden);
 
 export const visibleGmailThreads = (
   items: GmailThreadListItem[],

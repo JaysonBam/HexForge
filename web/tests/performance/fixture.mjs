@@ -117,17 +117,23 @@ export function createFixture({ delay = 120, threadCount = 30, tailDelay = 480, 
     }
     else if (table === 'projects' && method === 'PATCH') {
       const project = projects.find(row => row.id === url.searchParams.get('id')?.slice(3));
-      if (project) {
+      const allowed = project && (url.searchParams.get('gmailThreadId') !== 'is.null' || project.gmailThreadId == null);
+      if (allowed) {
         Object.assign(project, record.body);
         for (let i = hiddenThreads.length - 1; i >= 0; i -= 1)
           if (hiddenThreads[i].gmail_thread_id === project.gmailThreadId && hiddenThreads[i].gmail_account_email === project.gmailAccountEmail?.toLowerCase()) hiddenThreads.splice(i, 1);
       }
-      status = 204;
+      if (url.searchParams.has('select')) payload = allowed ? [{ id: project.id }] : [];
+      else status = 204;
     }
     else if (method !== 'GET') { payload = null; status = 204; }
     else {
       payload = ({ projects, parts, gmail_hidden_threads: hiddenThreads, project_cost_snapshots: snapshots, print_runs: runs, project_gmail_messages: messageRows, project_gmail_attachments: attachmentRows, audit_events: [{ id: 1, project_id: 'TEST1', action_type: 'REOPEN_REVIEW' }] })[table] ?? [];
       for (const [column, filter] of url.searchParams) {
+        if (column === 'or' && filter.includes('createdAt.gte.')) {
+          const start = filter.match(/createdAt\.gte\.([^)]*)/)[1];
+          payload = payload.filter(row => row.gmailThreadId != null || row.createdAt >= start);
+        }
         if (filter.startsWith('gte.')) payload = payload.filter(row => String(row[column] ?? new Date().toISOString()) >= filter.slice(4));
         if (filter === 'not.is.null') payload = payload.filter(row => row[column] != null);
         if (filter.startsWith('eq.')) payload = payload.filter(row => String(row[column]) === filter.slice(3));
