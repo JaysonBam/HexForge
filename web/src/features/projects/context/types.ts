@@ -27,6 +27,7 @@ export type PartTransitionAction =
   | 'SEND_TO_POST_PROCESSING'
   | 'MARK_PRINTED_READY'
   | 'COLLECT_PART'
+  | 'RETURN_FOR_REPRINT'
   | 'REQUEUE_PART';
 
 export interface ProjectContextType {

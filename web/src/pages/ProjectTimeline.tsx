@@ -280,7 +280,9 @@ export const ProjectTimeline = () => {
           {activeTab === 'production' && (
             <CheckpointPrinting project={project} onAdvanceToCollection={() => selectTab('collection')} />
           )}
-          {activeTab === 'collection' && <CheckpointCollection project={project} />}
+          {activeTab === 'collection' && (
+            <CheckpointCollection project={project} onReturnToProduction={() => selectTab('production')} />
+          )}
         </div>
       </div>
 

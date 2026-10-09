@@ -28,6 +28,10 @@ export const applyOptimisticPartTransition = (
 
     return {
       ...project,
+      ...(action === 'RETURN_FOR_REPRINT' ? {
+        state: 'IN_PRODUCTION' as ProjectState,
+        archived: false
+      } : {}),
       parts: project.parts.map((part) => {
         if (part.id !== partId) return part;
 
@@ -100,6 +104,15 @@ export const applyOptimisticPartTransition = (
             return setPrintStatus('PRINTED');
           case 'COLLECT_PART':
             return setPrintStatus('COLLECTED', { collectedBy: technicianName, collectedAt: now });
+          case 'RETURN_FOR_REPRINT':
+            return setPrintStatus('READY', {
+              printerName: undefined,
+              startedBy: undefined,
+              removedBy: undefined,
+              collectedBy: undefined,
+              collectedByStudentNumber: undefined,
+              collectedAt: undefined
+            });
           case 'REQUEUE_PART':
             return setPrintStatus('READY', {
               printerName: undefined,
