@@ -771,6 +771,7 @@ DECLARE
   v_machine text;
   v_active_run_id bigint;
   v_failure_reason text;
+  v_previous_collection jsonb;
 BEGIN
   v_tech := NULLIF(trim(coalesce(p_technician_name, '')), '');
   v_machine := NULLIF(trim(coalesce(p_machine_name, '')), '');
@@ -807,7 +808,7 @@ BEGIN
   v_from_status := v_part."printStatus";
   v_project_from_state := v_project.state;
 
-  IF v_action IN ('VERIFY_PART', 'MARK_PART_READY', 'START_PRINT', 'FINISH_PRINT', 'FAIL_PRINT', 'COLLECT_PART')
+  IF v_action IN ('VERIFY_PART', 'MARK_PART_READY', 'START_PRINT', 'FINISH_PRINT', 'FAIL_PRINT', 'COLLECT_PART', 'RETURN_FOR_REPRINT')
      AND v_tech IS NULL THEN
     v_errors := array_append(v_errors, 'Technician name is required.');
   END IF;
@@ -928,6 +929,21 @@ BEGIN
       v_to_status := 'COLLECTED';
     END IF;
 
+  ELSIF v_action = 'RETURN_FOR_REPRINT' THEN
+    IF v_project.state NOT IN ('READY_FOR_PRINTING', 'IN_PRODUCTION', 'READY_FOR_COLLECTION', 'PARTIALLY_COLLECTED', 'CLOSED') THEN
+      v_errors := array_append(v_errors, format('Cannot return a part for reprint while project is %s.', v_project.state));
+    END IF;
+    IF v_from_status NOT IN ('PRINTED', 'POST_PROCESSING', 'COLLECTED') THEN
+      v_errors := array_append(v_errors, format('Cannot return part for reprint from status %s.', v_from_status));
+    ELSE
+      v_to_status := 'READY';
+      v_previous_collection := jsonb_build_object(
+        'collected_by', v_part."collectedBy",
+        'collected_by_student_number', v_part."collectedByStudentNumber",
+        'collected_at', v_part."collectedAt"
+      );
+    END IF;
+
   ELSIF v_action = 'REQUEUE_PART' THEN
     IF v_from_status NOT IN ('FAILED', 'PRINTED', 'POST_PROCESSING', 'PRINTING', 'READY', 'VERIFIED') THEN
       v_errors := array_append(v_errors, format('Cannot requeue part from status %s.', v_from_status));
@@ -960,21 +976,31 @@ BEGIN
     END,
     "printerName" = CASE
       WHEN v_action = 'START_PRINT' THEN v_machine
-      WHEN v_action = 'REQUEUE_PART' THEN NULL
+      WHEN v_action IN ('REQUEUE_PART', 'RETURN_FOR_REPRINT') THEN NULL
       ELSE "printerName"
     END,
     "startedBy" = CASE
       WHEN v_action = 'START_PRINT' THEN v_tech
-      WHEN v_action = 'REQUEUE_PART' THEN NULL
+      WHEN v_action IN ('REQUEUE_PART', 'RETURN_FOR_REPRINT') THEN NULL
       ELSE "startedBy"
     END,
     "removedBy" = CASE
+      WHEN v_action = 'RETURN_FOR_REPRINT' THEN NULL
       WHEN v_action IN ('FINISH_PRINT', 'FAIL_PRINT', 'REQUEUE_PART') THEN v_tech
       ELSE "removedBy"
     END,
     "collectedBy" = CASE
       WHEN v_action = 'COLLECT_PART' THEN v_tech
+      WHEN v_action = 'RETURN_FOR_REPRINT' THEN NULL
       ELSE "collectedBy"
+    END,
+    "collectedByStudentNumber" = CASE
+      WHEN v_action = 'RETURN_FOR_REPRINT' THEN NULL
+      ELSE "collectedByStudentNumber"
+    END,
+    "collectedAt" = CASE
+      WHEN v_action = 'RETURN_FOR_REPRINT' THEN NULL
+      ELSE "collectedAt"
     END
   WHERE id = v_part.id
   RETURNING * INTO v_part;
@@ -1042,7 +1068,8 @@ BEGIN
     p_payload => jsonb_build_object(
       'machine_name', v_machine,
       'project_state', v_project.state,
-      'print_run_id', v_active_run_id
+      'print_run_id', v_active_run_id,
+      'previous_collection', v_previous_collection
     )
   );
 
@@ -1084,19 +1111,28 @@ BEGIN
 
   v_project_to_state := v_project.state;
 
-  IF v_total_parts > 0 AND v_collected_parts = v_total_parts THEN
-    v_project_to_state := 'CLOSED';
-  ELSIF v_collected_parts > 0 AND v_collected_parts < v_total_parts THEN
-    v_project_to_state := 'PARTIALLY_COLLECTED';
-  ELSIF v_project.state = 'READY_FOR_COLLECTION' AND v_collection_ready_parts < v_total_parts THEN
+  -- A returned part reopens production even when other parts remain collected.
+  -- Keep production active until staff explicitly release the finished reprint.
+  IF v_action = 'RETURN_FOR_REPRINT' THEN
     v_project_to_state := 'IN_PRODUCTION';
+  ELSIF v_total_parts > 0 AND v_collected_parts = v_total_parts THEN
+    v_project_to_state := 'CLOSED';
+  ELSIF v_project.state IN ('READY_FOR_COLLECTION', 'PARTIALLY_COLLECTED')
+        AND v_collection_ready_parts < v_total_parts THEN
+    v_project_to_state := 'IN_PRODUCTION';
+  ELSIF v_collected_parts > 0 AND v_collected_parts < v_total_parts
+        AND v_collection_ready_parts = v_total_parts
+        AND (v_action = 'COLLECT_PART' OR v_project.state IN ('READY_FOR_COLLECTION', 'PARTIALLY_COLLECTED')) THEN
+    v_project_to_state := 'PARTIALLY_COLLECTED';
   END IF;
 
-  IF v_project_to_state IS DISTINCT FROM v_project.state THEN
+  IF v_project_to_state IS DISTINCT FROM v_project.state
+     OR (v_action = 'RETURN_FOR_REPRINT' AND v_project.archived) THEN
     v_project_from_state := v_project.state;
     PERFORM set_config('app.transition_rpc', 'on', true);
     UPDATE public.projects
-    SET state = v_project_to_state
+    SET state = v_project_to_state,
+        archived = CASE WHEN v_action = 'RETURN_FOR_REPRINT' THEN false ELSE archived END
     WHERE id = v_project.id
     RETURNING * INTO v_project;
 
@@ -1127,6 +1163,10 @@ BEGIN
   );
 END;
 $$;
+
+-- CREATE OR REPLACE preserves any older explicit grants on the live function.
+REVOKE ALL ON FUNCTION public.transition_part_status(text, uuid, text, text, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.transition_part_status(text, uuid, text, text, text, text) TO authenticated, service_role;
 
 CREATE OR REPLACE FUNCTION public.get_public_project_status(project_code text)
 RETURNS jsonb

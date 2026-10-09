@@ -15,11 +15,14 @@ import {
     getPartFilamentSource,
     isProvidedFilamentSource
 } from '@/domain/filamentSource.ts';
-import { Copy, CheckSquare } from 'lucide-react';
+import { Copy, CheckSquare, RotateCcw } from 'lucide-react';
 import gmailIcon from '@/assets/icons/gmail.svg';
 import { GmailReplyComposer } from '@/features/gmail/GmailReplyComposer';
 
-export const CheckpointCollection = ({ project }: { project: Project }) => {
+export const CheckpointCollection = ({ project, onReturnToProduction }: {
+    project: Project;
+    onReturnToProduction?: () => void;
+}) => {
     const { updateProject, transitionPartStatus } = useProjects();
     const {
         getFilamentPrice,
@@ -57,6 +60,35 @@ export const CheckpointCollection = ({ project }: { project: Project }) => {
         p => p.printStatus === 'PRINTED' || p.printStatus === 'POST_PROCESSING' || p.printStatus === 'COLLECTED'
     );
     const isPaymentBlocked = isCollectionBlocked(project);
+
+    const returnForReprint = async (part: Part) => {
+        if (collectionAction) return;
+        setCollectionAction(`reprint:${part.id}`);
+        try {
+            const technicianName = await requestStaffName('returning this part for reprint');
+            if (!technicianName) return;
+
+            const result = await transitionPartStatus({
+                projectId: project.id,
+                partId: part.id,
+                action: 'RETURN_FOR_REPRINT',
+                technicianName,
+                reason: 'Returned for reprint.'
+            });
+            if (!result.ok) {
+                await showMessage({ title: 'Part was not returned', messages: result.errors, tone: 'error' });
+                return;
+            }
+            notify({
+                title: 'Part queued for reprint',
+                message: `${part.partName} is back in the normal printing queue.`,
+                tone: 'success'
+            });
+            onReturnToProduction?.();
+        } finally {
+            setCollectionAction(null);
+        }
+    };
 
     const collectPart = async (partId: string) => {
         if (collectionAction) return;
@@ -341,7 +373,7 @@ export const CheckpointCollection = ({ project }: { project: Project }) => {
                                 </div>
                             </div>
 
-                            <div className="w-64 flex-shrink-0">
+                            <div className="w-64 flex-shrink-0 space-y-2">
                                 {part.printStatus !== 'COLLECTED' ? (
                                     <>
                                         <div className="flex gap-2">
@@ -364,6 +396,18 @@ export const CheckpointCollection = ({ project }: { project: Project }) => {
                                 ) : (
                                     <div className="text-sm font-medium text-teal-900">Assisted by: {part.collectedBy}</div>
                                 )}
+                                <Button
+                                    onClick={() => returnForReprint(part)}
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-2"
+                                    disabled={project.state === 'CANCELLED' || collectionAction !== null}
+                                    loading={collectionAction === `reprint:${part.id}`}
+                                    loadingText="Returning…"
+                                    title="Return this part to the normal printing queue"
+                                >
+                                    <RotateCcw size={14} /> Reprint
+                                </Button>
                             </div>
                         </Card>
                     ))}
