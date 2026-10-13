@@ -137,6 +137,8 @@ const subjectToEditorHtml = (value: string) => {
 
 export const TokenSubjectEditor = ({ value, onChange }: TokenSubjectEditorProps) => {
   const editor = useEditor({
+    // Lazy/concurrent renders can outlive Tiptap's pre-mount destruction timer.
+    immediatelyRender: false,
     extensions: [
       StarterKit.configure({
         heading: false,
@@ -165,13 +167,13 @@ export const TokenSubjectEditor = ({ value, onChange }: TokenSubjectEditorProps)
   });
 
   useEffect(() => {
-    if (!editor) return;
+    if (!editor || editor.isDestroyed) return;
     const nextContent = subjectToEditorHtml(value);
     if (editor.getHTML() === nextContent) return;
     editor.commands.setContent(nextContent, { emitUpdate: false });
   }, [editor, value]);
 
-  if (!editor) return null;
+  if (!editor || editor.isDestroyed) return null;
 
   const insertToken = (token: EmailTokenType) => {
     const label = token === 'project_link' ? 'Project link' : tokenLabels[token];
@@ -208,8 +210,9 @@ export const RichEmailEditor = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
-      StarterKit,
+      StarterKit.configure({ link: false }),
       Highlight.configure({ multicolor: true }),
       Link.configure({
         openOnClick: false,
@@ -233,11 +236,11 @@ export const RichEmailEditor = ({
   });
 
   useEffect(() => {
-    if (!editor || editor.getHTML() === value) return;
+    if (!editor || editor.isDestroyed || editor.getHTML() === value) return;
     editor.commands.setContent(value, { emitUpdate: false });
   }, [editor, value]);
 
-  if (!editor) return null;
+  if (!editor || editor.isDestroyed) return null;
 
   const setLink = () => {
     const previousUrl = editor.getAttributes('link').href as string | undefined;
@@ -264,6 +267,7 @@ export const RichEmailEditor = ({
     setUploadingImage(true);
     try {
       const publicUrl = await uploadEmailSignatureImage(file);
+      if (editor.isDestroyed) return;
       editor.chain().focus().setImage({ src: publicUrl, alt: file.name }).run();
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'Signature image upload failed.');
