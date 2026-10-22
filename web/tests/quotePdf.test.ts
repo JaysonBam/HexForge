@@ -106,7 +106,9 @@ test('20 multi-material parts all appear once across pages with their part numbe
   const finalPage = pages.at(-1)!;
   const total = finalPage.find(({ text }) => text === 'Total Cost')!;
   const paymentNotice = finalPage.find(({ text }) => text.includes('acceptance of the quote'))!;
-  assert.equal(total.y - paymentNotice.y, 40, 'payment details should follow the total without a large blank gap');
+  assert.equal(paymentNotice.y, 178, 'the footer stays at the bottom of the final page');
+  assert.ok(total.y > 206, 'the total stays above the footer');
+  assert.ok(finalPage.some(({ text, y }) => text.startsWith('* Please discuss') && y === 50));
 });
 
 test('short and empty quotes stay on one page; supplied part numbers are preserved', async () => {

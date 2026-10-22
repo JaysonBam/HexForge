@@ -40,8 +40,9 @@ const pageHeight = 842;
 const marginX = 54;
 const rightX = 540;
 const centerX = pageWidth / 2;
+const footerTopY = 190;
 const tableBodyMinY = 54;
-const finalTableBodyMinY = 244;
+const finalTableBodyMinY = footerTopY + 54;
 const partNameX = marginX + 26;
 const continuationTableY = 754;
 const tableBodyLineGap = 12;
@@ -301,7 +302,7 @@ export const createQuotePdfBytes = async ({
   drawRightText(page, 'Total Cost', 430, totalY, 10, fonts.bold);
   drawRightText(page, `R ${totalCost.toFixed(2)}`, rightX, totalY, 10, fonts.bold);
 
-  y = totalY - 28;
+  y = footerTopY;
   drawRule(page, y + 16);
   y -= 12;
   drawCenteredText(page, 'Prints will only be started on acceptance of the quote.', y, 10.5, fonts.regular);
