@@ -17,6 +17,7 @@ create table public.projects (
   "studentName" text not null,
   "studentNumber" text not null,
   email text,
+  notes text not null default '',
   course text,
   lecturer text,
   "needsPayment" boolean not null default true,

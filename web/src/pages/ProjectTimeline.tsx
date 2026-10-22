@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { SidePanel } from '@/components/ui/SidePanel';
 import { PrintLocationBadge } from '@/components/ui/PrintLocationBadge';
 import { useFeedback } from '@/app/providers/FeedbackProvider';
 import { StateBadge } from '@/components/ui/StateBadge';
@@ -24,14 +25,15 @@ import {
 import type { ProjectWorkspaceNavigationContext } from '@/app/layout/Layout';
 import { LocalFilesCard } from '@/features/local-files/LocalFilesCard';
 import { ProjectCorrespondencePanel } from '@/features/gmail/ProjectCorrespondencePanel';
+import { ProjectNotesPanel } from '@/features/projects/ProjectNotesPanel';
 import { getGmailInboxState } from '@/features/gmail/gmailInboxStore';
 import {
   ArrowLeft,
   Archive,
+  History,
   Mail,
-  ShieldCheck,
-  Trash2,
-  X
+  NotebookPen,
+  Trash2
 } from 'lucide-react';
 
 export const ProjectTimeline = () => {
@@ -45,8 +47,7 @@ export const ProjectTimeline = () => {
   const { activeWorkspaceTab, selectWorkspaceTab } = useOutletContext<ProjectWorkspaceNavigationContext>();
   const project = getProject(id || '');
   const autoCreateLocalFolder = (location.state as { autoCreateLocalFolderFor?: string } | null)?.autoCreateLocalFolderFor === project?.id;
-  const [timelineOpen, setTimelineOpen] = useState(false);
-  const [correspondenceOpen, setCorrespondenceOpen] = useState(false);
+  const [openPanel, setOpenPanel] = useState<'timeline' | 'messages' | 'notes' | null>(null);
   const [deletingProject, setDeletingProject] = useState(false);
   const [archivingProject, setArchivingProject] = useState(false);
   const staffName = activeStaffName || claimActiveStaffName() || 'System';
@@ -240,23 +241,25 @@ export const ProjectTimeline = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full justify-center gap-1.5 px-2"
-            onClick={() => setTimelineOpen(true)}
-          >
-            <ShieldCheck size={15} /> Timeline
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full justify-center gap-1.5 px-2"
-            onClick={() => setCorrespondenceOpen(true)}
-          >
-            <Mail size={15} /> Messages
-          </Button>
+        <div className="grid grid-cols-3 gap-1">
+          {([
+            { id: 'timeline', label: 'Timeline', icon: History },
+            { id: 'messages', label: 'Messages', icon: Mail },
+            { id: 'notes', label: 'Notes', icon: NotebookPen }
+          ] as const).map(({ id: panelId, label, icon: Icon }) => (
+            <Button
+              key={panelId}
+              variant="outline"
+              size="sm"
+              className="min-w-0 w-full justify-center gap-1 px-1"
+              title={label}
+              aria-haspopup="dialog"
+              aria-expanded={openPanel === panelId}
+              onClick={() => setOpenPanel(panelId)}
+            >
+              <Icon size={14} className="shrink-0" aria-hidden="true" /> {label}
+            </Button>
+          ))}
         </div>
       </aside>
 
@@ -286,32 +289,31 @@ export const ProjectTimeline = () => {
         </div>
       </div>
 
-      {timelineOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/35 backdrop-blur-[2px] print:hidden" onClick={() => setTimelineOpen(false)}>
-          <aside
-            className="forge-drawer h-full w-full max-w-xl overflow-y-auto"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-300 bg-white/95 px-5 py-4 backdrop-blur">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Project History</p>
-                <h2 className="text-lg font-black text-slate-950">View Project Timeline</h2>
-              </div>
-              <Button variant="ghost" size="icon" onClick={() => setTimelineOpen(false)} aria-label="Close timeline">
-                <X size={18} />
-              </Button>
-            </div>
-            <div className="p-5">
-              <AuditTab projectId={project.id} />
-            </div>
-          </aside>
-        </div>
+      {openPanel === 'timeline' && (
+        <SidePanel
+          title="Project timeline"
+          subtitle={`${project.id} · ${project.studentName}`}
+          icon={History}
+          onClose={() => setOpenPanel(null)}
+          closeLabel="Close timeline"
+        >
+          <div className="min-h-0 flex-1 overflow-y-auto p-5">
+            <AuditTab projectId={project.id} />
+          </div>
+        </SidePanel>
+      )}
+      {openPanel === 'notes' && (
+        <ProjectNotesPanel
+          key={`notes-${project.id}`}
+          project={project}
+          onClose={() => setOpenPanel(null)}
+        />
       )}
       <ProjectCorrespondencePanel
         key={project.id}
         project={project}
-        open={correspondenceOpen}
-        onClose={() => setCorrespondenceOpen(false)}
+        open={openPanel === 'messages'}
+        onClose={() => setOpenPanel(null)}
         onProjectSynced={(updates) => updateProject(project.id, updates)}
       />
     </div>
@@ -538,7 +540,7 @@ const AuditTab = ({ projectId }: { projectId: string }) => {
 
       <div className="mt-5 space-y-2">
         {events.map((event) => (
-          <div key={event.id} className="forge-event-log rounded-md border border-slate-300 p-3 pl-4">
+          <div key={event.id} className="rounded-md border border-slate-300 p-3 pl-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-black text-slate-950">{event.action_type.replaceAll('_', ' ')}</p>
@@ -553,7 +555,7 @@ const AuditTab = ({ projectId }: { projectId: string }) => {
               )}
             </div>
             {(event.reason || event.override_note) && (
-              <p className="mt-2 rounded border border-[color:var(--forge-gold-border)] bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">
+              <p className="mt-2 rounded border border-slate-300 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">
                 {event.reason || event.override_note}
               </p>
             )}
