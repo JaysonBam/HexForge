@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { NotebookPen, X } from 'lucide-react';
+import { NotebookPen } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { SidePanel } from '@/components/ui/SidePanel';
 import type { Project } from '@/types';
 
 export function ProjectNotesPanel({ project, onSave, onClose }: {
@@ -12,13 +13,8 @@ export function ProjectNotesPanel({ project, onSave, onClose }: {
   const [savedNotes, setSavedNotes] = useState(project.notes ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
-  const [opener] = useState(() => document.activeElement);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const dirty = draft !== savedNotes;
-
-  useEffect(() => {
-    return () => { if (opener instanceof HTMLElement) opener.focus(); };
-  }, [opener]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -51,43 +47,32 @@ export function ProjectNotesPanel({ project, onSave, onClose }: {
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex justify-end bg-slate-950/35 backdrop-blur-[2px] print:hidden"
-      onClick={() => void save(true)}
+    <SidePanel
+      title="Project notes"
+      subtitle={`${project.id} · ${project.studentName}`}
+      icon={NotebookPen}
+      onClose={() => void save(true)}
+      closeLabel="Close notes"
+      closeDisabled={saving}
+      actions={(
+        <Button size="sm" onClick={() => void save()} disabled={!dirty} loading={saving} loadingText="Saving…">
+          Save
+        </Button>
+      )}
+      footer={(
+        <div className="shrink-0 border-t border-slate-200 bg-white px-5 py-3 text-xs text-slate-500" role="status" aria-live="polite">
+          {error
+            ? <span className="font-semibold text-rose-700">Notes could not be saved. Your text is still here. Try Save again.</span>
+            : saving ? 'Saving notes…' : dirty ? 'Unsaved changes · Save or close this panel to save.' : 'All notes saved'}
+        </div>
+      )}
       onKeyDown={(event) => {
-        if (event.key === 'Tab') {
-          const controls = event.currentTarget.querySelectorAll<HTMLButtonElement | HTMLTextAreaElement>('button:not(:disabled), textarea');
-          const first = controls[0];
-          const last = controls[controls.length - 1];
-          if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-          if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
-        }
-        if (event.key === 'Escape' || ((event.ctrlKey || event.metaKey) && event.key === 's')) {
+        if ((event.ctrlKey || event.metaKey) && event.key === 's') {
           event.preventDefault();
-          void save(event.key === 'Escape');
+          void save();
         }
       }}
     >
-      <aside
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="project-notes-title"
-        className="forge-drawer flex h-full w-full max-w-xl flex-col"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex shrink-0 items-center gap-3 border-b border-slate-300 bg-white px-5 py-4">
-          <NotebookPen size={20} className="shrink-0 text-slate-600" aria-hidden="true" />
-          <div className="min-w-0 flex-1">
-            <h2 id="project-notes-title" className="text-lg font-black text-slate-950">Project notes</h2>
-            <p className="truncate text-xs text-slate-500">{project.id} · {project.studentName}</p>
-          </div>
-          <Button size="sm" onClick={() => void save()} disabled={!dirty} loading={saving} loadingText="Saving…">
-            Save
-          </Button>
-          <Button variant="ghost" size="icon" disabled={saving} onClick={() => void save(true)} aria-label="Close notes">
-            <X size={18} />
-          </Button>
-        </div>
         <textarea
           ref={inputRef}
           autoFocus
@@ -98,12 +83,6 @@ export function ProjectNotesPanel({ project, onSave, onClose }: {
           readOnly={saving}
           onChange={(event) => setDraft(event.target.value)}
         />
-        <div className="shrink-0 border-t border-slate-200 bg-white px-5 py-3 text-xs text-slate-500" role="status" aria-live="polite">
-          {error
-            ? <span className="font-semibold text-rose-700">Notes could not be saved. Your text is still here. Try Save again.</span>
-            : saving ? 'Saving notes…' : dirty ? 'Unsaved changes · Save or close this panel to save.' : 'All notes saved'}
-        </div>
-      </aside>
-    </div>
+    </SidePanel>
   );
 }

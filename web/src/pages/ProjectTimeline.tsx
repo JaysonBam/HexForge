@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { SidePanel } from '@/components/ui/SidePanel';
 import { PrintLocationBadge } from '@/components/ui/PrintLocationBadge';
 import { useFeedback } from '@/app/providers/FeedbackProvider';
 import { StateBadge } from '@/components/ui/StateBadge';
@@ -32,8 +33,7 @@ import {
   History,
   Mail,
   NotebookPen,
-  Trash2,
-  X
+  Trash2
 } from 'lucide-react';
 
 export const ProjectTimeline = () => {
@@ -47,9 +47,7 @@ export const ProjectTimeline = () => {
   const { activeWorkspaceTab, selectWorkspaceTab } = useOutletContext<ProjectWorkspaceNavigationContext>();
   const project = getProject(id || '');
   const autoCreateLocalFolder = (location.state as { autoCreateLocalFolderFor?: string } | null)?.autoCreateLocalFolderFor === project?.id;
-  const [timelineOpen, setTimelineOpen] = useState(false);
-  const [correspondenceOpen, setCorrespondenceOpen] = useState(false);
-  const [notesOpen, setNotesOpen] = useState(false);
+  const [openPanel, setOpenPanel] = useState<'timeline' | 'messages' | 'notes' | null>(null);
   const [deletingProject, setDeletingProject] = useState(false);
   const [archivingProject, setArchivingProject] = useState(false);
   const staffName = activeStaffName || claimActiveStaffName() || 'System';
@@ -244,33 +242,24 @@ export const ProjectTimeline = () => {
         </div>
 
         <div className="grid grid-cols-3 gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full justify-center gap-1 px-1"
-            title="Timeline"
-            onClick={() => setTimelineOpen(true)}
-          >
-            <History size={14} className="shrink-0" aria-hidden="true" /> Timeline
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full justify-center gap-1 px-1"
-            title="Messages"
-            onClick={() => setCorrespondenceOpen(true)}
-          >
-            <Mail size={14} className="shrink-0" aria-hidden="true" /> Messages
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full justify-center gap-1 px-1"
-            title="Notes"
-            onClick={() => setNotesOpen(true)}
-          >
-            <NotebookPen size={14} className="shrink-0" aria-hidden="true" /> Notes
-          </Button>
+          {([
+            { id: 'timeline', label: 'Timeline', icon: History },
+            { id: 'messages', label: 'Messages', icon: Mail },
+            { id: 'notes', label: 'Notes', icon: NotebookPen }
+          ] as const).map(({ id: panelId, label, icon: Icon }) => (
+            <Button
+              key={panelId}
+              variant="outline"
+              size="sm"
+              className="min-w-0 w-full justify-center gap-1 px-1"
+              title={label}
+              aria-haspopup="dialog"
+              aria-expanded={openPanel === panelId}
+              onClick={() => setOpenPanel(panelId)}
+            >
+              <Icon size={14} className="shrink-0" aria-hidden="true" /> {label}
+            </Button>
+          ))}
         </div>
       </aside>
 
@@ -300,40 +289,32 @@ export const ProjectTimeline = () => {
         </div>
       </div>
 
-      {timelineOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/35 backdrop-blur-[2px] print:hidden" onClick={() => setTimelineOpen(false)}>
-          <aside
-            className="forge-drawer h-full w-full max-w-xl overflow-y-auto"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-300 bg-white/95 px-5 py-4 backdrop-blur">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Project History</p>
-                <h2 className="text-lg font-black text-slate-950">View Project Timeline</h2>
-              </div>
-              <Button variant="ghost" size="icon" onClick={() => setTimelineOpen(false)} aria-label="Close timeline">
-                <X size={18} />
-              </Button>
-            </div>
-            <div className="p-5">
-              <AuditTab projectId={project.id} />
-            </div>
-          </aside>
-        </div>
+      {openPanel === 'timeline' && (
+        <SidePanel
+          title="Project timeline"
+          subtitle={`${project.id} · ${project.studentName}`}
+          icon={History}
+          onClose={() => setOpenPanel(null)}
+          closeLabel="Close timeline"
+        >
+          <div className="min-h-0 flex-1 overflow-y-auto p-5">
+            <AuditTab projectId={project.id} />
+          </div>
+        </SidePanel>
       )}
-      {notesOpen && (
+      {openPanel === 'notes' && (
         <ProjectNotesPanel
           key={`notes-${project.id}`}
           project={project}
           onSave={(notes) => saveProjectNotes(project.id, notes)}
-          onClose={() => setNotesOpen(false)}
+          onClose={() => setOpenPanel(null)}
         />
       )}
       <ProjectCorrespondencePanel
         key={project.id}
         project={project}
-        open={correspondenceOpen}
-        onClose={() => setCorrespondenceOpen(false)}
+        open={openPanel === 'messages'}
+        onClose={() => setOpenPanel(null)}
         onProjectSynced={(updates) => updateProject(project.id, updates)}
       />
     </div>

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertTriangle, Download, ExternalLink, Loader2, Mail, Paperclip, RefreshCw, X } from 'lucide-react';
+import { AlertTriangle, Download, ExternalLink, Loader2, Mail, Paperclip, RefreshCw } from 'lucide-react';
 import type { Project } from '@/types';
 import { Button } from '@/components/ui/Button';
+import { SidePanel } from '@/components/ui/SidePanel';
 import { useFeedback } from '@/app/providers/FeedbackProvider';
 import { useLocalHelper } from '@/features/local-files/LocalHelperContext';
 import { getAvailableProjectFiles } from '@/features/local-files/projectLocalFileAvailability';
@@ -174,19 +175,20 @@ export const ProjectCorrespondencePanel = ({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/35 backdrop-blur-[2px] print:hidden" onClick={onClose}>
-      <aside className="forge-drawer flex h-full w-full max-w-2xl flex-col" onClick={(event) => event.stopPropagation()} aria-label="Main Gmail Thread correspondence">
-        <header className="border-b border-slate-300 bg-white/95 px-5 py-4 backdrop-blur">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Main Gmail Thread</p>
-              <h2 className="truncate text-lg font-black text-slate-950">{project.gmailThreadSubject || 'View Correspondence'}</h2>
-              {project.gmailThreadId && <p className="mt-1 text-xs font-semibold text-slate-600">Main contact: {project.gmailMainContactEmail || 'Not detected'} · Last refresh: {project.gmailLastSyncedAt ? formatDateTime(project.gmailLastSyncedAt) : 'Not yet refreshed'}</p>}
-            </div>
-            <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close correspondence"><X size={18} /></Button>
-          </div>
+    <SidePanel
+      title="Project messages"
+      subtitle={`${project.id} · ${project.studentName}`}
+      icon={Mail}
+      onClose={onClose}
+      closeLabel="Close messages"
+    >
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">
           {project.gmailThreadId && (
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mb-5 border-b border-slate-200 pb-5">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Main Gmail Thread</p>
+              <h3 className="mt-1 break-words text-sm font-bold text-slate-950">{project.gmailThreadSubject || 'Linked correspondence'}</h3>
+              <p className="mt-1 text-xs font-semibold text-slate-600">Main contact: {project.gmailMainContactEmail || 'Not detected'} · Last refresh: {project.gmailLastSyncedAt ? formatDateTime(project.gmailLastSyncedAt) : 'Not yet refreshed'}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
               <span className="inline-flex" title={!canUseGmail ? GMAIL_THREAD_ACCOUNT_MISMATCH : undefined}>
                 <Button variant="outline" size="sm" className="gap-2" onClick={() => void refresh(true)} disabled={refreshing || !canUseGmail}>
                   {refreshing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Refresh
@@ -197,10 +199,9 @@ export const ProjectCorrespondencePanel = ({
                   <ExternalLink size={14} /> Open Thread in Gmail
                 </Button>
               </span>
+              </div>
             </div>
           )}
-        </header>
-        <div className="flex-1 overflow-y-auto bg-slate-100 p-4 sm:p-5">
           {warning && <div className="mb-4 flex gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900"><AlertTriangle size={15} className="mt-0.5 shrink-0" /><span>{warning}</span></div>}
           {!project.gmailThreadId ? (
             <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">
@@ -248,7 +249,6 @@ export const ProjectCorrespondencePanel = ({
             </div>
           )}
         </div>
-      </aside>
-    </div>
+    </SidePanel>
   );
 };
