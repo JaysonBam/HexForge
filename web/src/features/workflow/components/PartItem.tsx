@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, ChevronUp, FileCheck2, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy, FileCheck2, Loader2, Trash2 } from 'lucide-react';
 import type { Part } from '@/types';
 import { useSettings } from '@/features/settings/context/SettingsContext';
 import { useProjects } from '@/features/projects/context/ProjectContext';
@@ -18,6 +18,7 @@ import {
     isProvidedFilamentSource
 } from '@/domain/filamentSource.ts';
 import { sourceFileName } from '@/features/local-files/sourceFileLink';
+import { copyPartThumbnail } from '@/api/supabase/thumbnailUploads';
 
 interface PartItemProps {
     part: Part;
@@ -25,13 +26,13 @@ interface PartItemProps {
 }
 
 export const PartItem = ({ part, projectId }: PartItemProps) => {
-    const { updatePart, deletePart, transitionPartStatus } = useProjects();
+    const { updatePart, deletePart, addExtractedParts, transitionPartStatus } = useProjects();
     const { getFilamentPrice, filaments, providedFilamentPricePerGram } = useSettings();
     const { requestStaffName } = useStaffActionName();
-    const { confirm, showMessage } = useFeedback();
+    const { confirm, prompt, notify, showMessage } = useFeedback();
     const [expanded, setExpanded] = useState(part.expanded ?? false);
     const [verificationError, setVerificationError] = useState('');
-    const [pendingAction, setPendingAction] = useState<'verify' | 'unverify' | null>(null);
+    const [pendingAction, setPendingAction] = useState<'verify' | 'unverify' | 'duplicate' | null>(null);
     const isVerifiedForReview = isPartVerifiedForReview(part);
     const visibleCheckedBy = getVisibleCheckedBy(part);
     const showClearVerification = canClearPartVerification(part);
@@ -135,6 +136,43 @@ export const PartItem = ({ part, projectId }: PartItemProps) => {
         }
     };
 
+    const handleDuplicatePart = async () => {
+        if (pendingAction) return;
+        setPendingAction('duplicate');
+        try {
+            const result = await prompt({
+                title: 'Duplicate part',
+                message: `Add copies of ${part.partName || 'this part'} with all details, including verification.`,
+                confirmLabel: 'Add Copies',
+                fields: [{ name: 'copies', label: 'Number of copies', required: true, defaultValue: '1' }]
+            });
+            if (!result) return;
+            const count = Number(result.copies);
+            if (!Number.isSafeInteger(count) || count < 1 || count > 1000) {
+                await showMessage({ title: 'Invalid number of copies', messages: ['Enter a whole number from 1 to 1000.'], tone: 'warning' });
+                return;
+            }
+            const copies: Partial<Part>[] = [];
+            for (let index = 0; index < count; index += 1) {
+                copies.push({ ...part,
+                    imageUrl: part.imageUrl ? await copyPartThumbnail(part.imageUrl) : undefined,
+                    printStatus: isVerifiedForReview ? 'VERIFIED' : 'DRAFT',
+                    checkedBy: isVerifiedForReview ? part.checkedBy : undefined
+                });
+            }
+            const saved = await addExtractedParts(projectId, copies);
+            if (saved) {
+                notify({ title: 'Part duplicated', message: `${count} ${count === 1 ? 'copy added' : 'copies added'} to the parts list.`, tone: 'success' });
+            } else {
+                await showMessage({ title: 'Part was not duplicated', messages: ['Could not save the copies. Please try again.'], tone: 'error' });
+            }
+        } catch (error) {
+            await showMessage({ title: 'Part was not duplicated', messages: [error instanceof Error ? error.message : 'Could not copy the part. Please try again.'], tone: 'error' });
+        } finally {
+            setPendingAction(null);
+        }
+    };
+
     const handleDeletePart = async () => {
         const shouldDelete = await confirm({
             title: 'Delete part',
@@ -184,6 +222,11 @@ export const PartItem = ({ part, projectId }: PartItemProps) => {
                 <div className="flex items-center gap-6 text-sm text-slate-700">
                     <span>{(part.primaryEstimatedWeight || 0) + (part.secondaryEstimatedWeight || 0)}g</span>
                     <span className="font-bold text-slate-950">R {totalServiceCost.toFixed(2)}</span>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" title="Duplicate part" aria-label={`Duplicate part ${part.partNumber}`}
+                        disabled={pendingAction !== null} aria-busy={pendingAction === 'duplicate' || undefined}
+                        onClick={(event) => { event.stopPropagation(); void handleDuplicatePart(); }}>
+                        {pendingAction === 'duplicate' ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
+                    </Button>
                 </div>
             </div>
 
