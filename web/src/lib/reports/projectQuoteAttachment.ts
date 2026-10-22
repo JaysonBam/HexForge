@@ -50,6 +50,7 @@ const buildQuotePdfLines = (
 ): QuotePdfLine[] => {
   if (project.quoteSnapshot) {
     return (project.quoteSnapshot.line_summary || []).map((line) => ({
+      partNumber: line.part_number,
       partName: line.part_name,
       materials: line.materials.map(formatSnapshotMaterialLabel),
       weights: line.materials.map((material) => formatWeight(material.grams)),
@@ -64,6 +65,7 @@ const buildQuotePdfLines = (
       : 0;
 
     return {
+      partNumber: part.partNumber,
       partName: part.partName,
       materials: [
         formatMaterialLabel(part, 'primary'),

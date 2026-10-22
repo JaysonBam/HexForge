@@ -1,15 +1,13 @@
 import type { Project } from '@/types';
 import type { PDFFont, PDFPage } from 'pdf-lib';
-import {
-  quoteContactSettings,
-  type QuoteContactSettings
-} from '@/domain/environmentSettings';
+import type { QuoteContactSettings } from '@/domain/environmentSettings';
 import {
   groupFilamentsByPrice,
   type Filament
 } from '@/domain/settingsConfig';
 
 export type QuotePdfLine = {
+  partNumber?: number;
   partName: string;
   materials: string[];
   weights: string[];
@@ -43,6 +41,9 @@ const marginX = 54;
 const rightX = 540;
 const centerX = pageWidth / 2;
 const footerTopY = 190;
+const tableBodyMinY = footerTopY + 54;
+const partNameX = marginX + 26;
+const continuationTableY = 754;
 const tableBodyLineGap = 12;
 const tableBodyRowGap = 11;
 const tableBodyTextAscent = 7;
@@ -171,12 +172,12 @@ export const createQuotePdfBytes = async ({
   filaments,
   providedFilamentPricePerGram,
   logo,
-  quoteSettings = quoteContactSettings
+  quoteSettings
 }: QuotePdfRequest) => {
   const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
   const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage([pageWidth, pageHeight]);
-  const contactSettings = quoteSettings;
+  let page = pdfDoc.addPage([pageWidth, pageHeight]);
+  const contactSettings = quoteSettings ?? (await import('@/domain/environmentSettings')).quoteContactSettings;
   const fonts: QuotePdfFonts = {
     regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
     bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold)
@@ -234,34 +235,53 @@ export const createQuotePdfBytes = async ({
   drawText(page, project.studentNumber, 150, y, 10, fonts.regular);
   y -= 30;
 
-  drawRule(page, y + 12);
-  drawRule(page, y - 4);
-  drawText(page, 'Part Name', marginX, y, 10, fonts.bold);
-  drawText(page, 'Material', 275, y, 10, fonts.bold);
-  drawRightText(page, 'Weight', 430, y, 10, fonts.bold);
-  drawRightText(page, 'Cost', rightX, y, 10, fonts.bold);
-  y -= 18;
+  const drawTableHeader = () => {
+    drawRule(page, y + 12);
+    drawRule(page, y - 4);
+    drawRightText(page, '#', partNameX - 10, y, 8, fonts.bold);
+    drawText(page, 'Part Name', partNameX, y, 10, fonts.bold);
+    drawText(page, 'Material', 275, y, 10, fonts.bold);
+    drawRightText(page, 'Weight', 430, y, 10, fonts.bold);
+    drawRightText(page, 'Cost', rightX, y, 10, fonts.bold);
+    y -= 18;
+  };
+  drawTableHeader();
 
   let tableBottomRuleY = y + 8;
 
-  lines.forEach((line) => {
-    if (y < footerTopY + 54) return;
+  const addTablePage = () => {
+    page = pdfDoc.addPage([pageWidth, pageHeight]);
+    drawText(page, 'Quote (continued)', marginX, 806, 13, fonts.bold);
+    drawRightText(page, `Priority #${project.priorityNumber}`, rightX, 806, 10, fonts.bold);
+    drawText(page, `${project.studentName} - ${project.studentNumber}`, marginX, 784, 10, fonts.regular);
+    y = continuationTableY;
+    drawTableHeader();
+    tableBottomRuleY = y + 8;
+  };
 
-    const partLines = wrapText(line.partName, fonts.regular, 9, 190);
+  lines.forEach((line, lineIndex) => {
+    const partLines = wrapText(line.partName, fonts.regular, 9, 275 - partNameX - 18);
     const rowLineCount = Math.max(partLines.length, line.materials.length, line.weights.length, line.costs.length, 1);
-    const rowStartY = y;
+    // Keep normal rows together; exceptionally tall rows continue across pages.
+    const rowHeight = (rowLineCount - 1) * tableBodyLineGap;
+    const fitsOnNewPage = continuationTableY - 18 - rowHeight >= tableBodyMinY;
+    if (y < tableBodyMinY || (y - rowHeight < tableBodyMinY && fitsOnNewPage)) addTablePage();
 
-    Array.from({ length: rowLineCount }).forEach((_, index) => {
-      const rowY = rowStartY - index * tableBodyLineGap;
-      if (rowY < footerTopY + 54) return;
-      if (partLines[index]) drawText(page, partLines[index], marginX, rowY, 9, fonts.regular);
-      if (line.materials[index]) drawText(page, line.materials[index], 275, rowY, 9, fonts.regular);
-      if (line.weights[index]) drawRightText(page, line.weights[index], 430, rowY, 9, fonts.regular);
-      if (line.costs[index]) drawRightText(page, line.costs[index], rightX, rowY, 9, fonts.regular);
-    });
+    for (let index = 0; index < rowLineCount; index += 1) {
+      const continued = y < tableBodyMinY;
+      if (continued) addTablePage();
+      if (index === 0 || continued) {
+        drawRightText(page, String(line.partNumber ?? lineIndex + 1), partNameX - 10, y, 8, fonts.regular);
+      }
+      if (partLines[index]) drawText(page, partLines[index], partNameX, y, 9, fonts.regular);
+      if (line.materials[index]) drawText(page, line.materials[index], 275, y, 9, fonts.regular);
+      if (line.weights[index]) drawRightText(page, line.weights[index], 430, y, 9, fonts.regular);
+      if (line.costs[index]) drawRightText(page, line.costs[index], rightX, y, 9, fonts.regular);
+      y -= tableBodyLineGap;
+    }
 
-    const lastRowTextBaselineY = rowStartY - (rowLineCount - 1) * tableBodyLineGap;
-    const nextRowBaselineY = rowStartY - rowLineCount * tableBodyLineGap - tableBodyRowGap;
+    const lastRowTextBaselineY = y + tableBodyLineGap;
+    const nextRowBaselineY = y - tableBodyRowGap;
     tableBottomRuleY = (
       lastRowTextBaselineY - tableBodyTextDescent + nextRowBaselineY + tableBodyTextAscent
     ) / 2;
@@ -336,6 +356,11 @@ export const createQuotePdfBytes = async ({
     rightX - marginX,
     12
   );
+
+  const pages = pdfDoc.getPages();
+  pages.forEach((quotePage, index) => {
+    drawRightText(quotePage, `Page ${index + 1} of ${pages.length}`, rightX, 20, 8, fonts.regular);
+  });
 
   return pdfDoc.save();
 };
