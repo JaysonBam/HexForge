@@ -91,6 +91,7 @@ export const CheckpointConfirmation = ({ project, onAdvanceToProduction }: { pro
   const showQuoteViewSelect = quoteViews.length > 1 && (previousSnapshots.length > 0 || quoteComparison.status === 'outdated');
   const quoteIsIssued = quoteComparison.hasSnapshot;
   const quotePdfLines = (currentIssuedSnapshot?.line_summary || []).map((line) => ({
+    partNumber: line.part_number,
     partName: line.part_name,
     materials: line.materials.map(formatLineMaterialLabel),
     weights: line.materials.map((material) => formatLineWeight(material.grams)),
