@@ -1,6 +1,20 @@
 import { getAuthSession } from './auth';
 import { supabase } from './client';
 import { v4 as uuidv4 } from 'uuid';
+import { getStoragePathFromImageUrl } from './storage';
+
+export async function copyPartThumbnail(imageUrl: string): Promise<string> {
+    const sourcePath = getStoragePathFromImageUrl(imageUrl);
+    if (!sourcePath) throw new Error('Could not find the part thumbnail to copy.');
+
+    const extension = sourcePath.match(/\.[a-z0-9]+$/i)?.[0] || '.png';
+    const destinationPath = `${uuidv4()}${extension}`;
+    const bucket = supabase.storage.from('Thumbnails');
+    const { error } = await bucket.copy(sourcePath, destinationPath);
+    if (error) throw new Error(`Could not copy the part thumbnail: ${error.message}`);
+
+    return bucket.getPublicUrl(destinationPath).data.publicUrl;
+}
 
 export async function uploadThumbnailFromBlobUrl(blobUrl: string): Promise<string | null> {
     try {
