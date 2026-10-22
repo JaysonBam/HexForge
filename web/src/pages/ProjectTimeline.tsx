@@ -251,13 +251,16 @@ export const ProjectTimeline = () => {
               key={panelId}
               variant="outline"
               size="sm"
-              className="min-w-0 w-full justify-center gap-1 px-1"
+              className="relative min-w-0 w-full justify-center gap-1 px-1"
               title={label}
               aria-haspopup="dialog"
               aria-expanded={openPanel === panelId}
               onClick={() => setOpenPanel(panelId)}
             >
               <Icon size={14} className="shrink-0" aria-hidden="true" /> {label}
+              {panelId === 'notes' && project.notes?.trim() && (
+                <span className="absolute right-1 top-1 size-2 rounded-full bg-red-500" role="img" aria-label="Has notes" />
+              )}
             </Button>
           ))}
         </div>
