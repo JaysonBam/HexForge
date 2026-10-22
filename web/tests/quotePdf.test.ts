@@ -92,6 +92,7 @@ test('20 multi-material parts all appear once across pages with their part numbe
     assert.ok(page.some(({ text }) => text === `Page ${index + 1} of ${pages.length}`));
     if (index < pages.length - 1) {
       assert.ok(!page.some(({ text }) => text === 'Total Cost' || text.includes('acceptance of the quote')));
+      assert.ok(page.some(({ text }) => text === 'Continued on next page'));
     }
   });
   assert.equal(all.filter(({ text }) => text === 'Total Cost').length, 1);
@@ -99,7 +100,13 @@ test('20 multi-material parts all appear once across pages with their part numbe
   assert.ok(pages.at(-1)!.some(({ text }) => text.includes('acceptance of the quote')));
   assert.equal(all.filter(({ text }) => text === 'PLA').length, 20);
   assert.equal(all.filter(({ text }) => text === 'PETG').length, 20);
-  all.filter(({ text }) => /^(Bracket|PLA$|PETG$|20g$|5g$)/.test(text)).forEach(({ y }) => assert.ok(y >= 244));
+  all.filter(({ text }) => /^(Bracket|PLA$|PETG$|20g$|5g$)/.test(text)).forEach(({ y }) => assert.ok(y >= 54));
+  const firstPageMaterials = pages[0].filter(({ text }) => text === 'PETG');
+  assert.ok(Math.min(...firstPageMaterials.map(({ y }) => y)) < 100, 'page one should use the space down to the bottom margin');
+  const finalPage = pages.at(-1)!;
+  const total = finalPage.find(({ text }) => text === 'Total Cost')!;
+  const paymentNotice = finalPage.find(({ text }) => text.includes('acceptance of the quote'))!;
+  assert.equal(total.y - paymentNotice.y, 40, 'payment details should follow the total without a large blank gap');
 });
 
 test('short and empty quotes stay on one page; supplied part numbers are preserved', async () => {
@@ -124,7 +131,7 @@ test('wrapped names and large quotes retain every row without overlapping the fo
     const name = line.partName.split(' with ')[0];
     assert.equal(all.filter(({ text }) => text.startsWith(name)).length, 1);
   }
-  all.filter(({ x, text }) => x === 80 && text !== 'Part Name').forEach(({ y }) => assert.ok(y >= 244));
+  all.filter(({ x, text }) => x === 80 && text !== 'Part Name').forEach(({ y }) => assert.ok(y >= 54));
   assert.equal(all.filter(({ text }) => text === 'Total Cost').length, 1);
 });
 
@@ -141,6 +148,18 @@ test('a single part taller than a page continues without dropping material lines
   for (const material of lines[0].materials) {
     assert.equal(all.filter(({ text }) => text === material).length, 1);
   }
-  all.filter(({ text }) => text.startsWith('Material ')).forEach(({ y }) => assert.ok(y >= 244));
+  all.filter(({ text }) => text.startsWith('Material ')).forEach(({ y }) => assert.ok(y >= 54));
+  assert.ok(pages.at(-1)!.find(({ text }) => text === 'Material 100')!.y >= 244);
   assert.equal(all.filter(({ text }) => text === 'Total Cost').length, 1);
+});
+
+test('the final part stays with the total when the payment details need another page', async () => {
+  const lines = makeLines(14);
+  const pages = await readPages(lines);
+  assert.equal(pages.length, 2);
+  const finalPage = pages.at(-1)!;
+  assert.ok(finalPage.some(({ text }) => text === lines.at(-1)!.partName));
+  assert.ok(finalPage.some(({ text }) => text === 'Total Cost'));
+  assert.ok(finalPage.some(({ text }) => text.includes('acceptance of the quote')));
+  assert.ok(Math.min(...pages[0].filter(({ text }) => text === 'PETG').map(({ y }) => y)) < 244);
 });

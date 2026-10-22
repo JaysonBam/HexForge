@@ -40,8 +40,8 @@ const pageHeight = 842;
 const marginX = 54;
 const rightX = 540;
 const centerX = pageWidth / 2;
-const footerTopY = 190;
-const tableBodyMinY = footerTopY + 54;
+const tableBodyMinY = 54;
+const finalTableBodyMinY = 244;
 const partNameX = marginX + 26;
 const continuationTableY = 754;
 const tableBodyLineGap = 12;
@@ -264,12 +264,20 @@ export const createQuotePdfBytes = async ({
     const rowLineCount = Math.max(partLines.length, line.materials.length, line.weights.length, line.costs.length, 1);
     // Keep normal rows together; exceptionally tall rows continue across pages.
     const rowHeight = (rowLineCount - 1) * tableBodyLineGap;
-    const fitsOnNewPage = continuationTableY - 18 - rowHeight >= tableBodyMinY;
-    if (y < tableBodyMinY || (y - rowHeight < tableBodyMinY && fitsOnNewPage)) addTablePage();
+    const isLastRow = lineIndex === lines.length - 1;
+    // Only the final row needs room beneath it for the total and payment details.
+    const fitsWithFooter = continuationTableY - 18 - rowHeight >= finalTableBodyMinY;
+    const rowMinY = isLastRow && fitsWithFooter ? finalTableBodyMinY : tableBodyMinY;
+    const fitsOnNewPage = continuationTableY - 18 - rowHeight >= rowMinY;
+    if (y < rowMinY || (y - rowHeight < rowMinY && fitsOnNewPage)) addTablePage();
 
     for (let index = 0; index < rowLineCount; index += 1) {
-      const continued = y < tableBodyMinY;
-      if (continued) addTablePage();
+      const lineMinY = isLastRow && index === rowLineCount - 1 ? finalTableBodyMinY : tableBodyMinY;
+      const continued = y < lineMinY;
+      if (continued) {
+        if (index > 0) drawRule(page, y + 3);
+        addTablePage();
+      }
       if (index === 0 || continued) {
         drawRightText(page, String(line.partNumber ?? lineIndex + 1), partNameX - 10, y, 8, fonts.regular);
       }
@@ -293,7 +301,7 @@ export const createQuotePdfBytes = async ({
   drawRightText(page, 'Total Cost', 430, totalY, 10, fonts.bold);
   drawRightText(page, `R ${totalCost.toFixed(2)}`, rightX, totalY, 10, fonts.bold);
 
-  y = footerTopY;
+  y = totalY - 28;
   drawRule(page, y + 16);
   y -= 12;
   drawCenteredText(page, 'Prints will only be started on acceptance of the quote.', y, 10.5, fonts.regular);
@@ -359,6 +367,9 @@ export const createQuotePdfBytes = async ({
 
   const pages = pdfDoc.getPages();
   pages.forEach((quotePage, index) => {
+    if (index < pages.length - 1) {
+      drawText(quotePage, 'Continued on next page', marginX, 20, 8, fonts.regular);
+    }
     drawRightText(quotePage, `Page ${index + 1} of ${pages.length}`, rightX, 20, 8, fonts.regular);
   });
 
