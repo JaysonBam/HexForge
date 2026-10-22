@@ -1,18 +1,17 @@
-import { useEffect, useId, useRef, useState, type KeyboardEventHandler, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { X, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
-export function SidePanel({ title, subtitle, icon: Icon, onClose, closeLabel, closeDisabled = false, actions, footer, children, onKeyDown }: {
+export function SidePanel({ title, subtitle, status, icon: Icon, onClose, closeLabel, closeDisabled = false, actions, children }: {
   title: string;
   subtitle: string;
+  status?: string;
   icon: LucideIcon;
   onClose: () => void;
   closeLabel: string;
   closeDisabled?: boolean;
   actions?: ReactNode;
-  footer?: ReactNode;
   children: ReactNode;
-  onKeyDown?: KeyboardEventHandler<HTMLDivElement>;
 }) {
   const titleId = useId();
   const panelRef = useRef<HTMLElement>(null);
@@ -29,7 +28,6 @@ export function SidePanel({ title, subtitle, icon: Icon, onClose, closeLabel, cl
       className="fixed inset-0 z-50 flex justify-end bg-slate-950/35 backdrop-blur-[2px] print:hidden"
       onClick={() => { if (!closeDisabled) onClose(); }}
       onKeyDown={(event) => {
-        onKeyDown?.(event);
         if (event.defaultPrevented) return;
         if (event.key === 'Escape') {
           event.preventDefault();
@@ -57,7 +55,10 @@ export function SidePanel({ title, subtitle, icon: Icon, onClose, closeLabel, cl
           <Icon size={20} className="shrink-0 text-slate-600" aria-hidden="true" />
           <div className="min-w-0 flex-1">
             <h2 id={titleId} className="truncate text-lg font-black text-slate-950">{title}</h2>
-            <p className="truncate text-xs text-slate-500">{subtitle}</p>
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <p className="min-w-0 truncate">{subtitle}</p>
+              {status && <span className="shrink-0" role="status" aria-live="polite">{status}</span>}
+            </div>
           </div>
           {actions}
           <Button ref={closeRef} variant="ghost" size="icon" className="shrink-0" disabled={closeDisabled} onClick={onClose} aria-label={closeLabel}>
@@ -65,7 +66,6 @@ export function SidePanel({ title, subtitle, icon: Icon, onClose, closeLabel, cl
           </Button>
         </header>
         <div className="flex min-h-0 flex-1 flex-col">{children}</div>
-        {footer}
       </aside>
     </div>
   );

@@ -41,7 +41,7 @@ export const ProjectTimeline = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { confirm, notify } = useFeedback();
-  const { deleteProject, getProject, projectsLoading, projectsLoadError, updateProject, saveProjectNotes, transitionProjectState } = useProjects();
+  const { deleteProject, getProject, projectsLoading, projectsLoadError, updateProject, transitionProjectState } = useProjects();
   const { activeStaffName, claimActiveStaffName } = useStaffSession();
   const { settingsLoading, settingsLoadError } = useSettings();
   const { activeWorkspaceTab, selectWorkspaceTab } = useOutletContext<ProjectWorkspaceNavigationContext>();
@@ -306,7 +306,6 @@ export const ProjectTimeline = () => {
         <ProjectNotesPanel
           key={`notes-${project.id}`}
           project={project}
-          onSave={(notes) => saveProjectNotes(project.id, notes)}
           onClose={() => setOpenPanel(null)}
         />
       )}
