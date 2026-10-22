@@ -24,12 +24,14 @@ import {
 import type { ProjectWorkspaceNavigationContext } from '@/app/layout/Layout';
 import { LocalFilesCard } from '@/features/local-files/LocalFilesCard';
 import { ProjectCorrespondencePanel } from '@/features/gmail/ProjectCorrespondencePanel';
+import { ProjectNotesPanel } from '@/features/projects/ProjectNotesPanel';
 import { getGmailInboxState } from '@/features/gmail/gmailInboxStore';
 import {
   ArrowLeft,
   Archive,
+  History,
   Mail,
-  ShieldCheck,
+  NotebookPen,
   Trash2,
   X
 } from 'lucide-react';
@@ -39,7 +41,7 @@ export const ProjectTimeline = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { confirm, notify } = useFeedback();
-  const { deleteProject, getProject, projectsLoading, projectsLoadError, updateProject, transitionProjectState } = useProjects();
+  const { deleteProject, getProject, projectsLoading, projectsLoadError, updateProject, saveProjectNotes, transitionProjectState } = useProjects();
   const { activeStaffName, claimActiveStaffName } = useStaffSession();
   const { settingsLoading, settingsLoadError } = useSettings();
   const { activeWorkspaceTab, selectWorkspaceTab } = useOutletContext<ProjectWorkspaceNavigationContext>();
@@ -47,6 +49,7 @@ export const ProjectTimeline = () => {
   const autoCreateLocalFolder = (location.state as { autoCreateLocalFolderFor?: string } | null)?.autoCreateLocalFolderFor === project?.id;
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [correspondenceOpen, setCorrespondenceOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
   const [deletingProject, setDeletingProject] = useState(false);
   const [archivingProject, setArchivingProject] = useState(false);
   const staffName = activeStaffName || claimActiveStaffName() || 'System';
@@ -240,22 +243,33 @@ export const ProjectTimeline = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-1">
           <Button
             variant="outline"
             size="sm"
-            className="w-full justify-center gap-1.5 px-2"
+            className="w-full justify-center gap-1 px-1"
+            title="Timeline"
             onClick={() => setTimelineOpen(true)}
           >
-            <ShieldCheck size={15} /> Timeline
+            <History size={14} className="shrink-0" aria-hidden="true" /> Timeline
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="w-full justify-center gap-1.5 px-2"
+            className="w-full justify-center gap-1 px-1"
+            title="Messages"
             onClick={() => setCorrespondenceOpen(true)}
           >
-            <Mail size={15} /> Messages
+            <Mail size={14} className="shrink-0" aria-hidden="true" /> Messages
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full justify-center gap-1 px-1"
+            title="Notes"
+            onClick={() => setNotesOpen(true)}
+          >
+            <NotebookPen size={14} className="shrink-0" aria-hidden="true" /> Notes
           </Button>
         </div>
       </aside>
@@ -306,6 +320,14 @@ export const ProjectTimeline = () => {
             </div>
           </aside>
         </div>
+      )}
+      {notesOpen && (
+        <ProjectNotesPanel
+          key={`notes-${project.id}`}
+          project={project}
+          onSave={(notes) => saveProjectNotes(project.id, notes)}
+          onClose={() => setNotesOpen(false)}
+        />
       )}
       <ProjectCorrespondencePanel
         key={project.id}

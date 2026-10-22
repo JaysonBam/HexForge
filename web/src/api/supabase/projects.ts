@@ -137,6 +137,7 @@ const mapProjectRows = (
   return projectRows.map((project) => ({
     ...project,
     email: typeof project.email === 'string' ? project.email : '',
+    notes: typeof project.notes === 'string' ? project.notes : '',
     parts: (partsByProject.get(project.id) ?? [])
       .sort((left, right) => Number(left.partNumber || 0) - Number(right.partNumber || 0))
       .map((part) => normalizePartVerification({
@@ -217,6 +218,13 @@ export const deleteProjectRecord = async (projectId: string) => {
   if (!result.error) notifyGmailInboxChange({ type: 'project', projectId, deleted: true });
   return result;
 };
+
+export const updateProjectNotesRecord = (projectId: string, notes: string) => supabase
+  .from('projects')
+  .update({ notes })
+  .eq('id', projectId)
+  .select('id')
+  .single();
 
 export const transitionProjectRecord = (args: {
   projectId: string;

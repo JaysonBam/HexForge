@@ -2,6 +2,8 @@
 
 HexForge is a workspace for the MISC 3D-printing intake, quote, production, collection, Gmail, reporting, and optional local-file workflows.
 
+Each project has a shared plain-text scratchpad. Open **Notes** beside **Timeline** and **Messages** at the bottom of the project sidebar. Click **Save** (or press Ctrl/Cmd+S), or close the notes panel to save. A failed save keeps the panel and draft open for retry. Notes are stored in `public.projects.notes`; apply `20261022120000_add_project_notes.sql` before releasing the frontend.
+
 ```text
 HexForge/
 ├─ web/             React/Vite application

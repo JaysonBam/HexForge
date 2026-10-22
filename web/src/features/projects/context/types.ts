@@ -41,6 +41,7 @@ export interface ProjectContextType {
   refreshProjects: () => Promise<void>;
   addProject: (data: Partial<Project>) => Promise<string | null>;
   updateProject: (id: string, data: Partial<Project>) => void;
+  saveProjectNotes: (id: string, notes: string) => Promise<boolean>;
   deleteProject: (id: string) => Promise<boolean>;
   addPart: (projectId: string) => void;
   updatePart: (projectId: string, partId: string, data: Partial<Part>) => void;

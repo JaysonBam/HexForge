@@ -119,6 +119,7 @@ export interface Project {
   studentName: string;
   studentNumber: string;
   email: string;
+  notes?: string;
   course: string;
   lecturer: string;
   needsPayment: boolean;

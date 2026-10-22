@@ -11,7 +11,8 @@ import {
   type ActiveProjectSnapshot,
   type ProjectSummary,
   transitionProjectRecord,
-  updateProjectRecord
+  updateProjectRecord,
+  updateProjectNotesRecord
 } from '@/api/supabase/projects';
 import {
   createPartRecord,
@@ -385,6 +386,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       studentName: data.studentName || '',
       studentNumber: data.studentNumber || '',
       email: data.email || '',
+      notes: data.notes || '',
       course: data.course || '',
       lecturer: data.lecturer || '',
       needsPayment: data.needsPayment ?? true,
@@ -433,6 +435,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     setProjects(prev => prev.map(p => p.id === id ? { ...p, ...updateData } : p));
     queueProjectUpdate(id, updateData);
+  };
+
+  const saveProjectNotes = async (id: string, notes: string) => {
+    if (!await flushQueuedProjectUpdate(id)) return false;
+    const saved = await trackMutation('Save project notes', () => updateProjectNotesRecord(id, notes));
+    if (saved) setProjects(current => current.map(project => project.id === id ? { ...project, notes } : project));
+    return saved;
   };
 
   const deleteProject = async (id: string) => {
@@ -733,6 +742,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       refreshProjects,
       addProject,
       updateProject,
+      saveProjectNotes,
       deleteProject,
       addPart,
       updatePart,
