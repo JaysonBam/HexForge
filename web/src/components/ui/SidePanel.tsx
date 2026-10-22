@@ -48,7 +48,7 @@ export function SidePanel({ title, subtitle, status, icon: Icon, onClose, closeL
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="forge-drawer flex h-full w-full max-w-2xl flex-col bg-white"
+        className="project-side-panel forge-drawer flex h-full w-full max-w-2xl flex-col bg-white"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="flex h-20 shrink-0 items-center gap-3 border-b border-slate-300 bg-white px-5 py-4">

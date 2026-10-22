@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Download, ExternalLink, Loader2, Mail, Paperclip, RefreshCw } from 'lucide-react';
 import type { Project } from '@/types';
 import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 import { SidePanel } from '@/components/ui/SidePanel';
 import { useFeedback } from '@/app/providers/FeedbackProvider';
 import { useLocalHelper } from '@/features/local-files/LocalHelperContext';
@@ -204,20 +205,20 @@ export const ProjectCorrespondencePanel = ({
           )}
           {warning && <div className="mb-4 flex gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900"><AlertTriangle size={15} className="mt-0.5 shrink-0" /><span>{warning}</span></div>}
           {!project.gmailThreadId ? (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">
+            <Card className="p-8 text-center">
               <Mail size={28} className="mx-auto text-slate-400" />
               <h3 className="mt-3 text-sm font-black text-slate-900">No Main Gmail Thread linked</h3>
               <p className="mt-1 text-xs font-semibold text-slate-600">Open Project Details to link a recent Gmail thread.</p>
-            </div>
+            </Card>
           ) : loadingCache && messages.length === 0 ? (
             <div className="flex min-h-48 items-center justify-center gap-2 text-sm font-bold text-slate-600"><Loader2 size={18} className="animate-spin" /> Loading saved messages…</div>
           ) : messages.length === 0 ? (
-            <div className="rounded-lg border border-slate-300 bg-white p-8 text-center text-sm font-semibold text-slate-600">No cached messages yet. Use Refresh to retrieve the Main Gmail Thread.</div>
+            <Card className="p-8 text-center text-sm font-semibold text-slate-600">No cached messages yet. Use Refresh to retrieve the Main Gmail Thread.</Card>
           ) : (
             <div className="space-y-4">
               {messages.map((message) => (
                 <article key={message.id} className={`flex ${message.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[88%] rounded-lg border p-4 shadow-sm ${message.direction === 'outgoing' ? 'border-sky-300 bg-sky-50' : 'border-slate-300 bg-white'}`}>
+                  <Card className={`max-w-[88%] p-4 ${message.direction === 'outgoing' ? 'bg-sky-50' : 'bg-white'}`}>
                     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                       <p className="text-xs font-black text-slate-900">{message.senderName || message.senderEmail || (message.direction === 'outgoing' ? 'HexForge' : 'Unknown sender')}</p>
                       <time className="text-[10px] font-bold text-slate-500">{formatDateTime(message.messageDate)}</time>
@@ -243,7 +244,7 @@ export const ProjectCorrespondencePanel = ({
                         })}
                       </div>
                     )}
-                  </div>
+                  </Card>
                 </article>
               ))}
             </div>

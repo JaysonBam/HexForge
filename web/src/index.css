@@ -517,9 +517,9 @@
     box-shadow: -28px 0 70px rgba(15, 23, 42, 0.18);
   }
 
-  .forge-event-log {
-    border-left: 2px solid rgba(56, 189, 248, 0.32);
-    background: #ffffff;
+  .project-side-panel {
+    --forge-shadow-soft: none;
+    box-shadow: none;
   }
 
   .forge-empty {

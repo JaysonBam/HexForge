@@ -73,7 +73,7 @@ export function ProjectNotesPanel({ project, onClose }: {
             ref={inputRef}
             aria-label="Project notes"
             placeholder="Write notes about this project…"
-            className="min-h-0 w-full flex-1 resize-none rounded-lg bg-white p-5 text-sm font-medium leading-relaxed text-slate-800 placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300"
+            className="min-h-0 w-full flex-1 resize-none rounded-lg bg-white p-5 text-sm font-medium leading-relaxed text-slate-800 placeholder:text-slate-400 focus:outline-none"
             value={draft}
             readOnly={saving}
             onChange={(event) => setDraft(event.target.value)}

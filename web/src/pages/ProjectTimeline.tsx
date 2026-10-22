@@ -540,7 +540,7 @@ const AuditTab = ({ projectId }: { projectId: string }) => {
 
       <div className="mt-5 space-y-2">
         {events.map((event) => (
-          <div key={event.id} className="forge-event-log rounded-md border border-slate-300 p-3 pl-4">
+          <div key={event.id} className="rounded-md border border-slate-300 p-3 pl-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-black text-slate-950">{event.action_type.replaceAll('_', ' ')}</p>
@@ -555,7 +555,7 @@ const AuditTab = ({ projectId }: { projectId: string }) => {
               )}
             </div>
             {(event.reason || event.override_note) && (
-              <p className="mt-2 rounded border border-[color:var(--forge-gold-border)] bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">
+              <p className="mt-2 rounded border border-slate-300 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">
                 {event.reason || event.override_note}
               </p>
             )}
