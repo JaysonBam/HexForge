@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { ThemeToggle } from '@/components/ui/ThemeControls';
 import { quoteContactSettings } from '@/domain/environmentSettings';
 
 const appName = 'HexForge';
@@ -23,6 +24,7 @@ const PageShell = ({ children }: { children: React.ReactNode }) => (
         </Link>
 
         <nav aria-label="Public pages" className="flex flex-wrap gap-2">
+          <ThemeToggle />
           <Link className="rounded-md px-3 py-2 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-800" to="/about">Overview</Link>
           <Link className="rounded-md px-3 py-2 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-800" to="/privacy">Privacy</Link>
           <Link className="rounded-md px-3 py-2 text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-800" to="/terms">Terms</Link>
@@ -46,7 +48,7 @@ const ContentPage = ({
   children: React.ReactNode;
 }) => (
   <PageShell>
-    <article className="rounded-lg border border-[rgba(214,168,79,0.35)] bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.08)] dark:border-[rgba(214,168,79,0.28)] dark:bg-slate-950 md:p-10">
+    <article className="rounded-lg border border-[rgba(214,168,79,0.35)] bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.08)] dark:border-[rgba(214,168,79,0.28)] dark:bg-[var(--forge-panel)] md:p-10">
       <div className="space-y-6">
         <header className="space-y-1">
           <p className="text-xs font-black uppercase tracking-wide text-sky-700 dark:text-sky-300">{eyebrow}</p>

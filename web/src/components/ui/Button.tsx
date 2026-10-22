@@ -15,7 +15,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       primary: 'forge-button-primary',
       secondary: 'forge-button-secondary',
       outline: 'forge-button-secondary',
-      ghost: 'text-slate-700 forge-button-ghost focus-visible:ring-sky-300',
+      ghost: 'text-slate-700 dark:text-slate-300 forge-button-ghost focus-visible:ring-sky-300',
       destructive: 'bg-rose-600 text-white hover:bg-rose-700 focus-visible:ring-rose-300',
       success: 'border border-teal-500 bg-teal-700 text-white shadow-sm hover:bg-teal-800 focus-visible:ring-teal-300'
     };

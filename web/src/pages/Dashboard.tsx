@@ -83,7 +83,7 @@ export const Dashboard = () => {
       <section className="flex flex-col gap-3">
         <div className="grid gap-3 lg:grid-cols-2 lg:items-stretch">
           <div className="relative flex min-w-0 items-center">
-            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sky-600" size={17} />
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sky-600 dark:text-sky-400" size={17} />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -99,11 +99,11 @@ export const Dashboard = () => {
           />
         </div>
 
-        <div className="grid w-full gap-2 sm:grid-cols-2 xl:grid-cols-4">
-          <CompactMetric label="Total Plates" value={totals.totalParts} tone="text-slate-950" />
-          <CompactMetric label="In Queue" value={totals.inQueue} tone="text-amber-700" />
-          <CompactMetric label="Printing" value={totals.printing} tone="text-indigo-700" />
-          <CompactMetric label="Printed" value={totals.printed} tone="text-emerald-700" />
+        <div className="grid w-full grid-cols-2 gap-2 xl:grid-cols-4">
+          <CompactMetric label="Total Plates" value={totals.totalParts} tone="text-slate-950 dark:text-slate-100" />
+          <CompactMetric label="In Queue" value={totals.inQueue} tone="text-amber-700 dark:text-amber-300" />
+          <CompactMetric label="Printing" value={totals.printing} tone="text-indigo-700 dark:text-indigo-300" />
+          <CompactMetric label="Printed" value={totals.printed} tone="text-emerald-700 dark:text-emerald-300" />
         </div>
       </section>
 
@@ -115,7 +115,7 @@ export const Dashboard = () => {
           return (
             <div key={laneKey} className={lane.tone}>
               <div className="forge-lane-header flex items-center justify-between gap-3 px-4 py-3">
-                <h2 className="text-[0.8rem] font-black uppercase tracking-[0.14em] text-slate-800">
+                <h2 className="text-[0.8rem] font-black uppercase tracking-[0.14em] text-slate-800 dark:text-slate-200">
                   {lane.title === 'Ready for Printing' ? 'Ready To Print' : lane.title}
                 </h2>
                 <span className="forge-lane-count">
@@ -140,7 +140,7 @@ export const Dashboard = () => {
       </section>
 
       {!projectsLoading && projectsLoadError && (
-        <div className="rounded-lg border border-rose-300 bg-rose-100 px-4 py-3 text-sm font-bold text-rose-900">
+        <div className="rounded-lg border border-rose-300 dark:border-rose-800 bg-rose-100 dark:bg-rose-950/55 px-4 py-3 text-sm font-bold text-rose-900 dark:text-rose-200">
           {projectsLoadError}
         </div>
       )}
@@ -160,7 +160,7 @@ const SkeletonBar = ({ className = '' }: { className?: string }) => (
 const DashboardLaneSkeleton = () => (
   <div className="space-y-3">
     {Array.from({ length: 3 }).map((_, index) => (
-      <Card key={index} className="border-slate-200 bg-white px-4 py-3">
+      <Card key={index} className="border-slate-200 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] px-4 py-3">
         <div className="flex items-start gap-4">
           <SkeletonBar className="h-10 w-16" />
           <div className="min-w-0 flex-1">
@@ -180,8 +180,8 @@ const LaneEmptyState = ({ laneKey }: { laneKey: DashboardLaneKey }) => {
   return (
     <div className="forge-lane-empty flex min-h-[24rem] flex-col items-center justify-center px-6 py-10 text-center">
       <Settings size={64} strokeWidth={1.35} className="text-slate-200" />
-      <div className="mt-7 text-lg font-black text-slate-900">{copy.title}</div>
-      <p className="mt-3 max-w-[16rem] text-sm font-semibold leading-7 text-slate-500">
+      <div className="mt-7 text-lg font-black text-slate-900 dark:text-slate-100">{copy.title}</div>
+      <p className="mt-3 max-w-[16rem] text-sm font-semibold leading-7 text-slate-500 dark:text-slate-400">
         {copy.description}
       </p>
     </div>
@@ -225,18 +225,18 @@ const EmailReminderCard = ({
   return (
     <div
       className={`flex min-h-12 flex-col gap-2 rounded-lg border px-3 py-2 text-left shadow-sm sm:flex-row sm:items-center sm:justify-between ${
-      isAuthBlocked || isError ? 'border-rose-300 bg-rose-50' : 'forge-metric'
+      isAuthBlocked || isError ? 'border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40' : 'forge-metric'
     }`}
     >
       <div className="flex w-full min-w-0 flex-1 items-center gap-3 text-left sm:w-auto">
         <img src={gmailIcon} alt="" className="h-8 w-8 shrink-0" />
         <div className="min-w-0">
           <div className={`truncate text-sm font-bold ${
-            isAuthBlocked || isError ? 'text-rose-900' : 'text-slate-950'
+            isAuthBlocked || isError ? 'text-rose-900 dark:text-rose-200' : 'text-slate-950 dark:text-slate-100'
           }`}>
             {emailSummaryText}
           </div>
-          <div className="mt-0.5 text-xs font-semibold text-slate-500">
+          <div className="mt-0.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
             Last check: {refreshedAt}
           </div>
         </div>
@@ -253,7 +253,7 @@ const EmailReminderCard = ({
                 onRefresh();
               }
             }}
-            className="inline-flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-md border border-rose-300 bg-white px-2.5 py-1.5 text-xs font-bold text-rose-800 transition hover:bg-rose-100 sm:flex-none"
+            className="inline-flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-md border border-rose-300 dark:border-rose-800 bg-white dark:bg-[var(--forge-panel)] px-2.5 py-1.5 text-xs font-bold text-rose-800 dark:text-rose-200 transition hover:bg-rose-100 dark:hover:bg-rose-950/55 sm:flex-none"
           >
             <AlertTriangle size={16} />
             {emailActionLabel}
@@ -262,7 +262,7 @@ const EmailReminderCard = ({
           <button
             type="button"
             onClick={onOpen}
-            className="inline-flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-md border border-sky-500/30 bg-white px-2.5 py-1.5 text-xs font-bold text-sky-700 transition hover:bg-sky-50 sm:flex-none"
+            className="inline-flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-md border border-sky-500/30 bg-white dark:bg-[var(--forge-panel)] px-2.5 py-1.5 text-xs font-bold text-sky-700 dark:text-sky-300 transition hover:bg-sky-50 dark:hover:bg-sky-950/40 sm:flex-none"
             aria-label="View emails needing action"
           >
             View emails
@@ -273,7 +273,7 @@ const EmailReminderCard = ({
             type="button"
             onClick={onRefresh}
             disabled={isRefreshing}
-            className="rounded-full p-1 text-slate-500 transition hover:bg-white hover:text-sky-700 disabled:cursor-wait disabled:opacity-60"
+            className="rounded-full p-1 text-slate-500 dark:text-slate-400 transition hover:bg-white dark:hover:bg-[var(--forge-panel)] hover:text-sky-700 dark:hover:text-sky-300 disabled:cursor-wait disabled:opacity-60"
             aria-label="Refresh emails needing action"
           >
             <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
@@ -294,7 +294,7 @@ const CompactMetric = ({
 }) => (
   <div className="forge-metric flex min-h-12 items-baseline gap-2 px-3.5 py-2.5 text-left">
     <div className={`text-2xl font-black leading-none ${tone}`}>{value}</div>
-    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">{label}</div>
+    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-600 dark:text-slate-400">{label}</div>
   </div>
 );
 
@@ -307,26 +307,26 @@ const ProjectRow = ({ project, onOpen }: { project: ReturnType<typeof useProject
       onClick={onOpen}
     >
       <div className="flex items-start gap-3">
-        <div className="forge-priority-large shrink-0 px-2 py-1.5 text-[1.2rem] font-black leading-none text-slate-950">
+        <div className="forge-priority-large shrink-0 px-2 py-1.5 text-[1.2rem] font-black leading-none text-slate-950 dark:text-slate-100">
           #{project.priorityNumber}
         </div>
 
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-[0.98rem] font-black leading-tight text-slate-950">
+          <h3 className="truncate text-[0.98rem] font-black leading-tight text-slate-950 dark:text-slate-100">
             {project.studentName || 'Unnamed Project'}
           </h3>
-          <p className="mt-1 truncate text-xs font-semibold tracking-[0.04em] text-slate-500">
+          <p className="mt-1 truncate text-xs font-semibold tracking-[0.04em] text-slate-500 dark:text-slate-400">
             {project.studentNumber || 'No student number'} {project.course ? `- ${project.course}` : ''}
           </p>
         </div>
         <PrintLocationBadge label={project.printLabel} className="mt-0.5 max-w-[35%] shrink-0" />
       </div>
 
-      <div className="mt-4 grid min-h-[3.55rem] grid-cols-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <StatusCell label={counts.total === 1 ? 'Part' : 'Parts'} value={counts.total} tone="text-sky-700" />
-        <StatusCell label="Queue" value={counts.ready} tone="text-amber-700" withDivider />
-        <StatusCell label="Printing" value={counts.printing} tone="text-indigo-700" withDivider />
-        <StatusCell label="Printed" value={counts.printed} tone="text-emerald-700" withDivider />
+      <div className="mt-4 grid min-h-[3.55rem] grid-cols-4 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)]">
+        <StatusCell label={counts.total === 1 ? 'Part' : 'Parts'} value={counts.total} tone="text-sky-700 dark:text-sky-300" />
+        <StatusCell label="Queue" value={counts.ready} tone="text-amber-700 dark:text-amber-300" withDivider />
+        <StatusCell label="Printing" value={counts.printing} tone="text-indigo-700 dark:text-indigo-300" withDivider />
+        <StatusCell label="Printed" value={counts.printed} tone="text-emerald-700 dark:text-emerald-300" withDivider />
       </div>
     </Card>
   );
@@ -343,8 +343,8 @@ const StatusCell = ({
   tone: string;
   withDivider?: boolean;
 }) => (
-  <div className={`flex flex-col items-center justify-center px-1.5 py-1.5 text-center ${withDivider ? 'border-l border-slate-200' : ''}`}>
+  <div className={`flex flex-col items-center justify-center px-1.5 py-1.5 text-center ${withDivider ? 'border-l border-slate-200 dark:border-slate-700' : ''}`}>
     <div className={`text-[1.35rem] font-black leading-none ${tone}`}>{value}</div>
-    <div className="mt-1 text-[0.56rem] font-black uppercase tracking-[0.1em] text-slate-500">{label}</div>
+    <div className="mt-1 text-[0.56rem] font-black uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400">{label}</div>
   </div>
 );

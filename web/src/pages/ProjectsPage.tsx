@@ -178,7 +178,7 @@ export const ProjectsPage = () => {
       <section className="forge-panel flex flex-col gap-3 p-4">
         <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto] xl:items-center">
           <div className="relative min-w-0">
-            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sky-600" size={17} />
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sky-600 dark:text-sky-400" size={17} />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -195,10 +195,10 @@ export const ProjectsPage = () => {
               aria-haspopup="menu"
               aria-expanded={stateFilterOpen}
             >
-              <ListFilter className="shrink-0 text-sky-600" size={15} />
+              <ListFilter className="shrink-0 text-sky-600 dark:text-sky-400" size={15} />
               <span className="min-w-0 flex-1 truncate">{stateFilterLabel}</span>
               <ChevronDown
-                className={`shrink-0 text-slate-500 transition-transform ${stateFilterOpen ? 'rotate-180' : ''}`}
+                className={`shrink-0 text-slate-500 dark:text-slate-400 transition-transform ${stateFilterOpen ? 'rotate-180' : ''}`}
                 size={16}
               />
             </button>
@@ -209,10 +209,10 @@ export const ProjectsPage = () => {
                 role="menu"
                 aria-label="Filter projects by state"
               >
-                <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-3 py-2.5">
+                <div className="flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-700 px-3 py-2.5">
                   <div>
-                    <div className="text-xs font-black uppercase tracking-[0.12em] text-slate-700">Project states</div>
-                    <div className="mt-0.5 text-xs font-semibold text-slate-500">
+                    <div className="text-xs font-black uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Project states</div>
+                    <div className="mt-0.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
                       {selectedStates.size} selected
                     </div>
                   </div>
@@ -223,7 +223,7 @@ export const ProjectsPage = () => {
                         ? new Set<ProjectState>()
                         : new Set(stateOptions.map((option) => option.value))
                     )}
-                    className="rounded-md px-2 py-1 text-xs font-black text-sky-700 transition hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                    className="rounded-md px-2 py-1 text-xs font-black text-sky-700 dark:text-sky-300 transition hover:bg-sky-50 dark:hover:bg-sky-950/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
                   >
                     {allStatesSelected ? 'Clear' : 'Select all'}
                   </button>
@@ -233,13 +233,13 @@ export const ProjectsPage = () => {
                   {stateOptions.map((option) => (
                     <label
                       key={option.value}
-                      className="flex cursor-pointer items-center gap-3 rounded-md px-2.5 py-2 text-sm font-semibold text-slate-800 transition hover:bg-sky-50"
+                      className="flex cursor-pointer items-center gap-3 rounded-md px-2.5 py-2 text-sm font-semibold text-slate-800 dark:text-slate-200 transition hover:bg-sky-50 dark:hover:bg-sky-950/40"
                     >
                       <input
                         type="checkbox"
                         checked={selectedStates.has(option.value)}
                         onChange={() => toggleState(option.value)}
-                        className="h-4 w-4 rounded border-slate-400 accent-sky-600"
+                        className="h-4 w-4 rounded border-slate-400 dark:border-slate-600 accent-sky-600"
                       />
                       <StateBadge state={option.value} />
                     </label>
@@ -250,7 +250,7 @@ export const ProjectsPage = () => {
           </div>
 
           <div className="relative">
-            <Calendar className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sky-600" size={15} />
+            <Calendar className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sky-600 dark:text-sky-400" size={15} />
             <select
               id="projects-year-filter"
               value={selectedYear}
@@ -263,10 +263,10 @@ export const ProjectsPage = () => {
                 </option>
               ))}
             </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400" size={16} />
           </div>
 
-          <span className="forge-pill px-3 py-1 text-xs text-slate-700">
+          <span className="forge-pill px-3 py-1 text-xs text-slate-700 dark:text-slate-300">
             {visibleProjects.length} shown
           </span>
 
@@ -281,7 +281,7 @@ export const ProjectsPage = () => {
         {projectsLoading ? (
           <ProjectsListSkeleton />
         ) : projectsLoadError ? (
-          <div className="rounded-lg border border-rose-300 bg-rose-100 px-6 py-5 text-sm font-bold text-rose-900">
+          <div className="rounded-lg border border-rose-300 dark:border-rose-800 bg-rose-100 dark:bg-rose-950/55 px-6 py-5 text-sm font-bold text-rose-900 dark:text-rose-200">
             {projectsLoadError}
           </div>
         ) : visibleProjects.length === 0 ? (
@@ -298,14 +298,14 @@ export const ProjectsPage = () => {
       {reportModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6 backdrop-blur-[2px]">
           <div className="forge-modal w-full max-w-md">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 dark:border-slate-700 px-5 py-4">
               <div className="flex min-w-0 gap-3">
                 <div className="forge-stamp flex h-10 w-10 shrink-0 items-center justify-center text-white">
                   <FileSpreadsheet size={19} />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-base font-black text-slate-950">Download collection report</h2>
-                  <p className="mt-1 text-sm font-medium text-slate-600">
+                  <h2 className="text-base font-black text-slate-950 dark:text-slate-100">Download collection report</h2>
+                  <p className="mt-1 text-sm font-medium text-slate-600 dark:text-slate-400">
                     Select the collection month to export as a formatted Excel sheet.
                   </p>
                 </div>
@@ -313,7 +313,7 @@ export const ProjectsPage = () => {
               <button
                 type="button"
                 onClick={() => setReportModalOpen(false)}
-                className="rounded-md p-1.5 text-slate-500 transition hover:bg-sky-50 hover:text-slate-950"
+                className="rounded-md p-1.5 text-slate-500 dark:text-slate-400 transition hover:bg-sky-50 dark:hover:bg-sky-950/40 hover:text-slate-950 dark:hover:text-slate-100"
                 aria-label="Close report dialog"
               >
                 <X size={18} />
@@ -322,7 +322,7 @@ export const ProjectsPage = () => {
 
             <div className="space-y-4 px-5 py-5">
               <label className="block">
-                <span className="text-xs font-black uppercase tracking-wide text-slate-600">Report month</span>
+                <span className="text-xs font-black uppercase tracking-wide text-slate-600 dark:text-slate-400">Report month</span>
                 <select
                   value={selectedReportMonth}
                   onChange={(event) => setSelectedReportMonth(event.target.value)}
@@ -337,22 +337,22 @@ export const ProjectsPage = () => {
               </label>
 
               <div className="forge-panel-muted px-4 py-3">
-                <div className="text-sm font-black text-slate-950">
+                <div className="text-sm font-black text-slate-950 dark:text-slate-100">
                   {reportRows.length} collected {reportRows.length === 1 ? 'part' : 'parts'}
                 </div>
-                <div className="mt-1 text-xs font-medium text-slate-600">
+                <div className="mt-1 text-xs font-medium text-slate-600 dark:text-slate-400">
                   Each collected part or plate is exported as an individual project row.
                 </div>
               </div>
 
               {reportError && (
-                <div className="rounded-md border border-rose-300 bg-rose-100 px-4 py-3 text-sm font-bold text-rose-900">
+                <div className="rounded-md border border-rose-300 dark:border-rose-800 bg-rose-100 dark:bg-rose-950/55 px-4 py-3 text-sm font-bold text-rose-900 dark:text-rose-200">
                   {reportError}
                 </div>
               )}
             </div>
 
-            <div className="flex flex-col-reverse gap-2 border-t border-slate-200 px-5 py-4 sm:flex-row sm:justify-end">
+            <div className="flex flex-col-reverse gap-2 border-t border-slate-200 dark:border-slate-700 px-5 py-4 sm:flex-row sm:justify-end">
               <Button type="button" variant="ghost" onClick={() => setReportModalOpen(false)}>
                 Cancel
               </Button>
@@ -382,9 +382,9 @@ const SkeletonBar = ({ className = '' }: { className?: string }) => (
 const ProjectsListSkeleton = () => (
   <>
     {Array.from({ length: 6 }).map((_, index) => (
-      <Card key={index} className="border-slate-300 bg-white px-4 py-3">
+      <Card key={index} className="border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] px-4 py-3">
         <div className="flex items-center gap-3">
-          <SkeletonBar className="h-7 w-14 shrink-0 bg-slate-300" />
+          <SkeletonBar className="h-7 w-14 shrink-0 bg-slate-300 dark:bg-slate-600" />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
               <SkeletonBar className="h-4 w-36" />
@@ -415,19 +415,19 @@ const ProjectListRow = ({ project, onOpen }: { project: ReturnType<typeof usePro
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h3 className="truncate text-sm font-black text-slate-950">
+          <h3 className="truncate text-sm font-black text-slate-950 dark:text-slate-100">
             {project.studentName || 'Unnamed Project'}
           </h3>
-          <span className="text-xs font-semibold text-slate-500">
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
             {project.studentNumber || 'No student number'}
           </span>
           {project.course && (
-            <span className="truncate text-xs font-semibold text-slate-500">
+            <span className="truncate text-xs font-semibold text-slate-500 dark:text-slate-400">
               {project.course}
             </span>
           )}
           {project.lecturer && (
-            <span className="truncate text-xs font-semibold text-slate-500">
+            <span className="truncate text-xs font-semibold text-slate-500 dark:text-slate-400">
               {project.lecturer}
             </span>
           )}
@@ -447,7 +447,7 @@ const ProjectListRow = ({ project, onOpen }: { project: ReturnType<typeof usePro
         <StateBadge state={project.state} />
       </div>
 
-      <ArrowRight size={17} className="shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-slate-800" />
+      <ArrowRight size={17} className="shrink-0 text-slate-400 dark:text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-slate-800" />
     </div>
 
     {project.printLabel?.trim() && (

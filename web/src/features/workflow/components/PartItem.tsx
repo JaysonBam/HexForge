@@ -187,24 +187,24 @@ export const PartItem = ({ part, projectId }: PartItemProps) => {
         <div className="forge-card overflow-hidden transition-all">
             {/* Header / Summary */}
             <div 
-                className="flex cursor-pointer items-center justify-between bg-slate-100/90 p-4 transition hover:bg-sky-50"
+                className="flex cursor-pointer items-center justify-between bg-slate-100/90 dark:bg-slate-900/90 p-4 transition hover:bg-sky-50 dark:hover:bg-sky-950/40"
                 onClick={() => setExpanded(!expanded)}
             >
                 <div className="flex items-center gap-3">
-                    <button className="text-slate-500">
+                    <button className="text-slate-500 dark:text-slate-400">
                         {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                     </button>
                     {part.imageUrl && (
                         <img 
                             src={part.imageUrl} 
                             alt={part.partName} 
-                            className="h-10 w-10 rounded border border-slate-300 bg-white object-contain shadow-sm" 
+                            className="h-10 w-10 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] object-contain shadow-sm"
                         />
                     )}
-                    <span className="font-bold text-slate-800">#{part.partNumber}</span>
-                    <span className="font-medium text-slate-950">{part.partName}</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200">#{part.partNumber}</span>
+                    <span className="font-medium text-slate-950 dark:text-slate-100">{part.partName}</span>
                     {part.sourceFilePath && (
-                        <span className="forge-badge inline-flex max-w-52 items-center gap-1 px-2 py-0.5 text-xs text-slate-700" title={part.sourceFilePath}>
+                        <span className="forge-badge inline-flex max-w-52 items-center gap-1 px-2 py-0.5 text-xs text-slate-700 dark:text-slate-300" title={part.sourceFilePath}>
                             <FileCheck2 size={12} className="shrink-0" />
                             <span className="truncate">{sourceFileName(part.sourceFilePath)}</span>
                         </span>
@@ -219,9 +219,9 @@ export const PartItem = ({ part, projectId }: PartItemProps) => {
                         </span>
                     )}
                 </div>
-                <div className="flex items-center gap-6 text-sm text-slate-700">
+                <div className="flex items-center gap-6 text-sm text-slate-700 dark:text-slate-300">
                     <span>{(part.primaryEstimatedWeight || 0) + (part.secondaryEstimatedWeight || 0)}g</span>
-                    <span className="font-bold text-slate-950">R {totalServiceCost.toFixed(2)}</span>
+                    <span className="font-bold text-slate-950 dark:text-slate-100">R {totalServiceCost.toFixed(2)}</span>
                     <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" title="Duplicate part" aria-label={`Duplicate part ${part.partNumber}`}
                         disabled={pendingAction !== null} aria-busy={pendingAction === 'duplicate' || undefined}
                         onClick={(event) => { event.stopPropagation(); void handleDuplicatePart(); }}>
@@ -232,7 +232,7 @@ export const PartItem = ({ part, projectId }: PartItemProps) => {
 
             {/* Expanded Details */}
             {expanded && (
-                <div className="border-t border-slate-300 bg-white p-5">
+                <div className="border-t border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] p-5">
                     {/* Top Section */}
                     <div className="part-detail-top">
                         <div className="flex min-w-0 items-start gap-5">
@@ -240,17 +240,17 @@ export const PartItem = ({ part, projectId }: PartItemProps) => {
                                 <img
                                     src={part.imageUrl}
                                     alt={part.partName}
-                                    className="h-24 w-24 flex-none rounded border border-slate-300 bg-slate-100 object-contain shadow-sm"
+                                    className="h-24 w-24 flex-none rounded border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 object-contain shadow-sm"
                                 />
                             ) : (
-                                <div className="flex h-24 w-24 flex-none items-center justify-center rounded border border-slate-300 bg-slate-100 p-2 text-center text-xs text-slate-500">
+                                <div className="flex h-24 w-24 flex-none items-center justify-center rounded border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 p-2 text-center text-xs text-slate-500 dark:text-slate-400">
                                     No Image
                                 </div>
                             )}
                             <div className="min-w-0 flex-1">
                                 <input
                                     type="text"
-                                    className="mb-4 w-full truncate border-b border-slate-300 bg-transparent pb-1 text-xl font-bold text-slate-900 focus:border-sky-600 focus:outline-none"
+                                    className="mb-4 w-full truncate border-b border-slate-300 dark:border-slate-700 bg-transparent pb-1 text-xl font-bold text-slate-900 dark:text-slate-100 focus:border-sky-600 focus:outline-none"
                                     value={part.partName}
                                     placeholder="Part Name"
                                     onChange={(e) => handleChange('partName', e.target.value)}
@@ -258,17 +258,17 @@ export const PartItem = ({ part, projectId }: PartItemProps) => {
                                 
                                 <div className="flex flex-wrap items-end gap-6">
                                     <div className="flex flex-col border-b border-transparent">
-                                        <span className="mb-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">Service Cost</span>
-                                        <span className="text-xl font-extrabold text-slate-950">
+                                        <span className="mb-1 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Service Cost</span>
+                                        <span className="text-xl font-extrabold text-slate-950 dark:text-slate-100">
                                             R {totalServiceCost.toFixed(2)}
                                         </span>
                                     </div>
 
                                     <div className="flex flex-col">
-                                        <span className="mb-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">Print Time</span>
+                                        <span className="mb-1 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Print Time</span>
                                         <input
                                             type="text"
-                                            className="w-24 border-b border-slate-300 bg-transparent py-0.5 text-base font-medium focus:border-sky-600 focus:outline-none"
+                                            className="w-24 border-b border-slate-300 dark:border-slate-700 bg-transparent py-0.5 text-base font-medium focus:border-sky-600 focus:outline-none"
                                             value={part.printingTime || ''}
                                             placeholder="0h 0m"
                                             onChange={(e) => handleChange('printingTime', e.target.value)}
@@ -279,7 +279,7 @@ export const PartItem = ({ part, projectId }: PartItemProps) => {
                         </div>
 
                         <div className="min-w-0">
-                            <label className="mb-2 flex text-[10px] font-bold uppercase tracking-widest text-slate-500">Special Instructions</label>
+                            <label className="mb-2 flex text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Special Instructions</label>
                             <textarea
                                 className="forge-command-input h-[6.25rem] w-full resize-y p-3 text-sm"
                                 value={part.specialInstruction || ''}
@@ -292,10 +292,10 @@ export const PartItem = ({ part, projectId }: PartItemProps) => {
                     {/* Material Boxes */}
                     <div className="part-material-grid">
                         {/* Primary Material Box */}
-                        <div className="part-material-card relative overflow-hidden rounded-lg border border-sky-300 bg-sky-100/70 p-4 shadow-sm">
+                        <div className="part-material-card relative overflow-hidden rounded-lg border border-sky-300 dark:border-sky-800 bg-sky-100/70 dark:bg-sky-950/70 p-4 shadow-sm">
                             <div className="absolute left-0 top-0 h-full w-1 bg-sky-500"></div>
-                            <div className="mb-4 flex items-center justify-between border-b border-sky-300 pb-3">
-                                <h4 className="text-sm font-bold uppercase tracking-wider text-sky-900">Primary Material</h4>
+                            <div className="mb-4 flex items-center justify-between border-b border-sky-300 dark:border-sky-800 pb-3">
+                                <h4 className="text-sm font-bold uppercase tracking-wider text-sky-900 dark:text-sky-200">Primary Material</h4>
                                 <div className="forge-badge forge-badge-blue px-3 py-1 text-xs" title="Service Cost for this Material">
                                     R {primaryServiceCostLocal.toFixed(2)}
                                 </div>
@@ -375,10 +375,10 @@ export const PartItem = ({ part, projectId }: PartItemProps) => {
                         {/* Secondary Material Box */}
                         {part.secondaryMaterial && (
 
-                        <div className="part-material-card relative overflow-hidden rounded-lg border border-pink-300 bg-pink-100/60 p-4 shadow-sm">
+                        <div className="part-material-card relative overflow-hidden rounded-lg border border-pink-300 dark:border-pink-800 bg-pink-100/60 dark:bg-pink-950/60 p-4 shadow-sm">
                             <div className="absolute left-0 top-0 h-full w-1 bg-pink-500"></div>
-                            <div className="mb-4 flex items-center justify-between border-b border-pink-300 pb-3">
-                                <h4 className="text-sm font-bold uppercase tracking-wider text-pink-900">Secondary Material</h4>
+                            <div className="mb-4 flex items-center justify-between border-b border-pink-300 dark:border-pink-800 pb-3">
+                                <h4 className="text-sm font-bold uppercase tracking-wider text-pink-900 dark:text-pink-200">Secondary Material</h4>
                                 <div className="forge-badge forge-badge-pink px-3 py-1 text-xs" title="Service Cost for this Material">
                                     R {secondaryServiceCostLocal.toFixed(2)}
                                 </div>
@@ -457,10 +457,10 @@ export const PartItem = ({ part, projectId }: PartItemProps) => {
                         )}
                     </div>
 
-                    <div className="flex items-center justify-between border-t border-slate-300 pt-4">
+                    <div className="flex items-center justify-between border-t border-slate-300 dark:border-slate-700 pt-4">
                         <div className="flex-1 max-w-xs">
-                            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Checked By</label>
-                            <div className={`w-full border-b py-1.5 text-sm font-medium ${verificationError ? 'border-rose-400 text-rose-700' : 'border-slate-300 text-slate-700'}`}>
+                            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Checked By</label>
+                            <div className={`w-full border-b py-1.5 text-sm font-medium ${verificationError ? 'border-rose-400 dark:border-rose-700 text-rose-700 dark:text-rose-300' : 'border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300'}`}>
                                 {visibleCheckedBy || (isVerifiedForReview ? 'Verification staff name missing' : 'Select the staff member in the header')}
                             </div>
                         </div>

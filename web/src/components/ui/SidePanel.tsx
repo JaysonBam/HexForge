@@ -48,14 +48,14 @@ export function SidePanel({ title, subtitle, status, icon: Icon, onClose, closeL
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="project-side-panel forge-drawer flex h-full w-full max-w-2xl flex-col bg-white"
+        className="project-side-panel forge-drawer flex h-full w-full max-w-2xl flex-col bg-white dark:bg-[var(--forge-panel)]"
         onClick={(event) => event.stopPropagation()}
       >
-        <header className="flex h-20 shrink-0 items-center gap-3 border-b border-slate-300 bg-white px-5 py-4">
-          <Icon size={20} className="shrink-0 text-slate-600" aria-hidden="true" />
+        <header className="flex h-20 shrink-0 items-center gap-3 border-b border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] px-5 py-4">
+          <Icon size={20} className="shrink-0 text-slate-600 dark:text-slate-400" aria-hidden="true" />
           <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="truncate text-lg font-black text-slate-950">{title}</h2>
-            <div className="flex items-center gap-2 text-xs text-slate-500">
+            <h2 id={titleId} className="truncate text-lg font-black text-slate-950 dark:text-slate-100">{title}</h2>
+            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
               <p className="min-w-0 truncate">{subtitle}</p>
               {status && <span className="shrink-0" role="status" aria-live="polite">{status}</span>}
             </div>

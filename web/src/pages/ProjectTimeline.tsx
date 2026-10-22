@@ -154,11 +154,11 @@ export const ProjectTimeline = () => {
 
   if (settingsLoadError) {
     return (
-      <div className="w-full rounded-lg border border-rose-300 bg-rose-100 p-10 text-center shadow-sm">
-        <h1 className="text-xl font-black text-rose-950">Settings could not be loaded</h1>
-        <p className="mt-2 text-sm font-semibold text-rose-800">{settingsLoadError}</p>
+      <div className="w-full rounded-lg border border-rose-300 dark:border-rose-800 bg-rose-100 dark:bg-rose-950/55 p-10 text-center shadow-sm">
+        <h1 className="text-xl font-black text-rose-950 dark:text-rose-200">Settings could not be loaded</h1>
+        <p className="mt-2 text-sm font-semibold text-rose-800 dark:text-rose-200">{settingsLoadError}</p>
         <Link to="/" className="mt-5 inline-flex">
-          <Button variant="outline" className="gap-2 bg-white"><ArrowLeft size={16} /> Back to Main Dashboard</Button>
+          <Button variant="outline" className="gap-2 bg-white dark:bg-[var(--forge-panel)]"><ArrowLeft size={16} /> Back to Main Dashboard</Button>
         </Link>
       </div>
     );
@@ -181,10 +181,10 @@ export const ProjectTimeline = () => {
 
     return (
       <div className="forge-panel w-full p-10 text-center">
-        <h1 className="text-xl font-black text-slate-950">
+        <h1 className="text-xl font-black text-slate-950 dark:text-slate-100">
           {projectsLoadError ? 'Projects could not be loaded' : 'Project not found'}
         </h1>
-        <p className="mt-2 text-sm text-slate-500">
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
           {projectsLoadError || 'The project code may have been removed or is not available in this workspace.'}
         </p>
         <Link to="/" className="mt-5 inline-flex">
@@ -390,9 +390,9 @@ const ProjectTimelineSkeleton = () => (
 
 const WorkspaceMetric = ({ label, value, detail }: { label: string; value: string; detail: string }) => (
   <div className="forge-metric p-3">
-    <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-600">{label}</p>
-    <p className="mt-1 text-xl font-black text-slate-950">{value}</p>
-    <p className="mt-1 truncate text-xs font-semibold text-slate-600">{detail}</p>
+    <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-600 dark:text-slate-400">{label}</p>
+    <p className="mt-1 text-xl font-black text-slate-950 dark:text-slate-100">{value}</p>
+    <p className="mt-1 truncate text-xs font-semibold text-slate-600 dark:text-slate-400">{detail}</p>
   </div>
 );
 
@@ -422,8 +422,8 @@ const OverviewTab = ({
       <aside className="space-y-5">
         <Card className="p-5">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Progress</p>
-            <h2 className="mt-1 text-xl font-black text-slate-950">Parts and production</h2>
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Progress</p>
+            <h2 className="mt-1 text-xl font-black text-slate-950 dark:text-slate-100">Parts and production</h2>
           </div>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
@@ -435,18 +435,18 @@ const OverviewTab = ({
         </Card>
 
         <Card className="p-5">
-          <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-600">Project blockers</p>
-          <p className="mt-1 text-xs font-semibold text-slate-600">
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-600 dark:text-slate-400">Project blockers</p>
+          <p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-400">
             Issues that currently prevent this project from moving to the next stage.
           </p>
           <div className="mt-3 space-y-2">
             {blockers.length === 0 ? (
-          <div className="rounded-md border border-emerald-300 bg-emerald-100 px-3 py-2 text-sm font-bold text-emerald-900">
+          <div className="rounded-md border border-emerald-300 dark:border-emerald-800 bg-emerald-100 dark:bg-emerald-950/55 px-3 py-2 text-sm font-bold text-emerald-900 dark:text-emerald-200">
                 Clear
               </div>
             ) : (
               blockers.map((blocker) => (
-                <div key={blocker} className="rounded-md border border-rose-300 bg-rose-100 px-3 py-2 text-sm font-bold text-rose-900">
+                <div key={blocker} className="rounded-md border border-rose-300 dark:border-rose-800 bg-rose-100 dark:bg-rose-950/55 px-3 py-2 text-sm font-bold text-rose-900 dark:text-rose-200">
                   {blocker}
                 </div>
               ))
@@ -454,13 +454,13 @@ const OverviewTab = ({
           </div>
         </Card>
 
-        <Card className="border-orange-200 bg-orange-50 p-4 print:hidden">
+        <Card className="border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/40 p-4 print:hidden">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-orange-700">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-orange-700 dark:text-orange-300">
                 {isArchivedOrCancelled ? 'Revive project' : 'Archive project'}
               </p>
-              <p className="mt-1 text-sm text-orange-950">
+              <p className="mt-1 text-sm text-orange-950 dark:text-orange-200">
                 {isArchivedOrCancelled
                   ? 'Return this project to the active workspace.'
                   : 'Archived projects can be revived later.'}
@@ -469,7 +469,7 @@ const OverviewTab = ({
             <Button
               variant="outline"
               size="sm"
-              className="w-auto gap-2 whitespace-nowrap self-start border-orange-300 text-orange-800 hover:bg-orange-100 sm:self-center"
+              className="w-auto gap-2 whitespace-nowrap self-start border-orange-300 dark:border-orange-800 text-orange-800 dark:text-orange-200 hover:bg-orange-100 dark:hover:bg-orange-950/55 sm:self-center"
               onClick={() => void onToggleArchive()}
               loading={archivingProject}
               loadingText={isArchivedOrCancelled ? 'Reviving…' : 'Archiving…'}
@@ -531,34 +531,34 @@ const AuditTab = ({ projectId }: { projectId: string }) => {
   return (
     <Card className="p-5">
       <div>
-        <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-600">Project Timeline</p>
-        <h2 className="mt-1 text-xl font-black text-slate-950">Recent project activity</h2>
+        <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-600 dark:text-slate-400">Project Timeline</p>
+        <h2 className="mt-1 text-xl font-black text-slate-950 dark:text-slate-100">Recent project activity</h2>
       </div>
 
-      {loading && <div className="forge-panel-muted mt-5 p-4 text-sm font-semibold text-slate-700">Loading audit events...</div>}
-      {error && <div className="mt-5 rounded-md border border-rose-300 bg-rose-100 p-4 text-sm font-bold text-rose-900">{error}</div>}
+      {loading && <div className="forge-panel-muted mt-5 p-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Loading audit events...</div>}
+      {error && <div className="mt-5 rounded-md border border-rose-300 dark:border-rose-800 bg-rose-100 dark:bg-rose-950/55 p-4 text-sm font-bold text-rose-900 dark:text-rose-200">{error}</div>}
       {!loading && !error && events.length === 0 && (
-        <div className="forge-panel-muted mt-5 p-4 text-sm font-semibold text-slate-700">No audit events recorded yet.</div>
+        <div className="forge-panel-muted mt-5 p-4 text-sm font-semibold text-slate-700 dark:text-slate-300">No audit events recorded yet.</div>
       )}
 
       <div className="mt-5 space-y-2">
         {events.map((event) => (
-          <div key={event.id} className="rounded-md border border-slate-300 p-3 pl-4">
+          <div key={event.id} className="rounded-md border border-slate-300 dark:border-slate-700 p-3 pl-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-black text-slate-950">{event.action_type.replaceAll('_', ' ')}</p>
-                <p className="text-xs font-semibold text-slate-600">
+                <p className="text-sm font-black text-slate-950 dark:text-slate-100">{event.action_type.replaceAll('_', ' ')}</p>
+                <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">
                   {event.technician_name} - {new Date(event.created_at).toLocaleString()}
                 </p>
               </div>
               {(event.to_project_state || event.to_part_status) && (
-                <span className="forge-pill px-2.5 py-1 text-xs text-slate-700">
+                <span className="forge-pill px-2.5 py-1 text-xs text-slate-700 dark:text-slate-300">
                   {event.from_project_state || event.from_part_status || 'N/A'} -&gt; {event.to_project_state || event.to_part_status}
                 </span>
               )}
             </div>
             {(event.reason || event.override_note) && (
-              <p className="mt-2 rounded border border-slate-300 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">
+              <p className="mt-2 rounded border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
                 {event.reason || event.override_note}
               </p>
             )}
@@ -578,11 +578,11 @@ const DeleteProjectCard = ({
   deleting: boolean;
   onDelete: () => Promise<void>;
 }) => (
-  <Card className="border-rose-200 bg-rose-50 p-4 print:hidden">
+  <Card className="border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 p-4 print:hidden">
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <p className="text-xs font-black uppercase tracking-[0.14em] text-rose-700">Delete project</p>
-        <p className="mt-1 text-sm text-rose-900">
+        <p className="text-xs font-black uppercase tracking-[0.14em] text-rose-700 dark:text-rose-300">Delete project</p>
+        <p className="mt-1 text-sm text-rose-900 dark:text-rose-200">
           Deletes <span className="font-mono">{project.id}</span> and its {project.parts.length} part{project.parts.length === 1 ? '' : 's'}.
         </p>
       </div>

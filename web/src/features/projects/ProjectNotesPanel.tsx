@@ -64,7 +64,7 @@ export function ProjectNotesPanel({ project, onClose }: {
     >
       <div className="flex min-h-0 flex-1 flex-col gap-4 p-5">
         {error && (
-          <div role="alert" className="rounded-md border border-rose-300 bg-rose-100 p-4 text-sm font-bold text-rose-900">
+          <div role="alert" className="rounded-md border border-rose-300 dark:border-rose-800 bg-rose-100 dark:bg-rose-950/55 p-4 text-sm font-bold text-rose-900 dark:text-rose-200">
             Notes could not be saved. Your text is still here. Try Save again.
           </div>
         )}
@@ -73,7 +73,7 @@ export function ProjectNotesPanel({ project, onClose }: {
             ref={inputRef}
             aria-label="Project notes"
             placeholder="Write notes about this project…"
-            className="min-h-0 w-full flex-1 resize-none rounded-lg bg-white p-5 text-sm font-medium leading-relaxed text-slate-800 placeholder:text-slate-400 focus:outline-none"
+            className="min-h-0 w-full flex-1 resize-none rounded-lg bg-white dark:bg-[var(--forge-panel)] p-5 text-sm font-medium leading-relaxed text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-400 focus:outline-none"
             value={draft}
             readOnly={saving}
             onChange={(event) => setDraft(event.target.value)}

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useSettings } from '@/features/settings/context/SettingsContext';
 import { Button } from '@/components/ui/Button';
+import { ThemeSettings } from '@/components/ui/ThemeControls';
 import { useFeedback } from '@/app/providers/FeedbackProvider';
 import type { EmailEditorSelection } from '@/domain/emailTemplates';
 import {
@@ -162,13 +163,14 @@ export const SettingsPage = () => {
 
     return (
         <div className="flex w-full flex-col gap-5">
+            <ThemeSettings />
             <section className="forge-panel p-4">
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
                     <div className="min-w-0">
-                        <div className="text-sm font-black uppercase tracking-[0.12em] text-sky-700">
+                        <div className="text-sm font-black uppercase tracking-[0.12em] text-sky-700 dark:text-sky-300">
                             System Settings
                         </div>
-                        <h1 className="mt-2 text-2xl font-black text-slate-950 sm:text-3xl">
+                        <h1 className="mt-2 text-2xl font-black text-slate-950 dark:text-slate-100 sm:text-3xl">
                             Manage the defaults behavior.
                         </h1>
                     </div>
@@ -176,15 +178,15 @@ export const SettingsPage = () => {
                     <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                         {totals.map((item) => (
                             <div key={item.label} className="forge-metric min-w-[8rem] px-3 py-2">
-                                <div className="text-2xl font-black leading-none text-slate-950">{item.value}</div>
-                                <div className="mt-1 text-[0.65rem] font-black uppercase tracking-[0.14em] text-slate-600">{item.label}</div>
+                                <div className="text-2xl font-black leading-none text-slate-950 dark:text-slate-100">{item.value}</div>
+                                <div className="mt-1 text-[0.65rem] font-black uppercase tracking-[0.14em] text-slate-600 dark:text-slate-400">{item.label}</div>
                             </div>
                         ))}
                     </div>
                 </div>
 
                 {(settingsLoadError || settingsSaveError) && (
-                    <div className="mt-4 rounded-lg border border-rose-300 bg-rose-100 px-4 py-3 text-sm font-bold text-rose-900">
+                    <div className="mt-4 rounded-lg border border-rose-300 dark:border-rose-800 bg-rose-100 dark:bg-rose-950/55 px-4 py-3 text-sm font-bold text-rose-900 dark:text-rose-200">
                         {settingsLoadError || settingsSaveError}
                     </div>
                 )}
@@ -228,12 +230,12 @@ export const SettingsPage = () => {
                                 value={newModule.lecturer}
                                 onChange={(event) => setNewModule((prev) => ({ ...prev, lecturer: event.target.value }))}
                             />
-                            <label className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-[color:var(--forge-gold-border)] bg-white px-3 text-xs font-bold text-slate-800 shadow-sm">
+                            <label className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-[color:var(--forge-gold-border)] bg-white dark:bg-[var(--forge-panel)] px-3 text-xs font-bold text-slate-800 dark:text-slate-200 shadow-sm">
                                 <input
                                     type="checkbox"
                                     checked={newModule.modulePayment}
                                     onChange={(event) => setNewModule((prev) => ({ ...prev, modulePayment: event.target.checked }))}
-                                    className="rounded text-slate-950"
+                                    className="rounded text-slate-950 dark:text-slate-100"
                                 />
                                 Mod pays
                             </label>
@@ -265,10 +267,10 @@ export const SettingsPage = () => {
                                         <th className="px-4 py-3 text-right">Remove</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-300 bg-white">
+                                <tbody className="divide-y divide-slate-300 dark:divide-slate-700 bg-white dark:bg-[var(--forge-panel)]">
                                     {modules.length === 0 ? (
                                         <tr>
-                                            <td colSpan={5} className="px-4 py-8 text-center text-sm font-semibold text-slate-600">
+                                            <td colSpan={5} className="px-4 py-8 text-center text-sm font-semibold text-slate-600 dark:text-slate-400">
                                                 No modules configured yet.
                                             </td>
                                         </tr>
@@ -292,8 +294,8 @@ export const SettingsPage = () => {
                     >
                         <div className="forge-panel-muted mb-4 grid gap-3 p-3 lg:grid-cols-[minmax(0,1fr)_12rem] lg:items-center">
                             <div>
-                                <h3 className="font-black text-slate-950">Provided filament service</h3>
-                                <p className="mt-1 text-sm font-semibold text-slate-600">
+                                <h3 className="font-black text-slate-950 dark:text-slate-100">Provided filament service</h3>
+                                <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-slate-400">
                                     Price per gram when a student or module brings compatible filament.
                                 </p>
                             </div>

@@ -3,6 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f172a" />
+    <script>
+      // Apply the saved preference before the first paint, including on public pages.
+      (() => {
+        let preference;
+        try { preference = localStorage.getItem('hexforge-theme-mode'); } catch {}
+        const theme = preference === 'light' || preference === 'dark'
+          ? preference : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+        document.querySelector('meta[name="theme-color"]').content = theme === 'dark' ? '#0f172a' : '#eef3f8';
+      })();
+    </script>
     <title>HexForge</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   </head>

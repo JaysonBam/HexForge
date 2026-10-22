@@ -354,9 +354,9 @@ export const CheckpointNew = ({ project, initialGmailThread }: { project?: Proje
     }
   };
 
-  const inputBaseClassName = 'forge-command-input h-11 w-full px-3.5 text-sm font-semibold placeholder:text-slate-500';
+  const inputBaseClassName = 'forge-command-input h-11 w-full px-3.5 text-sm font-semibold placeholder:text-slate-500 dark:placeholder:text-slate-400';
   const defaultInputClassName = inputBaseClassName;
-  const errorInputClassName = `${inputBaseClassName} border-rose-500 bg-rose-50 focus:border-rose-600 focus:ring-rose-200`;
+  const errorInputClassName = `${inputBaseClassName} border-rose-500 bg-rose-50 dark:bg-rose-950/40 focus:border-rose-600 focus:ring-rose-200`;
   const sectionClassName = 'forge-panel space-y-5 p-5';
 
   return (
@@ -368,10 +368,10 @@ export const CheckpointNew = ({ project, initialGmailThread }: { project?: Proje
           void handleSave();
         }}
       >
-      <CardHeader className="border-b border-slate-300 bg-gradient-to-r from-slate-100 via-white to-sky-50">
+      <CardHeader className="border-b border-slate-300 dark:border-slate-700 bg-gradient-to-r from-slate-100 dark:from-slate-900 via-white dark:via-slate-800 to-sky-50 dark:to-sky-950/40">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-2">
-            <h2 className="text-2xl font-black tracking-tight text-slate-950">
+            <h2 className="text-2xl font-black tracking-tight text-slate-950 dark:text-slate-100">
               {project ? 'Project Details' : 'New Project Details'}
             </h2>
           </div>
@@ -385,12 +385,12 @@ export const CheckpointNew = ({ project, initialGmailThread }: { project?: Proje
         </div>
       </CardHeader>
 
-      <CardContent className="forge-mechanical-lines space-y-8 bg-slate-100/70 p-5 md:p-6">
+      <CardContent className="forge-mechanical-lines space-y-8 bg-slate-100/70 dark:bg-slate-900/70 p-5 md:p-6">
         <section className={sectionClassName}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h3 className="text-lg font-black text-slate-950">Main Gmail Thread</h3>
-              <p className="mt-1 text-xs font-semibold text-slate-600">Optional. One Gmail conversation can be linked to this project.</p>
+              <h3 className="text-lg font-black text-slate-950 dark:text-slate-100">Main Gmail Thread</h3>
+              <p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-400">Optional. One Gmail conversation can be linked to this project.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               {(selectedGmailThread || project?.gmailThreadId) && (
@@ -406,33 +406,33 @@ export const CheckpointNew = ({ project, initialGmailThread }: { project?: Proje
                   </Button>
                 </span>
               )}
-              {project?.gmailThreadId && <Button variant="ghost" size="sm" className="gap-2 text-rose-700" onClick={() => void unlinkThread()} disabled={gmailLinking}><Unlink size={14} /> Unlink</Button>}
+              {project?.gmailThreadId && <Button variant="ghost" size="sm" className="gap-2 text-rose-700 dark:text-rose-300" onClick={() => void unlinkThread()} disabled={gmailLinking}><Unlink size={14} /> Unlink</Button>}
               <Button variant="outline" size="sm" className="gap-2" onClick={() => setGmailPickerOpen(true)} disabled={gmailLinking}>
                 <Mail size={14} /> {project?.gmailThreadId ? 'Replace Main Gmail Thread' : selectedGmailThread ? 'Choose another thread' : project ? 'Link Main Gmail Thread' : 'Import from Gmail'}
               </Button>
             </div>
           </div>
           {(selectedGmailThread || project?.gmailThreadId) ? (
-            <div className="rounded-lg border border-sky-300 bg-sky-50 p-4">
-              <p className="text-xs font-black uppercase tracking-[0.12em] text-sky-800">Linked Main Gmail Thread</p>
-              <p className="mt-1 text-sm font-black text-slate-950">{selectedGmailThread?.subject || project?.gmailThreadSubject || '(no subject)'}</p>
-              <p className="mt-1 text-xs font-semibold text-slate-600">Main contact: {selectedGmailThread?.snapshot.mainContactEmail || project?.gmailMainContactEmail || 'Not detected'}</p>
+            <div className="rounded-lg border border-sky-300 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/40 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-sky-800 dark:text-sky-200">Linked Main Gmail Thread</p>
+              <p className="mt-1 text-sm font-black text-slate-950 dark:text-slate-100">{selectedGmailThread?.subject || project?.gmailThreadSubject || '(no subject)'}</p>
+              <p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-400">Main contact: {selectedGmailThread?.snapshot.mainContactEmail || project?.gmailMainContactEmail || 'Not detected'}</p>
               {selectedGmailThread && (() => {
                 const filenames = selectedGmailThread.snapshot.messages.flatMap((message) => message.attachments)
                   .filter((attachment) => isSupportedGmailAttachment(attachment.filename)).map((attachment) => attachment.filename);
-                return filenames.length > 0 ? <div className="mt-3 flex flex-wrap gap-1.5">{filenames.map((filename, index) => <span key={`${filename}-${index}`} className="forge-badge inline-flex items-center gap-1 px-2 py-1 text-[10px]"><Paperclip size={11} /> {filename}</span>)}</div> : <p className="mt-3 text-xs font-semibold text-slate-500">No STL or 3MF attachments found in this thread.</p>;
+                return filenames.length > 0 ? <div className="mt-3 flex flex-wrap gap-1.5">{filenames.map((filename, index) => <span key={`${filename}-${index}`} className="forge-badge inline-flex items-center gap-1 px-2 py-1 text-[10px]"><Paperclip size={11} /> {filename}</span>)}</div> : <p className="mt-3 text-xs font-semibold text-slate-500 dark:text-slate-400">No STL or 3MF attachments found in this thread.</p>;
               })()}
             </div>
-          ) : <p className="rounded-md border border-dashed border-slate-300 bg-white px-4 py-3 text-xs font-semibold text-slate-500">No Main Gmail Thread linked.</p>}
+          ) : <p className="rounded-md border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400">No Main Gmail Thread linked.</p>}
         </section>
         <section className={sectionClassName}>
           <div className="space-y-1">
-            <h3 className="text-lg font-black text-slate-950">Student Information</h3>
+            <h3 className="text-lg font-black text-slate-950 dark:text-slate-100">Student Information</h3>
           </div>
 
           <div className="grid gap-5 md:grid-cols-2">
             <div className="space-y-2">
-              <label htmlFor="studentName" className="text-sm font-bold text-slate-800">Student Name</label>
+              <label htmlFor="studentName" className="text-sm font-bold text-slate-800 dark:text-slate-200">Student Name</label>
               <input
                 id="studentName"
                 type="text"
@@ -442,11 +442,11 @@ export const CheckpointNew = ({ project, initialGmailThread }: { project?: Proje
                 className={errors.studentName ? errorInputClassName : defaultInputClassName}
                 placeholder="Enter full name"
               />
-              {errors.studentName && <p className="text-xs font-semibold text-rose-600">{errors.studentName}</p>}
+              {errors.studentName && <p className="text-xs font-semibold text-rose-600 dark:text-rose-400">{errors.studentName}</p>}
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="studentNumber" className="text-sm font-bold text-slate-800">Student Number</label>
+              <label htmlFor="studentNumber" className="text-sm font-bold text-slate-800 dark:text-slate-200">Student Number</label>
               <input
                 id="studentNumber"
                 type="text"
@@ -461,13 +461,13 @@ export const CheckpointNew = ({ project, initialGmailThread }: { project?: Proje
                 inputMode="numeric"
                 maxLength={8}
               />
-              {errors.studentNumber && <p className="text-xs font-semibold text-rose-600">{errors.studentNumber}</p>}
+              {errors.studentNumber && <p className="text-xs font-semibold text-rose-600 dark:text-rose-400">{errors.studentNumber}</p>}
             </div>
           </div>
 
           <div className="grid gap-5 md:grid-cols-[minmax(0,1.4fr)_minmax(220px,0.6fr)]">
             <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-bold text-slate-800">Email Address</label>
+              <label htmlFor="email" className="text-sm font-bold text-slate-800 dark:text-slate-200">Email Address</label>
               <input
                 id="email"
                 type="email"
@@ -481,12 +481,12 @@ export const CheckpointNew = ({ project, initialGmailThread }: { project?: Proje
                 placeholder="student@example.com"
                 autoComplete="email"
               />
-              <p className="text-xs font-semibold text-slate-600">Will be auto-filled when student number is filled.</p>
-              {errors.email && <p className="text-xs font-semibold text-rose-600">{errors.email}</p>}
+              <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">Will be auto-filled when student number is filled.</p>
+              {errors.email && <p className="text-xs font-semibold text-rose-600 dark:text-rose-400">{errors.email}</p>}
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="priorityNumber" className="text-sm font-bold text-slate-800">Priority Number</label>
+              <label htmlFor="priorityNumber" className="text-sm font-bold text-slate-800 dark:text-slate-200">Priority Number</label>
               <input
                 id="priorityNumber"
                 type="number"
@@ -499,20 +499,20 @@ export const CheckpointNew = ({ project, initialGmailThread }: { project?: Proje
                 }}
                 className={errors.priorityNumber ? errorInputClassName : defaultInputClassName}
               />
-              <p className="text-xs font-semibold text-slate-600">Defaults to the next saved queue number, but stays editable.</p>
-              {errors.priorityNumber && <p className="text-xs font-semibold text-rose-600">{errors.priorityNumber}</p>}
+              <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">Defaults to the next saved queue number, but stays editable.</p>
+              {errors.priorityNumber && <p className="text-xs font-semibold text-rose-600 dark:text-rose-400">{errors.priorityNumber}</p>}
             </div>
           </div>
         </section>
 
         <section className={sectionClassName}>
           <div className="space-y-1">
-            <h3 className="text-lg font-black text-slate-950">Academic Details</h3>
+            <h3 className="text-lg font-black text-slate-950 dark:text-slate-100">Academic Details</h3>
           </div>
 
           <div className="grid gap-5 lg:grid-cols-3">
             <div className="space-y-2">
-              <label htmlFor="course" className="text-sm font-bold text-slate-800">Course</label>
+              <label htmlFor="course" className="text-sm font-bold text-slate-800 dark:text-slate-200">Course</label>
               <input
                 id="course"
                 type="text"
@@ -529,11 +529,11 @@ export const CheckpointNew = ({ project, initialGmailThread }: { project?: Proje
                   <option key={m.id} value={m.code}>{m.lecturer}</option>
                 ))}
               </datalist>
-              {errors.course && <p className="text-xs font-semibold text-rose-600">{errors.course}</p>}
+              {errors.course && <p className="text-xs font-semibold text-rose-600 dark:text-rose-400">{errors.course}</p>}
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="lecturer" className="text-sm font-bold text-slate-800">Lecturer</label>
+              <label htmlFor="lecturer" className="text-sm font-bold text-slate-800 dark:text-slate-200">Lecturer</label>
               <input
                 id="lecturer"
                 type="text"
@@ -552,7 +552,7 @@ export const CheckpointNew = ({ project, initialGmailThread }: { project?: Proje
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="defaultFilamentSource" className="text-sm font-bold text-slate-800">Default Filament Source</label>
+              <label htmlFor="defaultFilamentSource" className="text-sm font-bold text-slate-800 dark:text-slate-200">Default Filament Source</label>
               <select
                 id="defaultFilamentSource"
                 name="defaultFilamentSource"
@@ -573,14 +573,14 @@ export const CheckpointNew = ({ project, initialGmailThread }: { project?: Proje
 
         <section className={sectionClassName}>
           <div className="space-y-1">
-            <h3 className="text-lg font-black text-slate-950">Payment Detail</h3>
-            <p className="text-sm font-semibold text-slate-700"></p>
+            <h3 className="text-lg font-black text-slate-950 dark:text-slate-100">Payment Detail</h3>
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300"></p>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <label className="flex cursor-pointer items-start justify-between gap-4 rounded-lg border border-slate-300 bg-slate-100 px-4 py-4 shadow-sm transition-colors hover:border-[color:var(--forge-gold-border)] hover:bg-sky-50">
+            <label className="flex cursor-pointer items-start justify-between gap-4 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 px-4 py-4 shadow-sm transition-colors hover:border-[color:var(--forge-gold-border)] hover:bg-sky-50 dark:hover:bg-sky-950/40">
               <div className="space-y-1">
-                <span className="block text-sm font-bold text-slate-900">Module/Lecturer Pays</span>
+                <span className="block text-sm font-bold text-slate-900 dark:text-slate-100">Module/Lecturer Pays</span>
               </div>
               <input
                 type="checkbox"
@@ -590,24 +590,24 @@ export const CheckpointNew = ({ project, initialGmailThread }: { project?: Proje
                   moduleOrLecturerPays: e.target.checked,
                   needsPayment: !e.target.checked
                 }))}
-                className="mt-1 h-4 w-4 rounded border-slate-400 text-sky-700"
+                className="mt-1 h-4 w-4 rounded border-slate-400 dark:border-slate-600 text-sky-700 dark:text-sky-300"
               />
             </label>
 
             {!formData.moduleOrLecturerPays ? (
-              <label className="flex cursor-pointer items-start justify-between gap-4 rounded-lg border border-slate-300 bg-white px-4 py-4 shadow-sm transition-colors hover:border-[color:var(--forge-gold-border)] hover:bg-sky-50">
+              <label className="flex cursor-pointer items-start justify-between gap-4 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] px-4 py-4 shadow-sm transition-colors hover:border-[color:var(--forge-gold-border)] hover:bg-sky-50 dark:hover:bg-sky-950/40">
                 <div className="space-y-1">
-                  <span className="block text-sm font-bold text-slate-900">Student payment required</span>
+                  <span className="block text-sm font-bold text-slate-900 dark:text-slate-100">Student payment required</span>
                 </div>
                 <input
                   type="checkbox"
                   checked={formData.needsPayment}
                   onChange={(e) => setFormData(prev => ({ ...prev, needsPayment: e.target.checked }))}
-                  className="mt-1 h-4 w-4 rounded border-slate-400 text-sky-700"
+                  className="mt-1 h-4 w-4 rounded border-slate-400 dark:border-slate-600 text-sky-700 dark:text-sky-300"
                 />
               </label>
             ) : (
-              <div className="flex items-start rounded-lg border border-emerald-300 bg-emerald-100 px-4 py-4 text-sm text-emerald-950 shadow-sm">
+              <div className="flex items-start rounded-lg border border-emerald-300 dark:border-emerald-800 bg-emerald-100 dark:bg-emerald-950/55 px-4 py-4 text-sm text-emerald-950 dark:text-emerald-200 shadow-sm">
                 <div>
                   <p className="font-bold">Student payment disabled</p>
                 </div>
