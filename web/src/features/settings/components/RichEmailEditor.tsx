@@ -113,7 +113,7 @@ const toolbarButtonClass = (active = false) =>
     'inline-flex h-8 min-w-8 items-center justify-center rounded-md border px-2 text-xs font-bold transition',
     active
       ? 'border-sky-500 bg-slate-950 text-white shadow-sm'
-      : 'border-slate-300 bg-white text-slate-800 hover:border-[color:var(--forge-gold-border)] hover:bg-sky-50'
+      : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] text-slate-800 dark:text-slate-200 hover:border-[color:var(--forge-gold-border)] hover:bg-sky-50 dark:hover:bg-sky-950/40'
   ].join(' ');
 
 const escapeHtml = (value: string) =>
@@ -187,13 +187,13 @@ export const TokenSubjectEditor = ({ value, onChange }: TokenSubjectEditorProps)
     <div className="space-y-2">
       <EditorContent editor={editor} />
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => insertToken('student_name')} className="forge-badge forge-badge-blue px-3 py-1 text-xs transition hover:bg-sky-100">
+        <button type="button" onClick={() => insertToken('student_name')} className="forge-badge forge-badge-blue px-3 py-1 text-xs transition hover:bg-sky-100 dark:hover:bg-sky-950/55">
           Add student name
         </button>
-        <button type="button" onClick={() => insertToken('project_number')} className="forge-badge forge-badge-blue px-3 py-1 text-xs transition hover:bg-sky-100">
+        <button type="button" onClick={() => insertToken('project_number')} className="forge-badge forge-badge-blue px-3 py-1 text-xs transition hover:bg-sky-100 dark:hover:bg-sky-950/55">
           Add project #
         </button>
-        <button type="button" onClick={() => insertToken('project_link')} className="forge-badge forge-badge-blue px-3 py-1 text-xs transition hover:bg-sky-100">
+        <button type="button" onClick={() => insertToken('project_link')} className="forge-badge forge-badge-blue px-3 py-1 text-xs transition hover:bg-sky-100 dark:hover:bg-sky-950/55">
           Add project link
         </button>
       </div>
@@ -229,7 +229,7 @@ export const RichEmailEditor = ({
     content: value,
     editorProps: {
       attributes: {
-        class: 'rich-email-editor min-h-[18rem] rounded-b-md bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-sky-300'
+        class: 'rich-email-editor min-h-[18rem] rounded-b-md bg-white dark:bg-[var(--forge-panel)] px-4 py-3 text-sm leading-6 text-slate-900 dark:text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-sky-300'
       }
     },
     onUpdate: ({ editor: activeEditor }) => onChange(activeEditor.getHTML())
@@ -279,7 +279,7 @@ export const RichEmailEditor = ({
 
   return (
     <div className="forge-panel overflow-hidden">
-      <div className="flex flex-wrap items-center gap-1 border-b border-slate-300 bg-slate-100/90 p-2">
+      <div className="flex flex-wrap items-center gap-1 border-b border-slate-300 dark:border-slate-700 bg-slate-100/90 dark:bg-slate-900/90 p-2">
         <button type="button" className={toolbarButtonClass(editor.isActive('bold'))} onClick={() => editor.chain().focus().toggleBold().run()} title="Bold">
           <Bold size={15} />
         </button>
@@ -289,10 +289,10 @@ export const RichEmailEditor = ({
         <button type="button" className={toolbarButtonClass(editor.isActive('highlight'))} onClick={() => editor.chain().focus().toggleHighlight({ color: '#fef08a' }).run()} title="Highlight">
           <Highlighter size={15} />
         </button>
-        <label className="inline-flex h-8 items-center gap-2 rounded-md border border-slate-300 bg-white px-2 text-xs font-bold text-slate-800">
+        <label className="inline-flex h-8 items-center gap-2 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] px-2 text-xs font-bold text-slate-800 dark:text-slate-200">
           Font
           <select
-            className="h-6 rounded border border-slate-300 bg-white px-1 text-xs focus:border-sky-500 focus:outline-none"
+            className="h-6 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] px-1 text-xs focus:border-sky-500 focus:outline-none"
             defaultValue=""
             onChange={(event) => {
               const value = event.target.value;
@@ -308,10 +308,10 @@ export const RichEmailEditor = ({
             <option value="'Courier New', monospace">Courier</option>
           </select>
         </label>
-        <label className="inline-flex h-8 items-center gap-2 rounded-md border border-slate-300 bg-white px-2 text-xs font-bold text-slate-800">
+        <label className="inline-flex h-8 items-center gap-2 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] px-2 text-xs font-bold text-slate-800 dark:text-slate-200">
           Size
           <select
-            className="h-6 rounded border border-slate-300 bg-white px-1 text-xs focus:border-sky-500 focus:outline-none"
+            className="h-6 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] px-1 text-xs focus:border-sky-500 focus:outline-none"
             defaultValue=""
             onChange={(event) => {
               const value = event.target.value;
@@ -328,10 +328,10 @@ export const RichEmailEditor = ({
             <option value="22px">22</option>
           </select>
         </label>
-        <label className="inline-flex h-8 items-center gap-2 rounded-md border border-slate-300 bg-white px-2 text-xs font-bold text-slate-800">
+        <label className="inline-flex h-8 items-center gap-2 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] px-2 text-xs font-bold text-slate-800 dark:text-slate-200">
           Spacing
           <select
-            className="h-6 rounded border border-slate-300 bg-white px-1 text-xs focus:border-sky-500 focus:outline-none"
+            className="h-6 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] px-1 text-xs focus:border-sky-500 focus:outline-none"
             defaultValue=""
             onChange={(event) => {
               const value = event.target.value || null;
@@ -344,7 +344,7 @@ export const RichEmailEditor = ({
             <option value="none">No spacing</option>
           </select>
         </label>
-        <label className="inline-flex h-8 items-center gap-2 rounded-md border border-slate-300 bg-white px-2 text-xs font-bold text-slate-800">
+        <label className="inline-flex h-8 items-center gap-2 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] px-2 text-xs font-bold text-slate-800 dark:text-slate-200">
           Text
           <input
             type="color"
@@ -370,7 +370,7 @@ export const RichEmailEditor = ({
         </button>
 
         {allowTokens && (
-          <div className="ml-1 flex flex-wrap gap-1 border-l border-slate-300 pl-2">
+          <div className="ml-1 flex flex-wrap gap-1 border-l border-slate-300 dark:border-slate-700 pl-2">
             <button type="button" className={toolbarButtonClass()} onClick={() => insertToken('student_name')}>Student name</button>
             <button type="button" className={toolbarButtonClass()} onClick={() => insertToken('project_number')}>Project #</button>
             <button type="button" className={toolbarButtonClass()} onClick={() => insertToken('project_link')}>Project link</button>
@@ -378,7 +378,7 @@ export const RichEmailEditor = ({
         )}
 
         {allowImages && (
-          <div className="ml-1 border-l border-slate-300 pl-2">
+          <div className="ml-1 border-l border-slate-300 dark:border-slate-700 pl-2">
             <input
               ref={fileInputRef}
               type="file"

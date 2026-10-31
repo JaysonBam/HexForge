@@ -44,7 +44,7 @@ const displayedSlicerHintFor = (
 
 const fileDisplayPath = (file: LocalProjectFile) => file.relativePath.replaceAll('\\', '/');
 
-const fileActionClass = 'forge-focus-ring inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 shadow-sm transition-colors hover:border-sky-400 hover:bg-sky-50 hover:text-sky-800 disabled:pointer-events-none disabled:opacity-45';
+const fileActionClass = 'forge-focus-ring inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] text-slate-700 dark:text-slate-300 shadow-sm transition-colors hover:border-sky-400 dark:hover:border-sky-700 hover:bg-sky-50 dark:hover:bg-sky-950/40 hover:text-sky-800 dark:hover:text-sky-200 disabled:pointer-events-none disabled:opacity-45';
 
 const SlicerIcon = ({ hint }: { hint: SlicerHint }) => {
   if (hint === 'bambu') return <img src="/images/slicers/bambu-studio.png" alt="" className="h-full w-full rounded-[5px] object-cover" />;
@@ -334,10 +334,10 @@ export const LocalFilesCard = ({ project, autoCreateIfMissing = false }: { proje
   if (state === 'unavailable' || state === 'not_configured') return null;
   if (state === 'root_unavailable') {
     return (
-      <Card className="flex h-full min-h-0 flex-col border-amber-300 bg-amber-50 p-3 print:hidden">
-        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-amber-700">Local files</p>
-        <p className="mt-1 text-xs font-black text-amber-950">Workflow folders unavailable</p>
-        <p className="mt-1 text-[10px] font-semibold leading-relaxed text-amber-800">Reconnect the drive or check all four folders in helper settings.</p>
+      <Card className="flex h-full min-h-0 flex-col border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3 print:hidden">
+        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-amber-700 dark:text-amber-300">Local files</p>
+        <p className="mt-1 text-xs font-black text-amber-950 dark:text-amber-200">Workflow folders unavailable</p>
+        <p className="mt-1 text-[10px] font-semibold leading-relaxed text-amber-800 dark:text-amber-200">Reconnect the drive or check all four folders in helper settings.</p>
         <Button variant="outline" size="sm" className="mt-2 h-7 gap-1.5 px-2 text-[10px]" onClick={() => void client.openSettings()}><Settings size={13} /> Helper settings</Button>
       </Card>
     );
@@ -345,19 +345,19 @@ export const LocalFilesCard = ({ project, autoCreateIfMissing = false }: { proje
 
   return (
     <Card className="flex h-full min-h-0 flex-col overflow-hidden print:hidden">
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-300 bg-gradient-to-r from-slate-100 to-sky-50 px-3 py-2">
-        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-sky-700">Local files</p>
-        <button type="button" onClick={() => void refreshFiles()} disabled={loading || !resolution || resolution.status === 'not_found' || resolution.status === 'ambiguous'} className="forge-focus-ring inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-white hover:text-sky-700 disabled:opacity-40" aria-label="Refresh local files" title="Refresh local files">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-300 dark:border-slate-700 bg-gradient-to-r from-slate-100 dark:from-slate-900 to-sky-50 dark:to-sky-950/40 px-3 py-2">
+        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-sky-700 dark:text-sky-300">Local files</p>
+        <button type="button" onClick={() => void refreshFiles()} disabled={loading || !resolution || resolution.status === 'not_found' || resolution.status === 'ambiguous'} className="forge-focus-ring inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-500 dark:text-slate-400 transition-colors hover:bg-white dark:hover:bg-[var(--forge-panel)] hover:text-sky-700 dark:hover:text-sky-300 disabled:opacity-40" aria-label="Refresh local files" title="Refresh local files">
           <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
         </button>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 p-3">
-        {loading && !resolution && <div className="flex items-center gap-2 text-[11px] font-bold text-slate-600"><Loader2 size={14} className="animate-spin" /> Resolving project folder…</div>}
+        {loading && !resolution && <div className="flex items-center gap-2 text-[11px] font-bold text-slate-600 dark:text-slate-400"><Loader2 size={14} className="animate-spin" /> Resolving project folder…</div>}
 
         {resolution?.status === 'not_found' && (
           <div className="forge-panel-muted p-2.5">
-            <div className="flex items-start gap-2"><FolderPlus size={16} className="mt-0.5 shrink-0 text-sky-700" /><div><p className="text-xs font-black text-slate-900">No matching folder yet</p><p className="mt-0.5 text-[10px] font-semibold leading-relaxed text-slate-600">Create a folder for this existing project.</p></div></div>
+            <div className="flex items-start gap-2"><FolderPlus size={16} className="mt-0.5 shrink-0 text-sky-700 dark:text-sky-300" /><div><p className="text-xs font-black text-slate-900 dark:text-slate-100">No matching folder yet</p><p className="mt-0.5 text-[10px] font-semibold leading-relaxed text-slate-600 dark:text-slate-400">Create a folder for this existing project.</p></div></div>
             <Button size="sm" className="mt-2 h-7 w-full gap-1.5 text-[10px]" disabled={syncStatus.saving || actionId === 'create-folder'} onClick={() => void createFolder()}>
               {actionId === 'create-folder' ? <Loader2 size={13} className="animate-spin" /> : <FolderPlus size={13} />} Create Folder
             </Button>
@@ -366,11 +366,11 @@ export const LocalFilesCard = ({ project, autoCreateIfMissing = false }: { proje
 
         {resolution?.status === 'ambiguous' && (
           <div className="min-h-0 space-y-1.5 overflow-y-auto pr-1">
-            <p className="text-xs font-black text-slate-900">Choose the matching folder</p>
-            <p className="text-[10px] font-semibold leading-relaxed text-slate-600">Several folders use P{project.priorityNumber}; the helper will not guess.</p>
+            <p className="text-xs font-black text-slate-900 dark:text-slate-100">Choose the matching folder</p>
+            <p className="text-[10px] font-semibold leading-relaxed text-slate-600 dark:text-slate-400">Several folders use P{project.priorityNumber}; the helper will not guess.</p>
             {resolution.candidates.map((candidate) => (
-              <button key={candidate.candidateId} type="button" onClick={() => void selectCandidate(candidate.candidateId)} className="forge-panel-muted flex w-full items-center gap-2 p-2 text-left text-[10px] font-bold text-slate-800 hover:border-sky-400">
-                {actionId === candidate.candidateId ? <Loader2 size={13} className="animate-spin" /> : <Folder size={13} className="text-sky-700" />}
+              <button key={candidate.candidateId} type="button" onClick={() => void selectCandidate(candidate.candidateId)} className="forge-panel-muted flex w-full items-center gap-2 p-2 text-left text-[10px] font-bold text-slate-800 dark:text-slate-200 hover:border-sky-400 dark:hover:border-sky-700">
+                {actionId === candidate.candidateId ? <Loader2 size={13} className="animate-spin" /> : <Folder size={13} className="text-sky-700 dark:text-sky-300" />}
                 <span className="min-w-0 truncate">{WORKFLOW_FOLDER_LABELS[candidate.workflowFolder]} / {candidate.folderName}</span>
               </button>
             ))}
@@ -380,9 +380,9 @@ export const LocalFilesCard = ({ project, autoCreateIfMissing = false }: { proje
         {resolution && (resolution.status === 'matched' || resolution.status === 'created') && (
           <>
             {!resolution.sync.isInSync && (
-              <div className="rounded-md border border-amber-300 bg-amber-50 p-2.5 text-amber-950">
+              <div className="rounded-md border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-2.5 text-amber-950 dark:text-amber-200">
                 <div className="flex items-start gap-2"><AlertTriangle size={14} className="mt-0.5 shrink-0" /><div className="min-w-0"><p className="text-[10px] font-black">Local folder out of sync</p><p className="mt-0.5 text-[9px] font-semibold leading-relaxed">Found in {WORKFLOW_FOLDER_LABELS[resolution.workflowFolder]} as {resolution.folderName}.</p></div></div>
-                <Button variant="outline" size="sm" className="mt-2 h-7 w-full gap-1.5 border-amber-300 px-2 text-[10px]" disabled={actionId !== null} onClick={() => void syncFolder(resolution)}>
+                <Button variant="outline" size="sm" className="mt-2 h-7 w-full gap-1.5 border-amber-300 dark:border-amber-800 px-2 text-[10px]" disabled={actionId !== null} onClick={() => void syncFolder(resolution)}>
                   {actionId === 'sync-folder' ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} {resolution.sync.suggestedActionLabel}
                 </Button>
               </div>
@@ -391,28 +391,28 @@ export const LocalFilesCard = ({ project, autoCreateIfMissing = false }: { proje
               type="button"
               onClick={() => void openProjectFolder(resolution)}
               disabled={actionId !== null}
-              className="forge-panel-muted forge-focus-ring group flex w-full shrink-0 items-center gap-2 px-2.5 py-2 text-left transition-colors hover:border-sky-400 hover:bg-sky-50 disabled:opacity-60"
+              className="forge-panel-muted forge-focus-ring group flex w-full shrink-0 items-center gap-2 px-2.5 py-2 text-left transition-colors hover:border-sky-400 dark:hover:border-sky-700 hover:bg-sky-50 dark:hover:bg-sky-950/40 disabled:opacity-60"
               aria-label={`Open ${resolution.folderName} in File Explorer`}
               title={`Open ${resolution.folderName} in File Explorer`}
             >
-              {actionId === 'open-folder' ? <Loader2 size={14} className="shrink-0 animate-spin text-sky-700" /> : <FolderOpen size={14} className="shrink-0 text-sky-700" />}
-              <span className="min-w-0 flex-1 truncate text-[10px] font-black text-slate-900">{WORKFLOW_FOLDER_LABELS[resolution.workflowFolder]} / {resolution.folderName}</span>
-              <ExternalLink size={11} className="shrink-0 text-slate-400 transition-colors group-hover:text-sky-700" />
+              {actionId === 'open-folder' ? <Loader2 size={14} className="shrink-0 animate-spin text-sky-700 dark:text-sky-300" /> : <FolderOpen size={14} className="shrink-0 text-sky-700 dark:text-sky-300" />}
+              <span className="min-w-0 flex-1 truncate text-[10px] font-black text-slate-900 dark:text-slate-100">{WORKFLOW_FOLDER_LABELS[resolution.workflowFolder]} / {resolution.folderName}</span>
+              <ExternalLink size={11} className="shrink-0 text-slate-400 dark:text-slate-400 transition-colors group-hover:text-sky-700" />
             </button>
 
-            <p className="shrink-0 text-center text-[9px] font-bold uppercase tracking-[0.08em] text-slate-500">
+            <p className="shrink-0 text-center text-[9px] font-bold uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">
               {files.length} files · {groups.model.length} models · {groups.print_ready.length} print-ready
             </p>
 
             {importableCount > 1 && <Button variant="outline" size="sm" className="h-7 w-full shrink-0 gap-1.5 px-2 text-[10px]" disabled={actionId !== null} onClick={() => void importAll()}><FileInput size={13} /> Import all ({importableCount})</Button>}
 
             {files.length === 0 ? (
-              <div className="forge-empty min-h-0 flex-1 p-3 text-center text-[10px] font-semibold leading-relaxed text-slate-600">No supported local files found.</div>
+              <div className="forge-empty min-h-0 flex-1 p-3 text-center text-[10px] font-semibold leading-relaxed text-slate-600 dark:text-slate-400">No supported local files found.</div>
             ) : (
               <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-1">
                 {(['print_ready', 'model'] as const).map((group) => groups[group].length > 0 && (
                   <section key={group} className="space-y-1">
-                    <p className="sticky top-0 z-[1] bg-white/95 py-1 text-[9px] font-black uppercase tracking-[0.1em] text-slate-500 backdrop-blur-sm">{group === 'model' ? 'Model files' : 'Print-ready files'} · {groups[group].length}</p>
+                    <p className="sticky top-0 z-[1] bg-white/95 dark:bg-[var(--forge-panel)]/95 py-1 text-[9px] font-black uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400 backdrop-blur-sm">{group === 'model' ? 'Model files' : 'Print-ready files'} · {groups[group].length}</p>
                     {groups[group].map((file) => {
                       const hint = displayedSlicerHintFor(project, file, health?.defaultApplications);
                       const importing = actionId === `import:${file.fileId}`;
@@ -421,8 +421,8 @@ export const LocalFilesCard = ({ project, autoCreateIfMissing = false }: { proje
                       const displayPath = fileDisplayPath(file);
                       const linked = isFileLinkedToParts(file, project.parts);
                       return (
-                        <div key={file.fileId} className={`flex min-w-0 items-center gap-1.5 rounded-md border bg-white px-2 py-1.5 shadow-sm ${linked ? 'border-slate-700 ring-1 ring-slate-700/20' : 'border-slate-200'}`}>
-                          <p className="min-w-0 flex-1 truncate font-mono text-[9px] font-bold text-slate-800" title={displayPath}>{displayPath}</p>
+                        <div key={file.fileId} className={`flex min-w-0 items-center gap-1.5 rounded-md border bg-white dark:bg-[var(--forge-panel)] px-2 py-1.5 shadow-sm ${linked ? 'border-slate-700 ring-1 ring-slate-700/20' : 'border-slate-200 dark:border-slate-700'}`}>
+                          <p className="min-w-0 flex-1 truncate font-mono text-[9px] font-bold text-slate-800 dark:text-slate-200" title={displayPath}>{displayPath}</p>
                           <div className="flex shrink-0 items-center gap-1">
                             {file.group === 'print_ready' && file.importEligible && (
                               <button type="button" className={fileActionClass} disabled={actionId !== null} onClick={() => void performImport(file)} aria-label={`Import ${displayPath}`} title={`Import ${displayPath}`}>

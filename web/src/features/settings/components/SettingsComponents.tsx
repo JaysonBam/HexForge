@@ -45,10 +45,10 @@ export const SettingsSection = ({
   children: ReactNode;
 }) => (
   <section id={id} className="forge-panel scroll-mt-6 p-4">
-    <div className="mb-4 flex flex-col gap-3 border-b border-slate-300 pb-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="mb-4 flex flex-col gap-3 border-b border-slate-300 dark:border-slate-700 pb-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
-        <h2 className="text-lg font-black text-slate-950">{title}</h2>
-        <p className="mt-1 max-w-3xl text-sm text-slate-600">{description}</p>
+        <h2 className="text-lg font-black text-slate-950 dark:text-slate-100">{title}</h2>
+        <p className="mt-1 max-w-3xl text-sm text-slate-600 dark:text-slate-400">{description}</p>
       </div>
     </div>
     {children}
@@ -118,15 +118,15 @@ export const GmailConnectionSettings = () => {
   return (
     <div className="forge-panel-muted flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <div className="font-black text-slate-950">
+        <div className="font-black text-slate-950 dark:text-slate-100">
           {loading ? 'Checking Gmail connection…' : connectedEmail ? 'Gmail connected' : 'Gmail not connected'}
         </div>
-        <p className="mt-1 text-sm font-semibold text-slate-600">
+        <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-slate-400">
           {connectedEmail
             ? `${connectedEmail}. Google tokens are encrypted and used only by HexForge server functions.`
             : 'Connect Gmail when you need thread search, attachments, drafts, or replies.'}
         </p>
-        {error && <p role="alert" className="mt-2 text-sm font-bold text-rose-800">{error}</p>}
+        {error && <p role="alert" className="mt-2 text-sm font-bold text-rose-800 dark:text-rose-200">{error}</p>}
       </div>
       <Button
         type="button"
@@ -156,14 +156,14 @@ export const TextListEditor = ({
   onRemove: (item: string) => void;
 }) => (
   <div className="forge-panel-muted flex min-h-[20rem] flex-col">
-    <div className="border-b border-slate-300 p-3">
+    <div className="border-b border-slate-300 dark:border-slate-700 p-3">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="min-w-0 truncate font-black text-slate-950">{config.title}</h3>
-        <span className="forge-pill px-2 py-0.5 text-xs text-slate-700">
+        <h3 className="min-w-0 truncate font-black text-slate-950 dark:text-slate-100">{config.title}</h3>
+        <span className="forge-pill px-2 py-0.5 text-xs text-slate-700 dark:text-slate-300">
           {config.items.length}
         </span>
       </div>
-      <p className="mt-1 text-xs leading-5 text-slate-600">{config.description}</p>
+      <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-400">{config.description}</p>
     </div>
 
     <div className="flex gap-2 p-3">
@@ -189,11 +189,11 @@ export const TextListEditor = ({
       ) : (
         <ul className="space-y-1.5">
           {config.items.map((item) => (
-            <li key={item} className="forge-panel flex items-center justify-between gap-2 px-3 py-2 text-sm font-bold text-slate-900">
+            <li key={item} className="forge-panel flex items-center justify-between gap-2 px-3 py-2 text-sm font-bold text-slate-900 dark:text-slate-100">
               <span className="min-w-0 truncate">{item}</span>
               <button
                 onClick={() => onRemove(item)}
-                className="rounded border border-transparent p-1 text-slate-600 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-800"
+                className="rounded border border-transparent p-1 text-slate-600 dark:text-slate-400 transition hover:border-rose-300 dark:hover:border-rose-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-800 dark:hover:text-rose-200"
                 aria-label={`Remove ${item}`}
               >
                 <Trash2 size={14} />
@@ -215,16 +215,16 @@ export const ModuleRow = ({
   onUpdate: (id: string, updates: Partial<Module>) => void;
   onRemove: () => void;
 }) => (
-  <tr className="transition hover:bg-slate-50">
-    <td className="px-4 py-3 font-black text-slate-950">{module.code}</td>
-    <td className="px-4 py-3 font-medium text-slate-700">{module.lecturer}</td>
+  <tr className="transition hover:bg-slate-50 dark:hover:bg-slate-900">
+    <td className="px-4 py-3 font-black text-slate-950 dark:text-slate-100">{module.code}</td>
+    <td className="px-4 py-3 font-medium text-slate-700 dark:text-slate-300">{module.lecturer}</td>
     <td className="px-4 py-3">
-      <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-[color:var(--ui-border)] bg-white px-2.5 py-1 text-xs font-bold text-slate-800 shadow-sm">
+      <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-[color:var(--ui-border)] bg-white dark:bg-[var(--forge-panel)] px-2.5 py-1 text-xs font-bold text-slate-800 dark:text-slate-200 shadow-sm">
         <input
           type="checkbox"
           checked={module.modulePayment || false}
           onChange={(event) => onUpdate(module.id, { modulePayment: event.target.checked })}
-          className="rounded text-sky-700"
+          className="rounded text-sky-700 dark:text-sky-300"
         />
         {module.modulePayment ? 'Module' : 'Student'}
       </label>
@@ -246,7 +246,7 @@ export const ModuleRow = ({
     <td className="px-4 py-3 text-right">
       <button
         onClick={onRemove}
-        className="rounded-md border border-[color:var(--ui-border)] bg-white p-1.5 text-slate-600 shadow-sm transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-800"
+        className="rounded-md border border-[color:var(--ui-border)] bg-white dark:bg-[var(--forge-panel)] p-1.5 text-slate-600 dark:text-slate-400 shadow-sm transition hover:border-rose-300 dark:hover:border-rose-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-800 dark:hover:text-rose-200"
         aria-label={`Remove ${module.code}`}
       >
         <Trash2 size={14} />
@@ -267,10 +267,10 @@ export const FilamentPriceGroupRow = ({
   <div className="forge-panel grid gap-3 p-3">
     <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_8rem] sm:items-center">
       <div className="min-w-0">
-        <div className="font-black text-slate-950">
+        <div className="font-black text-slate-950 dark:text-slate-100">
           {group.filaments.length} {group.filaments.length === 1 ? 'material' : 'materials'}
         </div>
-        <div className="mt-0.5 text-xs font-semibold text-slate-600">Shared price per gram</div>
+        <div className="mt-0.5 text-xs font-semibold text-slate-600 dark:text-slate-400">Shared price per gram</div>
       </div>
       <input
         type="number"
@@ -285,11 +285,11 @@ export const FilamentPriceGroupRow = ({
 
     <div className="flex flex-wrap gap-2">
       {group.filaments.map((filament) => (
-        <div key={filament.id} className="inline-flex max-w-full items-center gap-2 rounded-md border border-[color:var(--ui-border)] bg-white px-2.5 py-1.5 text-sm font-bold text-slate-900 shadow-sm">
+        <div key={filament.id} className="inline-flex max-w-full items-center gap-2 rounded-md border border-[color:var(--ui-border)] bg-white dark:bg-[var(--forge-panel)] px-2.5 py-1.5 text-sm font-bold text-slate-900 dark:text-slate-100 shadow-sm">
           <span className="min-w-0 truncate">{filament.type}</span>
           <button
             onClick={() => onRemove(filament)}
-            className="rounded border border-transparent p-0.5 text-slate-500 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-800"
+            className="rounded border border-transparent p-0.5 text-slate-500 dark:text-slate-400 transition hover:border-rose-300 dark:hover:border-rose-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-800 dark:hover:text-rose-200"
             aria-label={`Remove ${filament.type}`}
           >
             <Trash2 size={13} />
@@ -330,7 +330,7 @@ export const EmailMessagesEditor = ({
     <div className="space-y-4">
       <div className="grid gap-3 lg:grid-cols-[minmax(14rem,22rem)_minmax(0,1fr)] lg:items-end">
         <label className="block">
-          <span className="mb-1 block text-xs font-black uppercase tracking-[0.12em] text-slate-600">Edit</span>
+          <span className="mb-1 block text-xs font-black uppercase tracking-[0.12em] text-slate-600 dark:text-slate-400">Edit</span>
           <select
             value={selection}
             onChange={(event) => onSelectionChange(event.target.value as EmailEditorSelection)}
@@ -351,19 +351,19 @@ export const EmailMessagesEditor = ({
                 onClick={() => updateEmailTemplate(selectedTemplate.key, { attachQuote: !selectedTemplate.attachQuote })}
                 className={`inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-black transition ${
                   selectedTemplate.attachQuote
-                    ? 'border-emerald-300 bg-emerald-100 text-emerald-900 shadow-sm'
-                    : 'border-slate-300 bg-white text-slate-700 hover:bg-sky-50'
+                    ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-100 dark:bg-emerald-950/55 text-emerald-900 dark:text-emerald-200 shadow-sm'
+                    : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] text-slate-700 dark:text-slate-300 hover:bg-sky-50 dark:hover:bg-sky-950/40'
                 }`}
               >
                 <Paperclip size={16} />
                 {selectedTemplate.attachQuote ? 'Quote attached' : 'No quote attachment'}
               </button>
-              <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-[color:var(--forge-gold-border)] bg-white px-4 text-sm font-bold text-slate-800 shadow-sm">
+              <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-[color:var(--forge-gold-border)] bg-white dark:bg-[var(--forge-panel)] px-4 text-sm font-bold text-slate-800 dark:text-slate-200 shadow-sm">
                 <input
                   type="checkbox"
                   checked={selectedTemplate.includeSignature}
                   onChange={(event) => updateEmailTemplate(selectedTemplate.key, { includeSignature: event.target.checked })}
-                  className="rounded text-slate-950"
+                  className="rounded text-slate-950 dark:text-slate-100"
                 />
                 Include signature
               </label>
@@ -387,8 +387,8 @@ export const EmailMessagesEditor = ({
       {(emailSettingsDirty || emailSettingsSaveError) && (
         <div className={`rounded-md border px-3 py-2 text-sm font-semibold ${
           emailSettingsSaveError
-            ? 'border-rose-300 bg-rose-50 text-rose-900'
-            : 'border-amber-300 bg-amber-50 text-amber-900'
+            ? 'border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 text-rose-900 dark:text-rose-200'
+            : 'border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200'
         }`}>
           {emailSettingsSaveError || 'You have unsaved email message changes. Click Save before closing the app or sending test drafts.'}
         </div>
@@ -398,7 +398,7 @@ export const EmailMessagesEditor = ({
         <div className="space-y-4">
           <div className="forge-panel-muted p-3">
             <label className="block">
-              <span className="mb-1 block text-sm font-bold text-slate-800">Subject</span>
+              <span className="mb-1 block text-sm font-bold text-slate-800 dark:text-slate-200">Subject</span>
               <TokenSubjectEditor
                 value={selectedTemplate.subject}
                 onChange={(subject) => updateEmailTemplate(selectedTemplate.key, { subject })}
@@ -414,7 +414,7 @@ export const EmailMessagesEditor = ({
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-950">
+          <div className="rounded-lg border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/40 px-4 py-3 text-sm font-semibold text-sky-950 dark:text-sky-200">
             This signature is appended to templates where "Include signature" is enabled. Images uploaded here are saved to the public-read email assets bucket so Gmail recipients can see them.
           </div>
           <RichEmailEditor
@@ -447,7 +447,7 @@ export const SettingsPageSkeleton = () => (
     <div className="space-y-5">
       {Array.from({ length: 4 }).map((_, index) => (
         <section key={index} className="forge-panel p-4">
-          <div className="mb-4 border-b border-slate-300 pb-4">
+          <div className="mb-4 border-b border-slate-300 dark:border-slate-700 pb-4">
             <div className="flex-1">
               <SkeletonBar className="h-5 w-40" />
               <SkeletonBar className="mt-2 h-4 w-full max-w-xl" />

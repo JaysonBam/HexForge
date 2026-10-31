@@ -1,5 +1,12 @@
 @import 'tailwindcss';
 
+/* Explicit browser preference; printed pages always use the light palette. */
+@custom-variant dark {
+  @media screen {
+    &:where([data-theme='dark'], [data-theme='dark'] *) { @slot; }
+  }
+}
+
 @layer base {
   :root {
     --ui-bg: #eef3f8;
@@ -28,6 +35,54 @@
     --forge-shadow: 0 14px 34px rgba(15, 23, 42, 0.085);
     --forge-shadow-soft: 0 8px 20px rgba(15, 23, 42, 0.055);
     --forge-focus: 0 0 0 3px rgba(56, 189, 248, 0.22);
+    --forge-header-bg: rgba(255, 255, 255, 0.96);
+    --forge-input-bg: #ffffff;
+    --forge-inset: rgba(255, 255, 255, 0.72);
+    --forge-lane-bg: rgba(255, 255, 255, 0.94);
+    --forge-table-bg: #f1f5f9;
+    --forge-label: #475569;
+    --forge-alert-bg: #fffbeb;
+    --forge-alert-ink: #78350f;
+    --forge-skeleton-edge: #e2e8f0;
+    --forge-skeleton-center: #eff6ff;
+  }
+
+  @media screen {
+    :root[data-theme='dark'] {
+      --ui-bg: #0f172a;
+      --ui-panel: #1e293b;
+      --ui-panel-muted: #172235;
+      --ui-border: #334155;
+      --ui-border-strong: #52647c;
+      --ui-text-muted: #a5b4c8;
+      --ui-shadow: 0 18px 42px rgba(0, 0, 0, 0.18);
+      --forge-ink: #f1f5f9;
+      --forge-ink-soft: #cbd5e1;
+      --forge-panel: #1e293b;
+      --forge-surface: #172235;
+      --forge-surface-strong: #26354b;
+      --forge-border: #334155;
+      --forge-border-strong: #52647c;
+      --forge-muted: #a5b4c8;
+      --forge-label: #b8c5d6;
+      --forge-blue: #0369a1;
+      --forge-blue-bright: #7dd3fc;
+      --forge-link: #7dd3fc;
+      --forge-gold: #dfb967;
+      --forge-gold-soft: rgba(214, 168, 79, 0.1);
+      --forge-gold-border: rgba(214, 168, 79, 0.3);
+      --forge-shadow: 0 14px 34px rgba(0, 0, 0, 0.18);
+      --forge-shadow-soft: 0 4px 16px rgba(0, 0, 0, 0.12);
+      --forge-header-bg: rgba(23, 34, 53, 0.97);
+      --forge-input-bg: #131e30;
+      --forge-inset: rgba(255, 255, 255, 0.035);
+      --forge-lane-bg: #172235;
+      --forge-table-bg: #172235;
+      --forge-alert-bg: #30291c;
+      --forge-alert-ink: #f5d797;
+      --forge-skeleton-edge: #26354b;
+      --forge-skeleton-center: #334155;
+    }
   }
 
   html {
@@ -41,7 +96,7 @@
       radial-gradient(circle at 90% 4%, rgba(214, 168, 79, 0.12), transparent 24rem),
       var(--ui-bg);
     background-size: auto, auto, auto;
-    color: #0f172a;
+    color: var(--forge-ink);
   }
 
   ::selection {
@@ -51,13 +106,19 @@
   input:not([type='checkbox']):not([type='radio']),
   textarea,
   select {
-    color: #0f172a;
-    caret-color: #0f172a;
+    color: var(--forge-ink);
+    caret-color: var(--forge-ink);
   }
 
   input::placeholder,
   textarea::placeholder {
-    color: #64748b;
+    color: var(--forge-muted);
+  }
+
+  select option, select optgroup { background: var(--forge-panel); color: var(--forge-ink); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
   }
 
   input[type='checkbox'],
@@ -84,7 +145,7 @@
   }
 
   .rich-email-editor a {
-    color: var(--forge-blue);
+    color: var(--forge-link, var(--forge-blue));
     text-decoration: underline;
   }
 
@@ -94,6 +155,8 @@
     max-width: 100%;
     margin: 0.5rem 0;
   }
+
+  .rich-email-editor mark { color: #17233b; }
 
   .subject-token-editor p {
     margin: 0;
@@ -115,6 +178,40 @@
 }
 
 @layer components {
+  .forge-theme-toggle {
+    border-color: var(--forge-border);
+    background: var(--forge-panel);
+    color: var(--forge-muted);
+  }
+
+  .forge-theme-toggle:hover { background: var(--forge-surface-strong); color: var(--forge-ink); }
+  .forge-theme-option { color: var(--forge-muted); }
+  .peer:checked + .forge-theme-option { background: var(--forge-panel); color: var(--forge-ink); box-shadow: var(--forge-shadow-soft); }
+
+  @media screen {
+    :root[data-theme='dark'] {
+      .forge-app-shell {
+        background: radial-gradient(ellipse at 12% -15%, rgba(56, 189, 248, 0.045), transparent 40rem), var(--ui-bg);
+      }
+      .forge-tab-active, .forge-stamp { background: var(--forge-surface-strong); }
+      .email-token-chip { background: #12334b; color: #bae6fd; }
+      .forge-button-primary { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 3px 10px rgba(0, 0, 0, 0.12); }
+      .forge-button-primary:hover { background: #075985; box-shadow: var(--forge-shadow-soft); }
+      .forge-badge-slate { background: #26354b; color: #cbd5e1; }
+      .forge-badge-blue { background: #12334b; color: #a5ddf8; }
+      .forge-badge-gold { background: #352d20; color: #f5d797; }
+      .forge-badge-pink { background: #3b2540; color: #f5b6d5; }
+      .forge-badge-teal { background: #173c3c; color: #99e5d9; }
+      .forge-badge-indigo { background: #2b2e51; color: #c7d2fe; }
+      .forge-badge-green { background: #173c32; color: #a7f3d0; }
+      .forge-badge-rose { background: #402635; color: #fecdd3; }
+      .forge-badge-zinc { background: #303747; color: #d4d4d8; border-color: #52647c; }
+      .forge-lane-blue { --lane-tint: rgba(214, 168, 79, 0.06); }
+      .forge-lane-teal { --lane-tint: rgba(56, 189, 248, 0.05); }
+      .forge-lane-indigo { --lane-tint: rgba(236, 72, 153, 0.05); }
+    }
+  }
+
   .forge-app-shell {
     background:
       radial-gradient(circle at 10% -8%, rgba(56, 189, 248, 0.13), transparent 31rem),
@@ -128,7 +225,7 @@
     position: relative;
     border-bottom: 1px solid var(--forge-border);
     z-index: 40;
-    background: rgba(255, 255, 255, 0.96);
+    background: var(--forge-header-bg);
     box-shadow: 0 10px 30px rgba(15, 23, 42, 0.065);
     backdrop-filter: blur(14px);
   }
@@ -167,16 +264,10 @@
     gap: 1rem;
     overflow: hidden;
     border-right: 1px solid var(--forge-border);
-    background: rgba(255, 255, 255, 0.96);
+    background: var(--forge-header-bg);
     box-shadow: 10px 0 30px rgba(15, 23, 42, 0.045);
     backdrop-filter: blur(14px);
-    padding: 9.75rem 0.75rem 0.75rem;
-  }
-
-  @media (min-width: 1280px) {
-    .project-summary-rail {
-      padding-top: 5.65rem;
-    }
+    padding: calc(var(--forge-header-height, 9rem) + 0.75rem) 0.75rem 0.75rem;
   }
 
   .project-summary-label {
@@ -184,7 +275,7 @@
     font-weight: 900;
     line-height: 1.1;
     text-transform: uppercase;
-    color: #64748b;
+    color: var(--forge-muted);
   }
 
   .project-summary-main {
@@ -210,7 +301,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    border-bottom: 1px solid rgba(203, 213, 225, 0.55);
+    border-bottom: 1px solid var(--forge-border);
     padding: 0.18rem 0;
   }
 
@@ -251,14 +342,14 @@
   }
 
   .forge-metal {
-    background: #f8fafc;
+    background: var(--forge-surface);
   }
 
   .forge-command-input {
     border: 1px solid var(--forge-border);
     border-radius: 6px;
-    background: #ffffff;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), var(--forge-shadow-soft);
+    background: var(--forge-input-bg);
+    box-shadow: inset 0 1px 0 var(--forge-inset), var(--forge-shadow-soft);
     color: var(--forge-ink);
     transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
   }
@@ -267,7 +358,7 @@
   .forge-command-input:focus-within,
   .forge-command-input:focus-visible {
     border-color: var(--forge-blue);
-    box-shadow: var(--forge-focus), inset 0 1px 0 rgba(255, 255, 255, 0.82);
+    box-shadow: var(--forge-focus), inset 0 1px 0 var(--forge-inset);
     outline: none;
   }
 
@@ -286,14 +377,14 @@
 
   .forge-button-secondary {
     border: 1px solid var(--forge-gold-border);
-    background: #ffffff;
+    background: var(--forge-panel);
     color: var(--forge-ink);
     box-shadow: var(--forge-shadow-soft);
   }
 
   .forge-button-secondary:hover {
     border-color: rgba(214, 168, 79, 0.62);
-    background: #f8fafc;
+    background: var(--forge-surface-strong);
     color: var(--forge-ink);
   }
 
@@ -314,11 +405,11 @@
     border: 1px solid var(--forge-border);
     border-radius: 8px;
     background: var(--forge-surface);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 3px 12px rgba(15, 23, 42, 0.045);
+    box-shadow: inset 0 1px 0 var(--forge-inset), 0 3px 12px rgba(15, 23, 42, 0.045);
   }
 
   .forge-nav-indicator {
-    background: #ffffff;
+    background: var(--forge-panel);
     box-shadow:
       inset 0 -2px 0 rgba(56, 189, 248, 0.42),
       inset 0 0 0 1px rgba(214, 168, 79, 0.24),
@@ -345,7 +436,7 @@
     width: fit-content;
     border: 1px solid rgba(214, 168, 79, 0.56);
     border-radius: 4px;
-    background: #ffffff;
+    background: var(--forge-panel);
     color: var(--forge-ink);
     box-shadow: inset 0 -2px 0 rgba(214, 168, 79, 0.28);
   }
@@ -364,7 +455,7 @@
     width: fit-content;
     border-radius: 999px;
     border: 1px solid var(--forge-border);
-    background: #ffffff;
+    background: var(--forge-panel);
     color: var(--forge-ink);
     font-weight: 800;
     letter-spacing: 0.04em;
@@ -434,7 +525,7 @@
     flex-direction: column;
     border: 1px solid var(--forge-border);
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.94);
+    background: var(--forge-lane-bg);
     box-shadow: var(--forge-shadow-soft);
   }
 
@@ -447,7 +538,7 @@
   }
 
   .forge-lane-header {
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid var(--forge-border);
     background: var(--lane-tint);
   }
 
@@ -457,13 +548,13 @@
     height: 1.9rem;
     align-items: center;
     justify-content: center;
-    border: 1px solid #d8e0ea;
+    border: 1px solid var(--forge-border);
     border-radius: 999px;
-    background: #ffffff;
-    color: #475569;
+    background: var(--forge-panel);
+    color: var(--forge-label);
     font-size: 0.76rem;
     font-weight: 900;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 3px 8px rgba(15, 23, 42, 0.04);
+    box-shadow: inset 0 1px 0 var(--forge-inset), 0 3px 8px rgba(15, 23, 42, 0.04);
   }
 
   .forge-lane-empty {
@@ -471,8 +562,8 @@
   }
 
   .forge-work-card {
-    border-color: #e2e8f0;
-    background: #ffffff;
+    border-color: var(--forge-border);
+    background: var(--forge-panel);
     box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
   }
 
@@ -496,8 +587,8 @@
 
   .forge-alert-warm {
     border-color: rgba(214, 168, 79, 0.45);
-    background: #fffbeb;
-    color: #78350f;
+    background: var(--forge-alert-bg);
+    color: var(--forge-alert-ink);
     box-shadow: var(--forge-shadow-soft);
   }
 
@@ -525,14 +616,14 @@
   .forge-empty {
     border: 1px dashed var(--forge-border-strong);
     border-radius: 8px;
-    background: #ffffff;
+    background: var(--forge-panel);
     color: var(--forge-muted);
   }
 
   .forge-skeleton {
     position: relative;
     overflow: hidden;
-    background: linear-gradient(90deg, #e2e8f0, #eff6ff 48%, #e2e8f0);
+    background: linear-gradient(90deg, var(--forge-skeleton-edge), var(--forge-skeleton-center) 48%, var(--forge-skeleton-edge));
     background-size: 220% 100%;
     animation: forge-shimmer 1.45s ease-in-out infinite;
   }
@@ -557,8 +648,8 @@
   }
 
   .forge-table-head {
-    background: #f1f5f9;
-    color: #334155;
+    background: var(--forge-table-bg);
+    color: var(--forge-label);
   }
 
   .forge-mechanical-lines {
@@ -617,7 +708,7 @@
   .part-material-label {
     display: block;
     margin-bottom: 0.25rem;
-    color: #475569;
+    color: var(--forge-label);
     font-size: 0.625rem;
     font-weight: 700;
     letter-spacing: 0.04em;
@@ -629,7 +720,7 @@
   .part-material-control {
     width: 100%;
     min-width: 0;
-    border-bottom: 1px solid #cbd5e1;
+    border-bottom: 1px solid var(--forge-border);
     background: transparent;
     padding: 0.32rem 0;
     font-size: 0.875rem;
@@ -648,7 +739,7 @@
       min-height: 0;
       border-right: 0;
       border-bottom: 1px solid var(--forge-border);
-      background: rgba(255, 255, 255, 0.96);
+      background: var(--forge-header-bg);
       box-shadow: none;
       overflow: visible;
       padding: 1rem;
@@ -704,6 +795,7 @@
     padding: 0;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+    color-scheme: light !important;
   }
 
   /* Ensure our print-only container uses its own padding rather than page margins */

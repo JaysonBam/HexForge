@@ -115,13 +115,13 @@ const GmailThreadPickerDialog = ({ onClose, onSelect, actionMode, onOpenProject 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]" onClick={onClose}>
       <section className="forge-drawer flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg" onClick={(event) => event.stopPropagation()} aria-modal="true" role="dialog" aria-labelledby="gmail-picker-title">
-        <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-4 sm:px-5">
+        <header className="shrink-0 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] px-4 py-4 sm:px-5">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-start gap-3">
               <img src={gmailIcon} alt="" className="mt-1 h-6 w-7 shrink-0" />
               <div className="min-w-0">
-                <h2 id="gmail-picker-title" className="text-lg font-black text-slate-950">{actionMode ? 'Emails needing action' : 'Choose Main Gmail Thread'}</h2>
-                <p className="mt-1 text-xs text-slate-500">The latest 50 print-related threads from {inbox.year}.</p>
+                <h2 id="gmail-picker-title" className="text-lg font-black text-slate-950 dark:text-slate-100">{actionMode ? 'Emails needing action' : 'Choose Main Gmail Thread'}</h2>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">The latest 50 print-related threads from {inbox.year}.</p>
               </div>
             </div>
             <div className="flex shrink-0 gap-1">
@@ -136,14 +136,14 @@ const GmailThreadPickerDialog = ({ onClose, onSelect, actionMode, onOpenProject 
               <div className="flex flex-wrap gap-1.5" aria-label="Email views">
                 {(['action', 'hidden', 'linked', 'all'] as const).map(value => (
                   <Button key={value} size="sm" variant={view === value ? 'primary' : 'outline'}
-                    className={view === value ? 'shadow-none' : 'border-slate-200 font-semibold shadow-none'}
+                    className={view === value ? 'shadow-none' : 'border-slate-200 dark:border-slate-700 font-semibold shadow-none'}
                     aria-pressed={view === value} onClick={() => setView(value)}>
                     {{ action: 'Needs action', hidden: 'Hidden', linked: 'Linked', all: 'All emails' }[value]}
                   </Button>
                 ))}
               </div>
             ) : (
-              <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs font-semibold text-slate-700">
+              <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
                 <label className="flex cursor-pointer items-center gap-2">
                   <input type="checkbox" checked={hideLinked} onChange={event => setHideLinked(event.target.checked)}
                     className="forge-focus-ring h-4 w-4 accent-sky-700" />
@@ -157,17 +157,17 @@ const GmailThreadPickerDialog = ({ onClose, onSelect, actionMode, onOpenProject 
               </div>
             )}
             {(items.length > 0 || !loading) && (
-              <p className="whitespace-nowrap text-xs font-semibold text-slate-500">{filteredItems.length} of {inbox.threadIds.length} visible</p>
+              <p className="whitespace-nowrap text-xs font-semibold text-slate-500 dark:text-slate-400">{filteredItems.length} of {inbox.threadIds.length} visible</p>
             )}
           </div>
         </header>
-        <div className="overflow-y-auto bg-slate-100 p-4">
+        <div className="overflow-y-auto bg-slate-100 dark:bg-slate-900 p-4">
           {saveError && (
-            <p role="alert" className="mb-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-900">{saveError}</p>
+            <p role="alert" className="mb-3 rounded-md border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3 text-sm font-semibold text-amber-900 dark:text-amber-200">{saveError}</p>
           )}
           {items.length > 0 && (
             <div className="relative mb-4">
-              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sky-600" size={16} />
+              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sky-600 dark:text-sky-400" size={16} />
               <input
                 type="search"
                 value={search}
@@ -177,34 +177,34 @@ const GmailThreadPickerDialog = ({ onClose, onSelect, actionMode, onOpenProject 
                 className="forge-command-input h-10 w-full pl-10 pr-10 text-sm font-semibold"
               />
               {search && (
-                <button type="button" onClick={() => setSearch('')} aria-label="Clear Gmail thread search" className="forge-focus-ring absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-500 hover:text-slate-900">
+                <button type="button" onClick={() => setSearch('')} aria-label="Clear Gmail thread search" className="forge-focus-ring absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100">
                   <X size={15} />
                 </button>
               )}
             </div>
           )}
           {loading && items.length === 0 && (
-            <div className="flex min-h-48 items-center justify-center gap-2 text-sm font-bold text-slate-600"><Loader2 size={18} className="animate-spin" /> Loading Gmail threads…</div>
+            <div className="flex min-h-48 items-center justify-center gap-2 text-sm font-bold text-slate-600 dark:text-slate-400"><Loader2 size={18} className="animate-spin" /> Loading Gmail threads…</div>
           )}
-          {loading && items.length > 0 && <p role="status" className="mb-3 flex items-center gap-2 text-xs font-semibold text-slate-600"><Loader2 size={14} className="animate-spin" /> Loading remaining threads…</p>}
+          {loading && items.length > 0 && <p role="status" className="mb-3 flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-400"><Loader2 size={14} className="animate-spin" /> Loading remaining threads…</p>}
           {error && (
-            <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
+            <div className="rounded-md border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-4 text-sm font-semibold text-amber-900 dark:text-amber-200">
               <p>{error}</p>
               {inbox.status === 'auth' && <Button size="sm" className="mt-3" onClick={() => void requestGmailReadAccess()}>Grant Gmail access</Button>}
               <Button variant="outline" size="sm" className="mt-3 gap-2" onClick={() => void load()}><RefreshCw size={14} /> Try again</Button>
             </div>
           )}
           {!loading && !error && items.length === 0 && (
-            <div className="rounded-md border border-slate-300 bg-white p-8 text-center text-sm font-semibold text-slate-600">No print-related Gmail threads were found this year.</div>
+            <div className="rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] p-8 text-center text-sm font-semibold text-slate-600 dark:text-slate-400">No print-related Gmail threads were found this year.</div>
           )}
           {!loading && !error && items.length > 0 && availableItems.length === 0
             && (!(hideLinked || hideHidden) || linkedKeys) && (!hideHidden || hiddenKeys) && (
-            <div className="rounded-md border border-slate-300 bg-white p-8 text-center text-sm font-semibold text-slate-600">
+            <div className="rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] p-8 text-center text-sm font-semibold text-slate-600 dark:text-slate-400">
               {actionMode ? 'No emails in this view.' : 'All emails are filtered out. Turn off the filters to show them.'}
             </div>
           )}
           {!loading && !error && availableItems.length > 0 && filteredItems.length === 0 && (
-            <div className="rounded-md border border-slate-300 bg-white p-8 text-center text-sm font-semibold text-slate-600">
+            <div className="rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] p-8 text-center text-sm font-semibold text-slate-600 dark:text-slate-400">
               No email threads matched “{search.trim()}” in this year’s print emails. Try a different name, email address, or phrase.
             </div>
           )}
@@ -215,9 +215,9 @@ const GmailThreadPickerDialog = ({ onClose, onSelect, actionMode, onOpenProject 
               const hidden = !linked && hiddenKeys?.has(key);
               const suggestion = !linked ? suggestions.get(item.threadId) : null;
               return (
-                <div key={item.threadId} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                <div key={item.threadId} className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] p-4 shadow-sm">
                   {actionMode ? <ThreadDetails item={item} linked={linked} hidden={!!hidden} /> : (
-                    <button type="button" className="forge-focus-ring block w-full rounded text-left hover:text-sky-800"
+                    <button type="button" className="forge-focus-ring block w-full rounded text-left hover:text-sky-800 dark:hover:text-sky-200"
                       onClick={() => { onSelect(item); onClose(); }}>
                       <ThreadDetails item={item} linked={linked} hidden={!!hidden} />
                     </button>
@@ -227,25 +227,25 @@ const GmailThreadPickerDialog = ({ onClose, onSelect, actionMode, onOpenProject 
                     <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
                       {actionMode ? <>
                         <a href={getGmailThreadUrl(item.threadId)} target="_blank" rel="noreferrer"
-                          className="forge-focus-ring inline-flex h-8 items-center gap-2 rounded-md border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"><img src={gmailIcon} alt="" className="h-3.5 w-4" /> Open in Gmail</a>
+                          className="forge-focus-ring inline-flex h-8 items-center gap-2 rounded-md border border-slate-200 dark:border-slate-700 px-3 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900"><img src={gmailIcon} alt="" className="h-3.5 w-4" /> Open in Gmail</a>
                         {linked ? inbox.linked.filter(link => link.id && link.gmailThreadId === item.threadId
                           && link.gmailAccountEmail?.trim().toLowerCase() === item.snapshot.accountEmail).map(link => (
-                            <Button key={link.id} size="sm" variant="outline" className="gap-1.5 border-slate-200 font-semibold shadow-none" onClick={() => { onOpenProject?.(link.id!); onClose(); }}><ExternalLink size={13} /> {link.priorityNumber == null ? 'Open project' : `Open P${link.priorityNumber}`}</Button>
+                            <Button key={link.id} size="sm" variant="outline" className="gap-1.5 border-slate-200 dark:border-slate-700 font-semibold shadow-none" onClick={() => { onOpenProject?.(link.id!); onClose(); }}><ExternalLink size={13} /> {link.priorityNumber == null ? 'Open project' : `Open P${link.priorityNumber}`}</Button>
                           )) : <>
-                          {suggestion && <Button size="sm" variant="outline" className="gap-1.5 border-slate-200 font-semibold shadow-none"
+                          {suggestion && <Button size="sm" variant="outline" className="gap-1.5 border-slate-200 dark:border-slate-700 font-semibold shadow-none"
                             title={`${suggestion.studentName} · Created ${formatDate(suggestion.createdAt)}`}
                             disabled={busy || !verified} onClick={() => void saveAction(item, suggestion)}>
                             {saving?.key === key && saving.linking ? <Loader2 size={13} className="animate-spin" /> : <Link2 size={13} />}
                             {suggestion.priorityNumber == null ? 'Link to project' : `Link to P${suggestion.priorityNumber}`}
                           </Button>}
                           <Button size="sm" disabled={busy} onClick={() => { onSelect(item); onClose(); }}>Create project</Button>
-                          <Button variant="ghost" size="sm" className="text-slate-500" disabled={busy || !verified} onClick={() => void saveAction(item)}>
+                          <Button variant="ghost" size="sm" className="text-slate-500 dark:text-slate-400" disabled={busy || !verified} onClick={() => void saveAction(item)}>
                             {saving?.key === key && !saving.linking ? <Loader2 size={14} className="animate-spin" /> : hidden ? 'Unhide' : 'Hide'}
                           </Button>
                         </>}
                       </> : <>
                         <Button size="sm" onClick={() => { onSelect(item); onClose(); }}>Select thread</Button>
-                        <Button variant="ghost" size="sm" className="text-xs text-slate-500"
+                        <Button variant="ghost" size="sm" className="text-xs text-slate-500 dark:text-slate-400"
                           disabled={busy || !linkedKeys || !hiddenKeys || linked}
                           title={linked ? 'Linked emails cannot be hidden.' : undefined}
                           aria-label={`${hidden ? 'Unhide' : 'Hide'} email: ${item.subject}`}
@@ -269,17 +269,17 @@ const ThreadDetails = ({ item, linked, hidden }: { item: GmailThreadListItem; li
   <div className="flex items-start justify-between gap-3">
     <div className="min-w-0 flex-1">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <p className="break-words text-sm font-bold text-slate-900">{item.senderName || item.senderEmail || 'Unknown sender'}</p>
-        {item.senderName && <p className="break-all text-[11px] text-slate-500">{item.senderEmail}</p>}
+        <p className="break-words text-sm font-bold text-slate-900 dark:text-slate-100">{item.senderName || item.senderEmail || 'Unknown sender'}</p>
+        {item.senderName && <p className="break-all text-[11px] text-slate-500 dark:text-slate-400">{item.senderEmail}</p>}
       </div>
-      <h3 className="mt-2 break-words text-sm font-bold text-slate-900">{displaySubject(item.subject)}</h3>
+      <h3 className="mt-2 break-words text-sm font-bold text-slate-900 dark:text-slate-100">{displaySubject(item.subject)}</h3>
     </div>
     <div className="flex max-w-[45%] shrink-0 flex-col items-end gap-1.5 text-right">
-      <time dateTime={item.messageDate} title={item.messageDate} className="text-[11px] text-slate-500">{formatDate(item.messageDate)}</time>
+      <time dateTime={item.messageDate} title={item.messageDate} className="text-[11px] text-slate-500 dark:text-slate-400">{formatDate(item.messageDate)}</time>
       <div className="flex flex-wrap justify-end gap-1.5 text-[10px] font-semibold">
-        {!linked && !hidden && gmailThreadHasIncomingMessage(item.snapshot) && <span className="rounded px-1.5 py-0.5 text-emerald-800 bg-emerald-50">New thread</span>}
-        {item.snapshot.hasUnread && <span className="rounded px-1.5 py-0.5 text-sky-800 bg-sky-50">Unread message</span>}
-        {item.snapshot.hasSpam && <span className="rounded px-1.5 py-0.5 text-amber-800 bg-amber-50">Spam</span>}
+        {!linked && !hidden && gmailThreadHasIncomingMessage(item.snapshot) && <span className="rounded px-1.5 py-0.5 text-emerald-800 dark:text-emerald-200 bg-emerald-50 dark:bg-emerald-950/40">New thread</span>}
+        {item.snapshot.hasUnread && <span className="rounded px-1.5 py-0.5 text-sky-800 dark:text-sky-200 bg-sky-50 dark:bg-sky-950/40">Unread message</span>}
+        {item.snapshot.hasSpam && <span className="rounded px-1.5 py-0.5 text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40">Spam</span>}
       </div>
     </div>
   </div>
@@ -289,14 +289,14 @@ const ThreadBody = ({ item }: { item: GmailThreadListItem }) => {
   const message = item.snapshot.messages.find(message => message.id === item.messageId) || item.snapshot.messages.at(-1);
   return (
     <details className="group min-w-0 flex-1 basis-44 open:basis-full">
-      <summary className="forge-focus-ring flex w-fit cursor-pointer list-none items-center gap-1 rounded text-xs text-slate-500 hover:text-slate-900 [&::-webkit-details-marker]:hidden">
+      <summary className="forge-focus-ring flex w-fit cursor-pointer list-none items-center gap-1 rounded text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 [&::-webkit-details-marker]:hidden">
         <ChevronDown size={13} className="transition-transform group-open:rotate-180 motion-reduce:transition-none" />
         Details{item.attachmentFilenames.length > 0 && <span className="ml-1 inline-flex items-center gap-1"><Paperclip size={11} />{item.attachmentFilenames.length} {item.attachmentFilenames.length === 1 ? 'attachment' : 'attachments'}</span>}
       </summary>
-      <div className="mt-3 space-y-3 rounded-md bg-slate-50 p-3">
-        <p className="max-h-52 overflow-y-auto whitespace-pre-wrap break-words text-xs leading-relaxed text-slate-600">{message?.body || item.preview || 'No plain-text message available.'}</p>
+      <div className="mt-3 space-y-3 rounded-md bg-slate-50 dark:bg-slate-900 p-3">
+        <p className="max-h-52 overflow-y-auto whitespace-pre-wrap break-words text-xs leading-relaxed text-slate-600 dark:text-slate-400">{message?.body || item.preview || 'No plain-text message available.'}</p>
         {item.attachmentFilenames.length > 0 && <ul className="grid gap-1.5 sm:grid-cols-2" aria-label="Attachments">
-          {item.attachmentFilenames.map((filename, index) => <li key={`${index}:${filename}`} className="flex min-w-0 items-start gap-1.5 text-xs text-slate-600"><Paperclip size={12} className="mt-0.5 shrink-0" /><span className="break-all">{filename}</span></li>)}
+          {item.attachmentFilenames.map((filename, index) => <li key={`${index}:${filename}`} className="flex min-w-0 items-start gap-1.5 text-xs text-slate-600 dark:text-slate-400"><Paperclip size={12} className="mt-0.5 shrink-0" /><span className="break-all">{filename}</span></li>)}
         </ul>}
       </div>
     </details>

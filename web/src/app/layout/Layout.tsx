@@ -1,5 +1,6 @@
 import { Outlet, Link, matchPath, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
+import { ThemeToggle } from '@/components/ui/ThemeControls';
 import {
   signOut,
   subscribeToAuthChanges
@@ -8,7 +9,7 @@ import { getProfileAvatarByEmail } from '@/api/supabase/profiles';
 import { useProjects } from '@/features/projects/context/ProjectContext';
 import { useSettings } from '@/features/settings/context/SettingsContext';
 import { useStaffSession } from '@/features/auth/context/StaffSessionContext';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import {
   Boxes,
   CreditCard,
@@ -90,6 +91,9 @@ export const Layout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const navListRef = useRef<HTMLDivElement | null>(null);
+  const headerRef = useRef<HTMLElement | null>(null);
+  const mainRef = useRef<HTMLElement | null>(null);
+  const [headerHeight, setHeaderHeight] = useState(72);
   const navItemRefs = useRef<Record<string, HTMLElement | null>>({});
   const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number } | null>(null);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -142,6 +146,10 @@ export const Layout = () => {
     activeWorkspaceTab,
     selectWorkspaceTab
   }), [activeWorkspaceTab, selectWorkspaceTab]);
+
+  useLayoutEffect(() => {
+    mainRef.current?.scrollTo(0, 0);
+  }, [location.pathname, activeWorkspaceTab]);
 
   useEffect(() => {
     let isMounted = true;
@@ -268,15 +276,25 @@ export const Layout = () => {
     }
   };
 
+  useLayoutEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const measure = () => setHeaderHeight(header.getBoundingClientRect().height);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <div className="forge-app-shell flex h-screen flex-col overflow-hidden text-slate-950">
-      <header className="forge-header print:hidden shrink-0">
-        <div className="flex w-full flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-5 lg:px-6 min-[1280px]:flex-nowrap">
-          <div className="flex min-w-0 items-center gap-4">
-            <div className="flex items-center gap-3 text-slate-950">
-              <Link to="/" className="flex w-[9rem] shrink-0 items-center gap-2 text-slate-950">
+    <div className="forge-app-shell flex h-screen flex-col overflow-hidden text-slate-950 dark:text-slate-100" style={{ '--forge-header-height': `${headerHeight}px` } as CSSProperties}>
+      <header ref={headerRef} className="forge-header print:hidden shrink-0">
+        <div className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5 lg:px-6">
+          <div className="flex min-w-0 max-w-full shrink-0 items-center gap-4">
+            <div className="flex items-center gap-3 text-slate-950 dark:text-slate-100">
+              <Link to="/" aria-label="HexForge home" className="flex w-auto shrink-0 items-center gap-2 text-slate-950 dark:text-slate-100 sm:w-[9rem]">
                 <img src="/favicon.svg" alt="" className="h-12 rounded-md object-contain" />
-                <span className="text-lg font-extrabold tracking-[0.01em]">
+                <span className="hidden text-lg font-extrabold tracking-[0.01em] sm:inline">
                   Hex<span className="text-[color:var(--forge-gold)]">Forge</span>
                 </span>
               </Link>
@@ -300,10 +318,10 @@ export const Layout = () => {
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = item.id === activeNavItem.id;
-                const itemClassName = `relative z-10 flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors duration-200 max-[1280px]:px-3 ${
+                const itemClassName = `relative z-10 flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors duration-200 max-[1440px]:px-3 ${
                   isActive
-                    ? 'text-slate-950'
-                    : 'text-slate-600 hover:text-slate-950'
+                    ? 'text-slate-950 dark:text-slate-100'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-slate-100'
                 }`;
 
                 if (item.tab) {
@@ -319,8 +337,8 @@ export const Layout = () => {
                       aria-current={isActive ? 'page' : undefined}
                       title={item.label}
                     >
-                      <Icon size={16} className={isActive ? 'text-sky-600' : 'text-slate-500'} />
-                      <span className="max-[1280px]:hidden">{item.label}</span>
+                      <Icon size={16} className={isActive ? 'text-sky-600 dark:text-sky-400' : 'text-slate-500 dark:text-slate-400'} />
+                      <span className={isProjectWorkspaceRoute ? 'max-[1440px]:hidden' : 'max-[1024px]:hidden'}>{item.label}</span>
                     </button>
                   );
                 }
@@ -336,28 +354,29 @@ export const Layout = () => {
                     aria-current={isActive ? 'page' : undefined}
                     title={item.label}
                   >
-                    <Icon size={16} className={isActive ? 'text-sky-600' : 'text-slate-500'} />
-                    <span className="max-[1280px]:hidden">{item.label}</span>
+                    <Icon size={16} className={isActive ? 'text-sky-600 dark:text-sky-400' : 'text-slate-500 dark:text-slate-400'} />
+                    <span className="max-[1024px]:hidden">{item.label}</span>
                   </Link>
                 );
               })}
             </nav>
           </div>
 
-          <div className="flex shrink-0 flex-nowrap items-center justify-end gap-3">
+          <div className="flex w-full min-w-0 max-w-full flex-wrap items-center justify-end gap-3 sm:w-auto">
             <LocalHelperIndicator />
+            <ThemeToggle />
             {syncStatus.saving && (
-              <span className="forge-pill gap-2 px-3 py-1 text-xs text-slate-700">
+              <span className="forge-pill gap-2 px-3 py-1 text-xs text-slate-700 dark:text-slate-300">
                 <span className="forge-energy-dot" aria-hidden="true" />
                 Saving...
               </span>
             )}
             {syncStatus.error && (
-              <div className="flex max-w-md items-center gap-2 rounded-full border border-rose-300 bg-rose-100 px-3 py-2 text-xs font-medium text-rose-800">
+              <div className="flex max-w-md items-center gap-2 rounded-full border border-rose-300 dark:border-rose-800 bg-rose-100 dark:bg-rose-950/55 px-3 py-2 text-xs font-medium text-rose-800 dark:text-rose-200">
                 <span className="truncate">{syncStatus.error}</span>
                 <button
                   onClick={clearSyncError}
-                  className="text-rose-500 transition-colors hover:text-rose-700"
+                  className="text-rose-500 dark:text-rose-400 transition-colors hover:text-rose-700 dark:hover:text-rose-300"
                   aria-label="Dismiss sync error"
                 >
                   <X size={14} />
@@ -372,12 +391,13 @@ export const Layout = () => {
                 onClick={isNewProjectRoute ? undefined : () => navigate('/project/new')}
                 className="gap-2 shadow-sm"
                 size="md"
+                aria-label={isNewProjectRoute ? 'Create Project' : 'New Project'}
               >
-                <Plus size={17} /> {isNewProjectRoute ? 'Create Project' : 'New Project'}
+                <Plus size={17} /><span className="hidden min-[360px]:inline">{isNewProjectRoute ? 'Create Project' : 'New Project'}</span>
               </Button>
             )}
 
-            <div className="forge-command-input flex min-w-[260px] items-center gap-2 px-3 py-2">
+            <div className="forge-command-input order-last flex w-full min-w-0 items-center gap-2 px-3 py-2 sm:order-none sm:w-auto sm:min-w-[260px]">
               <div className="min-w-0 flex-1">
                 <input
                   id="active-staff-name"
@@ -386,7 +406,7 @@ export const Layout = () => {
                   onChange={(event) => setActiveStaffName(event.target.value)}
                   list="staff-header-list"
                   placeholder="Who is on this workstation?"
-                  className="mt-1 w-full border-0 bg-transparent p-0 text-sm font-semibold text-slate-900 placeholder:text-slate-500 focus:outline-none"
+                  className="mt-1 w-full border-0 bg-transparent p-0 text-sm font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:outline-none"
                 />
                 <datalist id="staff-header-list">
                   {staffList.map((staffName) => <option key={staffName} value={staffName} />)}
@@ -396,7 +416,7 @@ export const Layout = () => {
                 <button
                   type="button"
                   onClick={clearActiveStaffName}
-                  className="text-xs font-semibold text-slate-500 transition-colors hover:text-rose-600"
+                  className="text-xs font-semibold text-slate-500 dark:text-slate-400 transition-colors hover:text-rose-600 dark:hover:text-rose-400"
                 >
                   Clear
                 </button>
@@ -407,7 +427,7 @@ export const Layout = () => {
               <button
                 type="button"
                 onClick={() => setIsProfileMenuOpen((open) => !open)}
-                className="forge-focus-ring flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[color:var(--forge-gold-border)] bg-slate-100 shadow-sm transition-colors hover:bg-sky-50"
+                className="forge-focus-ring flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[color:var(--forge-gold-border)] bg-slate-100 dark:bg-slate-900 shadow-sm transition-colors hover:bg-sky-50 dark:hover:bg-sky-950/40"
                 aria-haspopup="menu"
                 aria-expanded={isProfileMenuOpen}
                 aria-label="Open account menu"
@@ -424,7 +444,7 @@ export const Layout = () => {
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <span className="text-[11px] font-black tracking-[0.12em] text-slate-700">
+                  <span className="text-[11px] font-black tracking-[0.12em] text-slate-700 dark:text-slate-300">
                     {profileInitials}
                   </span>
                 )}
@@ -437,7 +457,7 @@ export const Layout = () => {
                 >
                   <Link
                     to="/about"
-                    className="flex w-full items-center rounded-md px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-sky-50 hover:text-slate-950"
+                    className="flex w-full items-center rounded-md px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 transition-colors hover:bg-sky-50 dark:hover:bg-sky-950/40 hover:text-slate-950 dark:hover:text-slate-100"
                     role="menuitem"
                     onClick={() => setIsProfileMenuOpen(false)}
                   >
@@ -445,7 +465,7 @@ export const Layout = () => {
                   </Link>
                   <Link
                     to="/privacy"
-                    className="flex w-full items-center rounded-md px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-sky-50 hover:text-slate-950"
+                    className="flex w-full items-center rounded-md px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 transition-colors hover:bg-sky-50 dark:hover:bg-sky-950/40 hover:text-slate-950 dark:hover:text-slate-100"
                     role="menuitem"
                     onClick={() => setIsProfileMenuOpen(false)}
                   >
@@ -453,17 +473,17 @@ export const Layout = () => {
                   </Link>
                   <Link
                     to="/terms"
-                    className="flex w-full items-center rounded-md px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-sky-50 hover:text-slate-950"
+                    className="flex w-full items-center rounded-md px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 transition-colors hover:bg-sky-50 dark:hover:bg-sky-950/40 hover:text-slate-950 dark:hover:text-slate-100"
                     role="menuitem"
                     onClick={() => setIsProfileMenuOpen(false)}
                   >
                     Terms
                   </Link>
-                  <div className="my-1 h-px bg-slate-200" />
+                  <div className="my-1 h-px bg-slate-200 dark:bg-slate-700" />
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-sky-50 hover:text-slate-950"
+                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 transition-colors hover:bg-sky-50 dark:hover:bg-sky-950/40 hover:text-slate-950 dark:hover:text-slate-100"
                     role="menuitem"
                   >
                     <LogOut size={16} />
@@ -478,7 +498,7 @@ export const Layout = () => {
       </header>
 
 
-      <main className="flex min-h-0 flex-1 flex-col overflow-auto overscroll-contain px-4 py-5 sm:px-5 lg:px-6 lg:py-6 print:p-0">
+      <main ref={mainRef} className="flex min-h-0 flex-1 flex-col overflow-auto overscroll-contain px-4 py-5 sm:px-5 lg:px-6 lg:py-6 print:p-0">
         <Outlet context={outletContext} />
       </main>
     </div>

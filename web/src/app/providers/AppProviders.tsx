@@ -5,12 +5,13 @@ import { ProjectProvider } from '@/features/projects/context/ProjectContext';
 import { SettingsProvider } from '@/features/settings/context/SettingsContext';
 import { StaffSessionProvider } from '@/features/auth/context/StaffSessionContext';
 import { LocalHelperProvider } from '@/features/local-files/LocalHelperContext';
+import { ThemeProvider } from './ThemeProvider';
 
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
-    <BrowserRouter>
+    <ThemeProvider><BrowserRouter>
       <FeedbackProvider>{children}</FeedbackProvider>
-    </BrowserRouter>
+    </BrowserRouter></ThemeProvider>
   );
 }
 

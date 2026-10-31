@@ -212,11 +212,11 @@ export const CheckpointReview = ({ project, onAdvanceFromLockedReview }: Checkpo
           aria-modal="true"
           aria-labelledby="drop-pages-title"
         >
-          <div className="forge-modal flex min-h-52 w-full max-w-xl flex-col items-center justify-center border-2 border-dashed border-sky-300 p-10 text-center shadow-2xl">
-            <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-lg border border-sky-300 bg-sky-100 shadow-sm">
-              <Upload className="h-8 w-8 text-sky-600" />
+          <div className="forge-modal flex min-h-52 w-full max-w-xl flex-col items-center justify-center border-2 border-dashed border-sky-300 dark:border-sky-800 p-10 text-center shadow-2xl">
+            <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-lg border border-sky-300 dark:border-sky-800 bg-sky-100 dark:bg-sky-950/55 shadow-sm">
+              <Upload className="h-8 w-8 text-sky-600 dark:text-sky-400" />
             </div>
-            <h2 id="drop-pages-title" className="text-3xl font-black text-slate-950">
+            <h2 id="drop-pages-title" className="text-3xl font-black text-slate-950 dark:text-slate-100">
               Drop Pages
             </h2>
           </div>
@@ -225,7 +225,7 @@ export const CheckpointReview = ({ project, onAdvanceFromLockedReview }: Checkpo
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-3">
-          <h3 className="text-lg font-semibold text-slate-950">
+          <h3 className="text-lg font-semibold text-slate-950 dark:text-slate-100">
             Parts List ({project.parts.length})
           </h3>
           <Button onClick={() => fileInputRef.current?.click()} disabled={loading}>
@@ -255,7 +255,7 @@ export const CheckpointReview = ({ project, onAdvanceFromLockedReview }: Checkpo
 
       <div className="flex flex-col gap-4">
         {project.parts.length === 0 ? (
-          <div className="forge-empty p-12 text-center text-slate-600">
+          <div className="forge-empty p-12 text-center text-slate-600 dark:text-slate-400">
             No parts added yet. Use Add Files or drag files onto this page to get started.
           </div>
         ) : (

@@ -78,21 +78,21 @@ export const GmailReplyComposer = ({
       {open && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]" onClick={() => !sending && setOpen(false)}>
           <section className="forge-drawer max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-lg" role="dialog" aria-modal="true" aria-labelledby="gmail-reply-title" onClick={(event) => event.stopPropagation()}>
-            <header className="flex items-start justify-between gap-4 border-b border-slate-300 bg-white px-5 py-4">
+            <header className="flex items-start justify-between gap-4 border-b border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] px-5 py-4">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Main Gmail Thread</p>
-                <h2 id="gmail-reply-title" className="text-lg font-black text-slate-950">Preview and send reply</h2>
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Main Gmail Thread</p>
+                <h2 id="gmail-reply-title" className="text-lg font-black text-slate-950 dark:text-slate-100">Preview and send reply</h2>
               </div>
               <Button variant="ghost" size="icon" onClick={() => setOpen(false)} disabled={sending} aria-label="Close reply preview"><X size={18} /></Button>
             </header>
-            <div className="max-h-[calc(92vh-9rem)] space-y-4 overflow-y-auto bg-slate-100 p-5">
-              <div className="grid gap-3 rounded-lg border border-slate-300 bg-white p-4 text-xs">
-                <p><span className="font-black text-slate-500">To:</span> <span className="font-semibold text-slate-900">{project.gmailMainContactEmail || project.email}</span></p>
-                <p><span className="font-black text-slate-500">Subject:</span> <span className="font-semibold text-slate-900">{project.gmailThreadSubject || '(no subject)'}</span></p>
+            <div className="max-h-[calc(92vh-9rem)] space-y-4 overflow-y-auto bg-slate-100 dark:bg-slate-900 p-5">
+              <div className="grid gap-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] p-4 text-xs">
+                <p><span className="font-black text-slate-500 dark:text-slate-400">To:</span> <span className="font-semibold text-slate-900 dark:text-slate-100">{project.gmailMainContactEmail || project.email}</span></p>
+                <p><span className="font-black text-slate-500 dark:text-slate-400">Subject:</span> <span className="font-semibold text-slate-900 dark:text-slate-100">{project.gmailThreadSubject || '(no subject)'}</span></p>
               </div>
               <div>
-                <p className="mb-2 text-sm font-bold text-slate-800">Reply</p>
-                <Suspense fallback={<p role="status" className="p-4 text-sm font-semibold text-slate-600">Loading reply editor…</p>}>
+                <p className="mb-2 text-sm font-bold text-slate-800 dark:text-slate-200">Reply</p>
+                <Suspense fallback={<p role="status" className="p-4 text-sm font-semibold text-slate-600 dark:text-slate-400">Loading reply editor…</p>}>
                 <RichEmailEditor
                   value={htmlBody}
                   onChange={(nextHtml) => {
@@ -105,9 +105,9 @@ export const GmailReplyComposer = ({
                 />
                 </Suspense>
               </div>
-              <p className="text-xs font-semibold text-slate-600">The thread is refreshed once before sending. This reply stays in Gmail and is cached in project correspondence.</p>
+              <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">The thread is refreshed once before sending. This reply stays in Gmail and is cached in project correspondence.</p>
             </div>
-            <footer className="flex justify-end gap-2 border-t border-slate-300 bg-white px-5 py-4">
+            <footer className="flex justify-end gap-2 border-t border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] px-5 py-4">
               <Button variant="ghost" onClick={() => setOpen(false)} disabled={sending}>Cancel</Button>
               <Button variant="success" className="gap-2" onClick={() => void send()} disabled={sending || !body.trim()}>
                 {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} {sending ? 'Sending…' : 'Send Reply'}

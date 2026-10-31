@@ -460,8 +460,8 @@ export const CheckpointConfirmation = ({ project, onAdvanceToProduction }: { pro
         <section className="forge-panel p-5">
             <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-600">Payment Management</p>
-                    <h3 className="mt-1 text-xl font-black text-slate-950">Quote, receipt and payment controls</h3>
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-600 dark:text-slate-400">Payment Management</p>
+                    <h3 className="mt-1 text-xl font-black text-slate-950 dark:text-slate-100">Quote, receipt and payment controls</h3>
                 </div>
                 <Button
                     className="gap-2"
@@ -479,14 +479,14 @@ export const CheckpointConfirmation = ({ project, onAdvanceToProduction }: { pro
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)]">
                 <div className="space-y-4">
                     <div className="forge-panel-muted px-4 py-3">
-                        <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-600">Quote Status</p>
-                        <h4 className="mt-1 text-lg font-black text-slate-950">{quoteStatusTitle}</h4>
-                        <p className="mt-2 text-sm font-semibold text-slate-700">{quoteStatusBody}</p>
-                        <div className="mt-3 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
+                        <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-600 dark:text-slate-400">Quote Status</p>
+                        <h4 className="mt-1 text-lg font-black text-slate-950 dark:text-slate-100">{quoteStatusTitle}</h4>
+                        <p className="mt-2 text-sm font-semibold text-slate-700 dark:text-slate-300">{quoteStatusBody}</p>
+                        <div className="mt-3 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
                             {quoteStatusTotal}
                         </div>
                         {quoteComparison.status === 'outdated' && (
-                            <p className="mt-3 text-sm font-semibold text-amber-800">
+                            <p className="mt-3 text-sm font-semibold text-amber-800 dark:text-amber-200">
                                 Updating will replace current issued v{currentIssuedSnapshot?.snapshot_version} with the updated draft values shown in the cost summary selector.
                             </p>
                         )}
@@ -503,7 +503,7 @@ export const CheckpointConfirmation = ({ project, onAdvanceToProduction }: { pro
                     </div>
 
                     <div>
-                        <label className="mb-1 block text-sm font-medium text-slate-800">Payment Note (internal)</label>
+                        <label className="mb-1 block text-sm font-medium text-slate-800 dark:text-slate-200">Payment Note (internal)</label>
                         <textarea
                             value={project.paymentNote || ''}
                             onChange={(e) => updateProject(project.id, { paymentNote: e.target.value })}
@@ -515,8 +515,8 @@ export const CheckpointConfirmation = ({ project, onAdvanceToProduction }: { pro
 
                 <div className="space-y-4">
                     <div className="forge-panel-muted p-4">
-                        <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-600">Payment Record</p>
-                        <p className="mt-1 text-sm font-semibold text-slate-700">
+                        <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-600 dark:text-slate-400">Payment Record</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-300">
                             {project.moduleOrLecturerPays
                                 ? 'Covered by module/lecturer.'
                                 : project.needsPayment
@@ -525,7 +525,7 @@ export const CheckpointConfirmation = ({ project, onAdvanceToProduction }: { pro
                         </p>
                         {project.needsPayment && !project.moduleOrLecturerPays && (
                             <div className="mt-3">
-                                <label className="mb-1 block text-sm font-bold text-slate-800">Receipt Number</label>
+                                <label className="mb-1 block text-sm font-bold text-slate-800 dark:text-slate-200">Receipt Number</label>
                                 <input
                                     type="text"
                                     value={project.receiptNumber || ''}
@@ -534,7 +534,7 @@ export const CheckpointConfirmation = ({ project, onAdvanceToProduction }: { pro
                                     className="forge-command-input w-full px-3 py-2 text-sm font-medium"
                                 />
                                 {!project.receiptNumber?.trim() && (
-                                    <p className="mt-1 text-xs font-semibold text-rose-600">Receipt number confirms payment before printing.</p>
+                                    <p className="mt-1 text-xs font-semibold text-rose-600 dark:text-rose-400">Receipt number confirms payment before printing.</p>
                                 )}
                             </div>
                         )}
@@ -542,7 +542,7 @@ export const CheckpointConfirmation = ({ project, onAdvanceToProduction }: { pro
 
                     {project.needsPayment && !project.moduleOrLecturerPays && (
                         <div>
-                            <label className="mb-1 block text-sm font-medium text-slate-800">Payment Override Note</label>
+                            <label className="mb-1 block text-sm font-medium text-slate-800 dark:text-slate-200">Payment Override Note</label>
                             <textarea
                                 value={project.paymentOverrideNote || ''}
                                 onChange={(e) => updateProject(project.id, { paymentOverrideNote: e.target.value })}
@@ -558,7 +558,7 @@ export const CheckpointConfirmation = ({ project, onAdvanceToProduction }: { pro
         <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
             <div className="forge-panel-muted p-4">
                 <div className="mb-4 flex items-center justify-between gap-3">
-                    <h3 className="text-lg font-semibold text-slate-900">Communication</h3>
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Communication</h3>
                     {project.gmailThreadId ? (
                       <GmailReplyComposer
                         project={project}
@@ -595,7 +595,7 @@ export const CheckpointConfirmation = ({ project, onAdvanceToProduction }: { pro
                         variant="outline"
                         size="icon"
                         onClick={copyToClipboard}
-                        className="absolute right-5 top-2.5 h-8 w-8 rounded-full border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-100"
+                        className="absolute right-5 top-2.5 h-8 w-8 rounded-full border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] text-slate-700 dark:text-slate-300 shadow-sm hover:bg-slate-100 dark:hover:bg-slate-900"
                         aria-label="Copy email to clipboard"
                         title="Copy email to clipboard"
                         disabled={!quoteIsIssued}
@@ -605,10 +605,10 @@ export const CheckpointConfirmation = ({ project, onAdvanceToProduction }: { pro
                 </div>
             </div>
 
-            <div className="rounded-lg border border-teal-300 bg-teal-100 p-5 shadow-sm">
-                <p className="text-xs font-black uppercase tracking-[0.14em] text-teal-800">Ready for Production</p>
-                <h3 className="mt-1 text-lg font-black text-teal-950">Confirm Quote and Start Printing</h3>
-                <p className="mt-2 text-sm font-semibold text-teal-900">
+            <div className="rounded-lg border border-teal-300 dark:border-teal-800 bg-teal-100 dark:bg-teal-950/55 p-5 shadow-sm">
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-teal-800 dark:text-teal-200">Ready for Production</p>
+                <h3 className="mt-1 text-lg font-black text-teal-950 dark:text-teal-200">Confirm Quote and Start Printing</h3>
+                <p className="mt-2 text-sm font-semibold text-teal-900 dark:text-teal-200">
                     {productionReadinessBody}
                 </p>
                 <Button
@@ -623,15 +623,15 @@ export const CheckpointConfirmation = ({ project, onAdvanceToProduction }: { pro
                     <CheckCircle className="w-5 h-5" /> Confirm Quote and Start Printing
                 </Button>
                 {!quoteComparison.hasSnapshot && (
-                  <p className="mt-2 text-xs font-semibold text-teal-800">
+                  <p className="mt-2 text-xs font-semibold text-teal-800 dark:text-teal-200">
                     Download, communication, and production unlock after the first quote is issued.
                   </p>
                 )}
             </div>
         </div>
 
-        <div className="border-t border-slate-300 pt-4">
-            <Button variant="outline" className="gap-2 border-rose-300 text-rose-800 hover:bg-rose-100" onClick={handleArchive} disabled={pendingAction !== null} loading={pendingAction === 'archive'} loadingText="Archiving…">
+        <div className="border-t border-slate-300 dark:border-slate-700 pt-4">
+            <Button variant="outline" className="gap-2 border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-200 hover:bg-rose-100 dark:hover:bg-rose-950/55" onClick={handleArchive} disabled={pendingAction !== null} loading={pendingAction === 'archive'} loadingText="Archiving…">
                 <Archive className="w-4 h-4" /> Cancel / Archive Project
             </Button>
         </div>

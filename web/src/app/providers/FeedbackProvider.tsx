@@ -72,10 +72,10 @@ type FeedbackContextType = {
 const FeedbackContext = createContext<FeedbackContextType | undefined>(undefined);
 
 const toneClasses: Record<FeedbackTone, string> = {
-  info: 'border-sky-300 bg-sky-50 text-sky-950',
-  success: 'border-emerald-300 bg-emerald-50 text-emerald-950',
-  warning: 'border-amber-300 bg-amber-50 text-amber-950',
-  error: 'border-red-300 bg-red-50 text-red-950'
+  info: 'border-sky-300 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/40 text-sky-950 dark:text-sky-200',
+  success: 'border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-200',
+  warning: 'border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-950 dark:text-amber-200',
+  error: 'border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40 text-red-950 dark:text-red-200'
 };
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -179,7 +179,7 @@ export const FeedbackProvider = ({ children }: { children: React.ReactNode }) =>
       <dialog
         ref={dialogRef}
         aria-labelledby="feedback-dialog-title"
-        className="m-auto w-[calc(100%-2rem)] max-w-md overflow-hidden rounded-lg border border-slate-300 bg-white p-0 text-slate-950 shadow-2xl backdrop:bg-slate-950/55"
+        className="m-auto w-[calc(100%-2rem)] max-w-md overflow-hidden rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] p-0 text-slate-950 dark:text-slate-100 shadow-2xl backdrop:bg-slate-950/55"
         onCancel={(event) => {
           event.preventDefault();
           closeDialog();
@@ -193,7 +193,7 @@ export const FeedbackProvider = ({ children }: { children: React.ReactNode }) =>
             <h2 id="feedback-dialog-title" className="text-lg font-extrabold">
               {dialog.title}
             </h2>
-            {dialog.message && <p className="mt-2 text-sm text-slate-600">{dialog.message}</p>}
+            {dialog.message && <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{dialog.message}</p>}
 
             {dialog.messages?.length ? (
               <ul className={`mt-4 list-disc space-y-1 rounded-md border px-8 py-3 text-sm ${toneClasses[dialog.tone || 'info']}`}>
@@ -204,8 +204,8 @@ export const FeedbackProvider = ({ children }: { children: React.ReactNode }) =>
             {dialog.kind === 'prompt' && (
               <div className="mt-5 space-y-4">
                 {dialog.fields.map((field) => {
-                  const inputClasses = `mt-1 w-full rounded-md border bg-white px-3 py-2 text-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
-                    promptErrors[field.name] ? 'border-red-500' : 'border-slate-300'
+                  const inputClasses = `mt-1 w-full rounded-md border bg-white dark:bg-[var(--forge-panel)] px-3 py-2 text-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 ${
+                    promptErrors[field.name] ? 'border-red-500' : 'border-slate-300 dark:border-slate-700'
                   }`;
                   const sharedProps = {
                     id: `feedback-${field.name}`,
@@ -223,7 +223,7 @@ export const FeedbackProvider = ({ children }: { children: React.ReactNode }) =>
                   };
 
                   return (
-                    <label key={field.name} className="block text-sm font-bold text-slate-800">
+                    <label key={field.name} className="block text-sm font-bold text-slate-800 dark:text-slate-200">
                       {field.label}{field.required ? ' *' : ''}
                       {field.type === 'select' ? (
                         <select {...sharedProps} className={inputClasses}>
@@ -237,7 +237,7 @@ export const FeedbackProvider = ({ children }: { children: React.ReactNode }) =>
                       ) : (
                         <input {...sharedProps} className={inputClasses} type="text" placeholder={field.placeholder} />
                       )}
-                      <span className={`mt-1 block min-h-4 text-xs ${promptErrors[field.name] ? 'text-red-700' : 'text-slate-500'}`}>
+                      <span className={`mt-1 block min-h-4 text-xs ${promptErrors[field.name] ? 'text-red-700 dark:text-red-300' : 'text-slate-500 dark:text-slate-400'}`}>
                         {promptErrors[field.name] || (field.required ? 'Required' : '')}
                       </span>
                     </label>
@@ -250,7 +250,7 @@ export const FeedbackProvider = ({ children }: { children: React.ReactNode }) =>
               {dialog.kind !== 'message' && (
                 <button
                   type="button"
-                  className="rounded-md px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600"
+                  className="rounded-md px-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600"
                   onClick={closeDialog}
                 >
                   {dialog.cancelLabel || 'Cancel'}

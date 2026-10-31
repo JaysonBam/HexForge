@@ -185,10 +185,10 @@ export const ProjectCorrespondencePanel = ({
     >
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
           {project.gmailThreadId && (
-            <div className="mb-5 border-b border-slate-200 pb-5">
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Main Gmail Thread</p>
-              <h3 className="mt-1 break-words text-sm font-bold text-slate-950">{project.gmailThreadSubject || 'Linked correspondence'}</h3>
-              <p className="mt-1 text-xs font-semibold text-slate-600">Main contact: {project.gmailMainContactEmail || 'Not detected'} · Last refresh: {project.gmailLastSyncedAt ? formatDateTime(project.gmailLastSyncedAt) : 'Not yet refreshed'}</p>
+            <div className="mb-5 border-b border-slate-200 dark:border-slate-700 pb-5">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Main Gmail Thread</p>
+              <h3 className="mt-1 break-words text-sm font-bold text-slate-950 dark:text-slate-100">{project.gmailThreadSubject || 'Linked correspondence'}</h3>
+              <p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-400">Main contact: {project.gmailMainContactEmail || 'Not detected'} · Last refresh: {project.gmailLastSyncedAt ? formatDateTime(project.gmailLastSyncedAt) : 'Not yet refreshed'}</p>
               <div className="mt-3 flex flex-wrap gap-2">
               <span className="inline-flex" title={!canUseGmail ? GMAIL_THREAD_ACCOUNT_MISMATCH : undefined}>
                 <Button variant="outline" size="sm" className="gap-2" onClick={() => void refresh(true)} disabled={refreshing || !canUseGmail}>
@@ -203,30 +203,30 @@ export const ProjectCorrespondencePanel = ({
               </div>
             </div>
           )}
-          {warning && <div className="mb-4 flex gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900"><AlertTriangle size={15} className="mt-0.5 shrink-0" /><span>{warning}</span></div>}
+          {warning && <div className="mb-4 flex gap-2 rounded-md border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3 text-xs font-semibold text-amber-900 dark:text-amber-200"><AlertTriangle size={15} className="mt-0.5 shrink-0" /><span>{warning}</span></div>}
           {!project.gmailThreadId ? (
             <Card className="p-8 text-center">
-              <Mail size={28} className="mx-auto text-slate-400" />
-              <h3 className="mt-3 text-sm font-black text-slate-900">No Main Gmail Thread linked</h3>
-              <p className="mt-1 text-xs font-semibold text-slate-600">Open Project Details to link a recent Gmail thread.</p>
+              <Mail size={28} className="mx-auto text-slate-400 dark:text-slate-400" />
+              <h3 className="mt-3 text-sm font-black text-slate-900 dark:text-slate-100">No Main Gmail Thread linked</h3>
+              <p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-400">Open Project Details to link a recent Gmail thread.</p>
             </Card>
           ) : loadingCache && messages.length === 0 ? (
-            <div className="flex min-h-48 items-center justify-center gap-2 text-sm font-bold text-slate-600"><Loader2 size={18} className="animate-spin" /> Loading saved messages…</div>
+            <div className="flex min-h-48 items-center justify-center gap-2 text-sm font-bold text-slate-600 dark:text-slate-400"><Loader2 size={18} className="animate-spin" /> Loading saved messages…</div>
           ) : messages.length === 0 ? (
-            <Card className="p-8 text-center text-sm font-semibold text-slate-600">No cached messages yet. Use Refresh to retrieve the Main Gmail Thread.</Card>
+            <Card className="p-8 text-center text-sm font-semibold text-slate-600 dark:text-slate-400">No cached messages yet. Use Refresh to retrieve the Main Gmail Thread.</Card>
           ) : (
             <div className="space-y-4">
               {messages.map((message) => (
                 <article key={message.id} className={`flex ${message.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
-                  <Card className={`max-w-[88%] p-4 ${message.direction === 'outgoing' ? 'bg-sky-50' : 'bg-white'}`}>
+                  <Card className={`max-w-[88%] p-4 ${message.direction === 'outgoing' ? 'bg-sky-50 dark:bg-sky-950/40' : 'bg-white dark:bg-[var(--forge-panel)]'}`}>
                     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                      <p className="text-xs font-black text-slate-900">{message.senderName || message.senderEmail || (message.direction === 'outgoing' ? 'HexForge' : 'Unknown sender')}</p>
-                      <time className="text-[10px] font-bold text-slate-500">{formatDateTime(message.messageDate)}</time>
+                      <p className="text-xs font-black text-slate-900 dark:text-slate-100">{message.senderName || message.senderEmail || (message.direction === 'outgoing' ? 'HexForge' : 'Unknown sender')}</p>
+                      <time className="text-[10px] font-bold text-slate-500 dark:text-slate-400">{formatDateTime(message.messageDate)}</time>
                     </div>
-                    {message.senderName && <p className="mt-0.5 text-[10px] font-semibold text-slate-500">{message.senderEmail}</p>}
-                    <p className="mt-3 whitespace-pre-wrap break-words text-sm font-medium leading-relaxed text-slate-800">{message.body || '(No plain-text body)'}</p>
+                    {message.senderName && <p className="mt-0.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400">{message.senderEmail}</p>}
+                    <p className="mt-3 whitespace-pre-wrap break-words text-sm font-medium leading-relaxed text-slate-800 dark:text-slate-200">{message.body || '(No plain-text body)'}</p>
                     {message.attachments.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-1.5 border-t border-slate-200 pt-3">
+                      <div className="mt-3 flex flex-wrap gap-1.5 border-t border-slate-200 dark:border-slate-700 pt-3">
                         {message.attachments.map((attachment) => {
                           const attachmentKey = `${attachment.messageId}-${attachment.partId}`;
                           const downloadable = isSupportedGmailAttachment(attachment.filename);

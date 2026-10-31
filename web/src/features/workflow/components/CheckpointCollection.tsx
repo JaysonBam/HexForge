@@ -258,25 +258,25 @@ export const CheckpointCollection = ({ project, onReturnToProduction }: {
 
             <div className="forge-panel-muted mb-6 p-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div className="flex items-center gap-2 rounded-md border border-sky-300 bg-sky-100 py-1 pl-3 pr-1 shadow-sm">
-                        <span className="text-sm font-semibold text-sky-900">Print Label:</span>
+                    <div className="flex items-center gap-2 rounded-md border border-sky-300 dark:border-sky-800 bg-sky-100 dark:bg-sky-950/55 py-1 pl-3 pr-1 shadow-sm">
+                        <span className="text-sm font-semibold text-sky-900 dark:text-sky-200">Print Label:</span>
                         <input
                             type="text"
                             value={project.printLabel || ''}
                             onChange={(e) => updateProject(project.id, { printLabel: e.target.value })}
                             placeholder="E.g. Tray A1"
-                            className="forge-command-input w-32 px-2 py-1 text-sm text-sky-950"
+                            className="forge-command-input w-32 px-2 py-1 text-sm text-sky-950 dark:text-sky-200"
                         />
                     </div>
 
-                    <div className="text-sm font-semibold text-slate-700">
+                    <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                         Collection total: R {displayedReceiptTotal.toFixed(2)}
                     </div>
 
                     <div className="flex flex-col items-end gap-2">
                         {project.needsPayment && !project.moduleOrLecturerPays && (
                             <div className="flex flex-col items-start gap-1">
-                                <label className="text-xs font-bold uppercase tracking-[0.12em] text-slate-600">
+                                <label className="text-xs font-bold uppercase tracking-[0.12em] text-slate-600 dark:text-slate-400">
                                     Receipt Number
                                 </label>
                                 <input
@@ -286,15 +286,15 @@ export const CheckpointCollection = ({ project, onReturnToProduction }: {
                                     placeholder="Enter receipt number"
                                     className={`w-52 rounded-md border px-3 py-2 text-sm font-medium focus:outline-none focus:ring-1 ${
                                         isPaymentBlocked
-                                            ? 'border-rose-300 bg-rose-50 text-rose-900 focus:border-rose-500 focus:ring-rose-500'
-                                            : 'forge-command-input text-slate-900'
+                                            ? 'border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 text-rose-900 dark:text-rose-200 focus:border-rose-500 focus:ring-rose-500'
+                                            : 'forge-command-input text-slate-900 dark:text-slate-100'
                                     }`}
                                 />
                             </div>
                         )}
 
                         {isPaymentBlocked && (
-                            <div className="rounded border border-red-300 bg-red-100 px-2 py-1 text-xs font-semibold text-red-800">
+                            <div className="rounded border border-red-300 dark:border-red-800 bg-red-100 dark:bg-red-950/55 px-2 py-1 text-xs font-semibold text-red-800 dark:text-red-200">
                                 Enter the receipt number before collection can proceed.
                             </div>
                         )}
@@ -304,7 +304,7 @@ export const CheckpointCollection = ({ project, onReturnToProduction }: {
 
             <div className="forge-panel-muted mt-8 mb-6 p-4">
                 <div className="mb-4 flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-slate-900">Communication</h3>
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Communication</h3>
                     <div className="flex flex-wrap justify-end gap-2">
                         {project.gmailThreadId ? (
                             <GmailReplyComposer
@@ -332,7 +332,7 @@ export const CheckpointCollection = ({ project, onReturnToProduction }: {
                 <div className="space-y-4">
                     <div className="relative">
                         <textarea
-                            className="forge-command-input h-40 w-full p-3 pr-20 text-sm font-medium leading-relaxed text-slate-700"
+                            className="forge-command-input h-40 w-full p-3 pr-20 text-sm font-medium leading-relaxed text-slate-700 dark:text-slate-300"
                             value={emailContent}
                             readOnly
                         />
@@ -341,7 +341,7 @@ export const CheckpointCollection = ({ project, onReturnToProduction }: {
                             variant="outline"
                             size="icon"
                             onClick={copyToClipboard}
-                            className="absolute right-5 top-2.5 h-8 w-8 rounded-full border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-100"
+                            className="absolute right-5 top-2.5 h-8 w-8 rounded-full border-slate-300 dark:border-slate-700 bg-white dark:bg-[var(--forge-panel)] text-slate-700 dark:text-slate-300 shadow-sm hover:bg-slate-100 dark:hover:bg-slate-900"
                             aria-label="Copy email to clipboard"
                             title="Copy email to clipboard"
                         >
@@ -352,24 +352,24 @@ export const CheckpointCollection = ({ project, onReturnToProduction }: {
             </div>
 
             {printableCollectionParts.length === 0 ? (
-                <div className="forge-empty px-4 py-8 text-center text-slate-700">No printed parts to collect yet.</div>
+                <div className="forge-empty px-4 py-8 text-center text-slate-700 dark:text-slate-300">No printed parts to collect yet.</div>
             ) : (
                 <div className="space-y-3">
                     {printableCollectionParts.map(part => (
-                        <Card key={part.id} className={`flex items-center justify-between p-3 ${part.printStatus === 'COLLECTED' ? 'border-teal-300 bg-teal-100/80 opacity-80' : ''}`}>
+                        <Card key={part.id} className={`flex items-center justify-between p-3 ${part.printStatus === 'COLLECTED' ? 'border-teal-300 dark:border-teal-800 bg-teal-100/80 dark:bg-teal-950/80 opacity-80' : ''}`}>
                             <div className="flex items-center gap-4">
                                 {part.imageUrl && (
-                                    <img src={part.imageUrl} alt={part.partName} className="h-16 w-16 rounded border bg-white object-contain" />
+                                    <img src={part.imageUrl} alt={part.partName} className="h-16 w-16 rounded border bg-white dark:bg-[var(--forge-panel)] object-contain" />
                                 )}
                                 <div>
                                     <div className="font-medium">{part.partName}</div>
                                     {part.specialInstruction && part.specialInstruction.trim() !== '' && (
-                                        <div className="text-sm italic text-slate-700">Note: {part.specialInstruction}</div>
+                                        <div className="text-sm italic text-slate-700 dark:text-slate-300">Note: {part.specialInstruction}</div>
                                     )}
-                                    <div className="mt-1 text-xs text-slate-600">
+                                    <div className="mt-1 text-xs text-slate-600 dark:text-slate-400">
                                         Removed by: {part.removedBy}
                                     </div>
-                                    <div className="mt-1 text-xs text-slate-600">Status: {part.printStatus}</div>
+                                    <div className="mt-1 text-xs text-slate-600 dark:text-slate-400">Status: {part.printStatus}</div>
                                 </div>
                             </div>
 
@@ -377,7 +377,7 @@ export const CheckpointCollection = ({ project, onReturnToProduction }: {
                                 {part.printStatus !== 'COLLECTED' ? (
                                     <>
                                         <div className="flex gap-2">
-                                            <div className={`flex-1 rounded border px-3 py-2 text-sm font-medium ${activeStaffName ? 'border-slate-300 bg-slate-100 text-slate-800' : 'forge-alert-warm'}`}>
+                                            <div className={`flex-1 rounded border px-3 py-2 text-sm font-medium ${activeStaffName ? 'border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200' : 'forge-alert-warm'}`}>
                                                 {activeStaffName || 'Set the current staff member in the header.'}
                                             </div>
                                             <Button
@@ -394,7 +394,7 @@ export const CheckpointCollection = ({ project, onReturnToProduction }: {
                                         </div>
                                     </>
                                 ) : (
-                                    <div className="text-sm font-medium text-teal-900">Assisted by: {part.collectedBy}</div>
+                                    <div className="text-sm font-medium text-teal-900 dark:text-teal-200">Assisted by: {part.collectedBy}</div>
                                 )}
                                 <Button
                                     onClick={() => returnForReprint(part)}

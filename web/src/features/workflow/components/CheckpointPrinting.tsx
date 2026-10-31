@@ -263,12 +263,12 @@ export const CheckpointPrinting = ({ project, onAdvanceToCollection }: { project
         if (runs.length === 0) return null;
 
         return (
-            <div className="mt-2 space-y-1 border-t border-slate-300 pt-2">
+            <div className="mt-2 space-y-1 border-t border-slate-300 dark:border-slate-700 pt-2">
                 {runs.map((run, idx) => {
                     const outcomeLabel = run.outcome || (run.failed_at ? 'FAILED' : run.finished_at ? 'PRINTED' : idx === 0 && part.printStatus !== 'PRINTING' ? 'REQUEUED' : 'IN_PROGRESS');
                     const failureReasonLabel = run.failure_reason?.trim();
                     return (
-                        <div key={run.id} className="text-[11px] text-slate-500">
+                        <div key={run.id} className="text-[11px] text-slate-500 dark:text-slate-400">
                             Attempt {runs.length - idx}: {outcomeLabel} - {run.machine_name || 'Unknown machine'}
                             {outcomeLabel === 'FAILED' && failureReasonLabel ? ` - ${failureReasonLabel}` : ''}
                         </div>
@@ -284,7 +284,7 @@ export const CheckpointPrinting = ({ project, onAdvanceToCollection }: { project
                 <div className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-[2px]">
                     <div className="flex min-h-full items-center justify-center p-4">
                         <div className="forge-modal w-full max-w-sm space-y-4 p-6">
-                            <h3 className="border-b border-slate-300 pb-2 text-lg font-bold">
+                            <h3 className="border-b border-slate-300 dark:border-slate-700 pb-2 text-lg font-bold">
                                 {activeAction.type === 'START' ? 'Start Print Job' : activeAction.type === 'FINISH' ? 'Finish Print Job' : 'Fail Print Job'}
                             </h3>
 
@@ -295,7 +295,7 @@ export const CheckpointPrinting = ({ project, onAdvanceToCollection }: { project
                                             <label className="mb-1 block text-sm font-medium">Machine</label>
                                             <input
                                                 type="text"
-                                                className={`forge-command-input w-full p-2 ${formErrors.selectedPrinter ? 'border-rose-400 bg-rose-50' : ''}`}
+                                                className={`forge-command-input w-full p-2 ${formErrors.selectedPrinter ? 'border-rose-400 dark:border-rose-700 bg-rose-50 dark:bg-rose-950/40' : ''}`}
                                                 value={selectedPrinter}
                                                 onChange={e => setSelectedPrinter(e.target.value)}
                                                 list="printers-modal"
@@ -304,7 +304,7 @@ export const CheckpointPrinting = ({ project, onAdvanceToCollection }: { project
                                             <datalist id="printers-modal">
                                                 {printers.map(p => <option key={p} value={p} />)}
                                             </datalist>
-                                            {formErrors.selectedPrinter && <p className="mt-1 text-xs font-semibold text-rose-600">{formErrors.selectedPrinter}</p>}
+                                            {formErrors.selectedPrinter && <p className="mt-1 text-xs font-semibold text-rose-600 dark:text-rose-400">{formErrors.selectedPrinter}</p>}
                                         </div>
                                         <div>
                                             <label className="mb-1 block text-sm font-medium">Primary Material Brand</label>
@@ -340,20 +340,20 @@ export const CheckpointPrinting = ({ project, onAdvanceToCollection }: { project
                                     <div>
                                         <label className="mb-1 block text-sm font-medium">Failure Reason</label>
                                         <textarea
-                                            className={`forge-command-input w-full p-2 ${formErrors.failureReason ? 'border-rose-400 bg-rose-50' : ''}`}
+                                            className={`forge-command-input w-full p-2 ${formErrors.failureReason ? 'border-rose-400 dark:border-rose-700 bg-rose-50 dark:bg-rose-950/40' : ''}`}
                                             value={failureReason}
                                             onChange={e => setFailureReason(e.target.value)}
                                             placeholder="What needs to be fixed before re-run?"
                                             rows={3}
                                         />
-                                        {formErrors.failureReason && <p className="mt-1 text-xs font-semibold text-rose-600">{formErrors.failureReason}</p>}
+                                        {formErrors.failureReason && <p className="mt-1 text-xs font-semibold text-rose-600 dark:text-rose-400">{formErrors.failureReason}</p>}
                                     </div>
                                 )}
 
                                 <div>
                                     <label className="mb-1 block text-sm font-medium">Staff member</label>
                                     <select
-                                        className={`forge-command-input w-full p-2 ${formErrors.actionStaffName ? 'border-rose-400 bg-rose-50' : ''}`}
+                                        className={`forge-command-input w-full p-2 ${formErrors.actionStaffName ? 'border-rose-400 dark:border-rose-700 bg-rose-50 dark:bg-rose-950/40' : ''}`}
                                         value={actionStaffName}
                                         onChange={(event) => {
                                             setActionStaffName(event.target.value);
@@ -363,7 +363,7 @@ export const CheckpointPrinting = ({ project, onAdvanceToCollection }: { project
                                         <option value="">Select a staff member</option>
                                         {staffOptions.map((name) => <option key={name} value={name}>{name}</option>)}
                                     </select>
-                                    {formErrors.actionStaffName && <p className="mt-1 text-xs font-semibold text-rose-600">{formErrors.actionStaffName}</p>}
+                                    {formErrors.actionStaffName && <p className="mt-1 text-xs font-semibold text-rose-600 dark:text-rose-400">{formErrors.actionStaffName}</p>}
                                 </div>
                             </div>
 
@@ -380,7 +380,7 @@ export const CheckpointPrinting = ({ project, onAdvanceToCollection }: { project
                 <div>
                     <h2 className="text-lg font-bold">Printing Dashboard</h2>
                     {allCollectionReady && (
-                        <p className="mt-1 text-sm text-slate-600">
+                        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                             All parts are complete. Keep the project in production until you are ready to release it to collection.
                         </p>
                     )}
@@ -394,9 +394,9 @@ export const CheckpointPrinting = ({ project, onAdvanceToCollection }: { project
 
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
                 <div className="forge-lane forge-lane-blue min-h-[400px] border p-4">
-                    <h3 className="mb-4 flex items-center gap-2 font-bold text-slate-800">
+                    <h3 className="mb-4 flex items-center gap-2 font-bold text-slate-800 dark:text-slate-200">
                         QUEUED
-                        <span className="forge-pill px-2 py-0.5 text-xs text-slate-800">
+                        <span className="forge-pill px-2 py-0.5 text-xs text-slate-800 dark:text-slate-200">
                             {queuedParts.length}
                         </span>
                     </h3>
@@ -405,20 +405,20 @@ export const CheckpointPrinting = ({ project, onAdvanceToCollection }: { project
                             <Card key={part.id} className="border-l-4 border-l-sky-500 p-3 shadow-sm">
                                 <div className="flex gap-3">
                                     {part.imageUrl && (
-                                        <img src={part.imageUrl} alt={part.partName} className="h-12 w-12 rounded border bg-white object-contain" />
+                                        <img src={part.imageUrl} alt={part.partName} className="h-12 w-12 rounded border bg-white dark:bg-[var(--forge-panel)] object-contain" />
                                     )}
                                     <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
                                         <div className="font-medium">{part.partName}</div>
-                                        {part.sourceFilePath && <div className="mt-1 truncate font-mono text-[11px] text-slate-600" title={part.sourceFilePath}>File: {sourceFileName(part.sourceFilePath)}</div>}
+                                        {part.sourceFilePath && <div className="mt-1 truncate font-mono text-[11px] text-slate-600 dark:text-slate-400" title={part.sourceFilePath}>File: {sourceFileName(part.sourceFilePath)}</div>}
                                         {part.specialInstruction && part.specialInstruction.trim() !== '' && (
-                                            <div className="mt-1 text-sm italic text-slate-700">Note: {part.specialInstruction}</div>
+                                            <div className="mt-1 text-sm italic text-slate-700 dark:text-slate-300">Note: {part.specialInstruction}</div>
                                         )}
-                                        <div className="mt-1 text-sm text-slate-700">
+                                        <div className="mt-1 text-sm text-slate-700 dark:text-slate-300">
                                             {part.primaryMaterial}
                                             {part.secondaryMaterial ? ` + ${part.secondaryMaterial}` : ''} - {part.primaryEstimatedWeight}g
                                         </div>
-                                        <div className="mt-1 text-xs text-slate-600">Status: {getProductionLabel(part.printStatus)}</div>
-                                        <div className="mt-1 text-xs text-slate-600">{getRecentRunSummary(part)}</div>
+                                        <div className="mt-1 text-xs text-slate-600 dark:text-slate-400">Status: {getProductionLabel(part.printStatus)}</div>
+                                        <div className="mt-1 text-xs text-slate-600 dark:text-slate-400">{getRecentRunSummary(part)}</div>
                                         {renderRunHistory(part)}
                                     </div>
                                 </div>
@@ -434,9 +434,9 @@ export const CheckpointPrinting = ({ project, onAdvanceToCollection }: { project
                 </div>
 
                 <div className="forge-lane forge-lane-indigo min-h-[400px] border p-4">
-                    <h3 className="mb-4 flex items-center gap-2 font-bold text-indigo-900">
+                    <h3 className="mb-4 flex items-center gap-2 font-bold text-indigo-900 dark:text-indigo-200">
                         PRINTING
-                        <span className="forge-pill px-2 py-0.5 text-xs text-indigo-900">
+                        <span className="forge-pill px-2 py-0.5 text-xs text-indigo-900 dark:text-indigo-200">
                             {printingParts.length}
                         </span>
                     </h3>
@@ -445,17 +445,17 @@ export const CheckpointPrinting = ({ project, onAdvanceToCollection }: { project
                             <Card key={part.id} className="border-l-4 border-l-indigo-500 p-3 shadow-sm">
                                 <div className="flex gap-3">
                                     {part.imageUrl && (
-                                        <img src={part.imageUrl} alt={part.partName} className="h-12 w-12 rounded border bg-white object-contain" />
+                                        <img src={part.imageUrl} alt={part.partName} className="h-12 w-12 rounded border bg-white dark:bg-[var(--forge-panel)] object-contain" />
                                     )}
                                     <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
                                         <div className="font-medium">{part.partName}</div>
-                                        {part.sourceFilePath && <div className="mt-1 truncate font-mono text-[11px] text-slate-600" title={part.sourceFilePath}>File: {sourceFileName(part.sourceFilePath)}</div>}
+                                        {part.sourceFilePath && <div className="mt-1 truncate font-mono text-[11px] text-slate-600 dark:text-slate-400" title={part.sourceFilePath}>File: {sourceFileName(part.sourceFilePath)}</div>}
                                         {part.specialInstruction && part.specialInstruction.trim() !== '' && (
-                                            <div className="mt-1 text-sm italic text-indigo-700">Note: {part.specialInstruction}</div>
+                                            <div className="mt-1 text-sm italic text-indigo-700 dark:text-indigo-300">Note: {part.specialInstruction}</div>
                                         )}
-                                        <div className="mt-1 text-sm font-mono text-indigo-700">On: {part.printerName}</div>
-                                        <div className="mt-1 text-xs text-slate-600">Started by: {part.startedBy}</div>
-                                        <div className="mt-1 text-xs text-slate-700">{getRecentRunSummary(part)}</div>
+                                        <div className="mt-1 text-sm font-mono text-indigo-700 dark:text-indigo-300">On: {part.printerName}</div>
+                                        <div className="mt-1 text-xs text-slate-600 dark:text-slate-400">Started by: {part.startedBy}</div>
+                                        <div className="mt-1 text-xs text-slate-700 dark:text-slate-300">{getRecentRunSummary(part)}</div>
                                         {renderRunHistory(part)}
                                     </div>
                                 </div>
@@ -466,15 +466,15 @@ export const CheckpointPrinting = ({ project, onAdvanceToCollection }: { project
                                         size="sm"
                                         variant="outline"
                                         title="Revert to queued"
-                                        className="h-auto w-10 shrink-0 p-0 text-slate-600 hover:bg-slate-100"
+                                        className="h-auto w-10 shrink-0 p-0 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900"
                                         disabled={pendingAction !== null}
                                     >
                                         <Undo2 size={14} />
                                     </Button>
-                                    <Button onClick={() => openFail(part.id)} size="sm" variant="outline" className="gap-2 border-red-300 text-red-800 hover:bg-red-100" disabled={pendingAction !== null}>
+                                    <Button onClick={() => openFail(part.id)} size="sm" variant="outline" className="gap-2 border-red-300 dark:border-red-800 text-red-800 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-950/55" disabled={pendingAction !== null}>
                                         <AlertTriangle size={14} /> Fail
                                     </Button>
-                                    <Button onClick={() => openFinish(part.id)} size="sm" variant="outline" className="flex-1 gap-2 hover:border-green-300 hover:bg-green-100 hover:text-green-800" disabled={pendingAction !== null}>
+                                    <Button onClick={() => openFinish(part.id)} size="sm" variant="outline" className="flex-1 gap-2 hover:border-green-300 dark:hover:border-green-800 hover:bg-green-100 dark:hover:bg-green-950/55 hover:text-green-800 dark:hover:text-green-200" disabled={pendingAction !== null}>
                                         <Check size={14} /> Finish
                                     </Button>
                                 </div>
@@ -484,30 +484,30 @@ export const CheckpointPrinting = ({ project, onAdvanceToCollection }: { project
                 </div>
 
                 <div className="forge-lane forge-lane-teal min-h-[400px] border p-4">
-                    <h3 className="mb-4 flex items-center gap-2 font-bold text-teal-900">
+                    <h3 className="mb-4 flex items-center gap-2 font-bold text-teal-900 dark:text-teal-200">
                         PRINTED
-                        <span className="forge-pill px-2 py-0.5 text-xs text-teal-900">
+                        <span className="forge-pill px-2 py-0.5 text-xs text-teal-900 dark:text-teal-200">
                             {printedParts.length}
                         </span>
                     </h3>
                     <div className="space-y-3">
                         {printedParts.map(part => (
-                            <Card key={part.id} className="border-l-4 border-l-teal-600 bg-white p-3 shadow-sm">
+                            <Card key={part.id} className="border-l-4 border-l-teal-600 bg-white dark:bg-[var(--forge-panel)] p-3 shadow-sm">
                                 <div className="flex gap-3">
                                     {part.imageUrl && (
-                                        <img src={part.imageUrl} alt={part.partName} className="h-12 w-12 rounded border bg-white object-contain" />
+                                        <img src={part.imageUrl} alt={part.partName} className="h-12 w-12 rounded border bg-white dark:bg-[var(--forge-panel)] object-contain" />
                                     )}
                                     <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
-                                        <div className="font-medium text-slate-800">{part.partName}</div>
-                                        {part.sourceFilePath && <div className="mt-1 truncate font-mono text-[11px] text-slate-600" title={part.sourceFilePath}>File: {sourceFileName(part.sourceFilePath)}</div>}
+                                        <div className="font-medium text-slate-800 dark:text-slate-200">{part.partName}</div>
+                                        {part.sourceFilePath && <div className="mt-1 truncate font-mono text-[11px] text-slate-600 dark:text-slate-400" title={part.sourceFilePath}>File: {sourceFileName(part.sourceFilePath)}</div>}
                                         {part.specialInstruction && part.specialInstruction.trim() !== '' && (
-                                            <div className="mt-1 text-sm italic text-teal-700">Note: {part.specialInstruction}</div>
+                                            <div className="mt-1 text-sm italic text-teal-700 dark:text-teal-300">Note: {part.specialInstruction}</div>
                                         )}
-                                        <div className="mt-1 text-sm font-mono text-slate-700">On: {part.printerName}</div>
-                                        <div className="mt-1 text-xs text-slate-600">Started by: {part.startedBy}</div>
-                                        <div className="mt-1 text-xs text-slate-600">Removed by: {part.removedBy}</div>
-                                        <div className="mt-1 text-xs text-slate-700">Status: {getProductionLabel(part.printStatus)}</div>
-                                        <div className="mt-1 text-xs text-slate-700">{getRecentRunSummary(part)}</div>
+                                        <div className="mt-1 text-sm font-mono text-slate-700 dark:text-slate-300">On: {part.printerName}</div>
+                                        <div className="mt-1 text-xs text-slate-600 dark:text-slate-400">Started by: {part.startedBy}</div>
+                                        <div className="mt-1 text-xs text-slate-600 dark:text-slate-400">Removed by: {part.removedBy}</div>
+                                        <div className="mt-1 text-xs text-slate-700 dark:text-slate-300">Status: {getProductionLabel(part.printStatus)}</div>
+                                        <div className="mt-1 text-xs text-slate-700 dark:text-slate-300">{getRecentRunSummary(part)}</div>
                                         {renderRunHistory(part)}
                                     </div>
                                 </div>
@@ -519,7 +519,7 @@ export const CheckpointPrinting = ({ project, onAdvanceToCollection }: { project
                                             size="sm"
                                             variant="outline"
                                             title="Requeue this part"
-                                        className="h-8 gap-2 px-2 py-1 text-slate-600 hover:bg-slate-100"
+                                        className="h-8 gap-2 px-2 py-1 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900"
                                         disabled={pendingAction !== null}
                                         >
                                             <Undo2 size={14} /> Requeue
